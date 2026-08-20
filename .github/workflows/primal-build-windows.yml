@@ -1,0 +1,97 @@
+﻿name: Build Windows installer
+
+# The Mac cannot produce a Windows build: VS Code has no cross-compilation path
+# for win32, so the installer has to be built on Windows. GitHub's hosted
+# windows-2022 runner is the same approach VSCodium uses to ship its releases.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Target architecture
+        type: choice
+        options: [x64, arm64]
+        default: x64
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify-rebrand:
+    # Cheap gate on Linux. If the rebrand has drifted, or a Microsoft endpoint
+    # crept back into product.json, fail here rather than after a 45 minute
+    # Windows build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node --experimental-strip-types primal/rebrand.ts --check
+
+  windows:
+    needs: verify-rebrand
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      # Skip Electron's own postinstall download; the build fetches what it
+      # needs, and the default download is a large duplicate.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      npm_config_arch: ${{ inputs.arch || 'x64' }}
+      npm_config_target_arch: ${{ inputs.arch || 'x64' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Pin npm 10
+        # npm 11 silently ignores the disturl/target/runtime keys in .npmrc, so
+        # native modules would be built against Node's ABI instead of
+        # Electron's and the app would crash on launch. This is not optional.
+        run: npm install -g npm@10
+
+      - name: Show toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify rebrand survived install
+        run: node --experimental-strip-types primal/rebrand.ts --check
+
+      - name: Compile
+        run: npm run gulp vscode-win32-${{ inputs.arch || 'x64' }}-min
+
+      - name: Build inno updater
+        run: npm run gulp vscode-win32-${{ inputs.arch || 'x64' }}-inno-updater
+
+      - name: Build system installer
+        run: npm run gulp vscode-win32-${{ inputs.arch || 'x64' }}-system-setup
+
+      - name: Build user installer
+        run: npm run gulp vscode-win32-${{ inputs.arch || 'x64' }}-user-setup
+
+      - name: Locate installers
+        shell: bash
+        run: |
+          echo "installers produced:"
+          find .build -name '*.exe' -type f 2>/dev/null | while read -r f; do
+            echo "  $f  ($(du -h "$f" | cut -f1))"
+          done
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          # Unsigned, exactly as VSCodium publishes. Signing is a certificate
+          # purchase, not a build change, and can be added later without
+          # touching this workflow.
+          name: primal-code-windows-${{ inputs.arch || 'x64' }}-unsigned
+          path: .build/win32-*/**/*.exe
+          if-no-files-found: error
+          retention-days: 14

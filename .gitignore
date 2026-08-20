@@ -54,3 +54,10 @@ dist
 .v[0-9]*/
 # Local agent validation evidence
 .agent-validation/
+
+# Primal Code: our built-in agent ships prebuilt, but upstream's bare `dist`
+# rule above would silently exclude it and ship an extension with no code.
+# Git will not descend into an excluded directory, so the directory itself has
+# to be re-included before its contents.
+!extensions/primal-code/dist/
+!extensions/primal-code/dist/**

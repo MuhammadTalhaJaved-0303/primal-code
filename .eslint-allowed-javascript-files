@@ -1,21 +1,21 @@
-# Allowlist of pre-existing JavaScript files (.js, .cjs, .mjs).
+
 #
+#
+#
+# Allowlist of pre-existing JavaScript files (.js, .cjs, .mjs).
+# DO NOT ADD NEW ENTRIES. Write new files in TypeScript instead.
+# Lines starting with `#` are comments. Blank lines are ignored.
+# Modifications to this file require sign-off from the CODEOWNERS.
 # This file is consumed by eslint.config.js and gates the
 # `local/code-no-new-javascript-files` lint rule.
-#
-# DO NOT ADD NEW ENTRIES. Write new files in TypeScript instead.
-# Modifications to this file require sign-off from the CODEOWNERS.
-#
-# Lines starting with `#` are comments. Blank lines are ignored.
-
 .github/skills/heap-snapshot-analysis/helpers/streamSnapshot.mjs
 .vscode-test.js
 build/azure-pipelines/common/installPlaywright.js
 build/azure-pipelines/github-check-run.js
 build/builtin/browser-main.js
 build/builtin/main.js
-build/npm/stubs/sharp/index.js
 build/codex/generate-protocol.mjs
+build/npm/stubs/sharp/index.js
 eslint.config.js
 extensions/copilot/.mocha-multi-reporters.js
 extensions/copilot/.mocharc.js
@@ -71,6 +71,12 @@ extensions/microsoft-authentication/packageMocks/keytar/index.js
 extensions/objective-c/build/update-grammars.js
 extensions/php/build/update-grammar.mjs
 extensions/postinstall.mjs
+extensions/primal-code/dist/extension.js
+extensions/primal-code/dist/messages.js
+extensions/primal-code/dist/openai-messages.js
+extensions/primal-code/dist/openai.js
+extensions/primal-code/dist/provider.js
+extensions/primal-code/dist/secrets.js
 extensions/razor/build/update-grammar.mjs
 extensions/rust/build/update-grammar.mjs
 extensions/search-result/syntaxes/generateTMLanguage.js

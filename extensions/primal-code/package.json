@@ -1,0 +1,87 @@
+{
+  "name": "primal-code",
+  "displayName": "Primal Code",
+  "description": "Bring your own OpenAI or Anthropic key and use it as a first-class model everywhere VS Code asks for one: chat, agent mode, inline edits.",
+  "version": "0.2.0",
+  "publisher": "primal-ai",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "claude",
+    "anthropic",
+    "openai",
+    "gpt",
+    "ai",
+    "agent",
+    "byok"
+  ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0A0A0B",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MuhammadTalhaJaved-0303/Tendra"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "primal",
+        "displayName": "Primal Code",
+        "managementCommand": "primal.manageModels"
+      }
+    ],
+    "commands": [
+      {
+        "command": "primal.setApiKey",
+        "title": "Primal: Set API key (OpenAI or Anthropic)",
+        "category": "Primal"
+      },
+      {
+        "command": "primal.clearApiKey",
+        "title": "Primal: Remove an API key",
+        "category": "Primal"
+      },
+      {
+        "command": "primal.manageModels",
+        "title": "Primal: Manage models",
+        "category": "Primal"
+      }
+    ],
+    "configuration": {
+      "title": "Primal Code",
+      "properties": {
+        "primal.maxOutputTokens": {
+          "type": "number",
+          "default": 8000,
+          "minimum": 1024,
+          "maximum": 64000,
+          "description": "Maximum tokens Claude may generate in a single response."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -p ./ -w",
+    "typecheck": "tsc -p ./ --noEmit",
+    "test": "vitest run",
+    "package": "npx --yes @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/vscode": "^1.104.0",
+    "typescript": "^6",
+    "vitest": "^4.1.8"
+  }
+}

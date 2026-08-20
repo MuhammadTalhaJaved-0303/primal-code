@@ -1,41 +1,39 @@
 {
-	"nameShort": "Code - OSS",
-	"nameLong": "Code - OSS",
-	"applicationName": "code-oss",
-	"dataFolderName": ".vscode-oss",
-	"sharedDataFolderName": ".vscode-oss-shared",
-	"win32MutexName": "vscodeoss",
+	"nameShort": "Primal Code",
+	"nameLong": "Primal Code",
+	"applicationName": "primal-code",
+	"dataFolderName": ".primal-code",
+	"sharedDataFolderName": ".primal-code-shared",
+	"win32MutexName": "primalcode",
 	"licenseName": "MIT",
-	"licenseUrl": "https://github.com/microsoft/vscode/blob/main/LICENSE.txt",
-	"serverLicenseUrl": "https://github.com/microsoft/vscode/blob/main/LICENSE.txt",
+	"licenseUrl": "https://github.com/MuhammadTalhaJaved-0303/primal-code/blob/main/LICENSE.txt",
+	"serverLicenseUrl": "https://github.com/MuhammadTalhaJaved-0303/primal-code/blob/main/LICENSE.txt",
 	"serverGreeting": [],
 	"serverLicense": [],
 	"serverLicensePrompt": "",
-	"serverApplicationName": "code-server-oss",
-	"serverDataFolderName": ".vscode-server-oss",
-	"tunnelApplicationName": "code-tunnel-oss",
-	"win32DirName": "Microsoft Code OSS",
-	"win32NameVersion": "Microsoft Code OSS",
-	"win32RegValueName": "CodeOSS",
-	"win32x64AppId": "{{D77B7E06-80BA-4137-BCF4-654B95CCEBC5}",
-	"win32arm64AppId": "{{D1ACE434-89C5-48D1-88D3-E2991DF85475}",
-	"win32x64UserAppId": "{{CC6B787D-37A0-49E8-AE24-8559A032BE0C}",
-	"win32arm64UserAppId": "{{3AEBF0C8-F733-4AD4-BADE-FDB816D53D7B}",
-	"win32AppUserModelId": "Microsoft.CodeOSS",
-	"win32ShellNameShort": "C&ode - OSS",
-	"win32TunnelServiceMutex": "vscodeoss-tunnelservice",
-	"win32TunnelMutex": "vscodeoss-tunnel",
-	"darwinBundleIdentifier": "com.visualstudio.code.oss",
-	"darwinProfileUUID": "47827DD9-4734-49A0-AF80-7E19B11495CC",
-	"darwinProfilePayloadUUID": "CF808BE7-53F3-46C6-A7E2-7EDB98A5E959",
-	"linuxIconName": "code-oss",
+	"serverApplicationName": "primal-code-server",
+	"serverDataFolderName": ".primal-code-server",
+	"tunnelApplicationName": "primal-code-tunnel",
+	"win32DirName": "Primal Code",
+	"win32NameVersion": "Primal Code",
+	"win32RegValueName": "PrimalCode",
+	"win32x64AppId": "{{03058D30-4B25-43A0-AEC6-93CDB637B781}",
+	"win32arm64AppId": "{{C73EB537-63A1-4EE9-A19C-5EBE60136F78}",
+	"win32x64UserAppId": "{{55AD35D7-57FF-4185-A945-54CF6F4DFC13}",
+	"win32arm64UserAppId": "{{8ABA774D-381E-4AEC-A026-30D62C0DCEBD}",
+	"win32AppUserModelId": "PrimalAI.PrimalCode",
+	"win32ShellNameShort": "P&rimal Code",
+	"win32TunnelServiceMutex": "primalcode-tunnelservice",
+	"win32TunnelMutex": "primalcode-tunnel",
+	"darwinBundleIdentifier": "ai.primal.code",
+	"darwinProfileUUID": "12382272-4A6C-4355-B579-F525D4639225",
+	"darwinProfilePayloadUUID": "80AAF0CD-1D28-4DB1-BCA3-DC72FA3B7976",
+	"linuxIconName": "primal-code",
 	"licenseFileName": "LICENSE.txt",
-	"reportIssueUrl": "https://github.com/microsoft/vscode/issues/new",
+	"reportIssueUrl": "https://github.com/MuhammadTalhaJaved-0303/primal-code/issues/new",
 	"nodejsArtifactFeed": "",
 	"electronArtifactFeed": "",
-	"urlProtocol": "code-oss",
-	"agentsTelemetryAppName": "agents",
-	"webviewContentExternalBaseUrlTemplate": "https://{{uuid}}.vscode-cdn.net/insider/ef65ac1ba57f57f2a3961bfe94aa20481caca4c6/out/vs/workbench/contrib/webview/browser/pre/",
+	"urlProtocol": "primal-code",
 	"builtInExtensions": [
 		{
 			"name": "ms-vscode.js-debug-companion",
@@ -86,89 +84,11 @@
 			}
 		}
 	],
-	"defaultChatAgent": {
-		"extensionId": "GitHub.copilot",
-		"chatExtensionId": "GitHub.copilot-chat",
-		"chatExtensionOutputId": "GitHub.copilot-chat.GitHub Copilot Chat.log",
-		"chatExtensionOutputExtensionStateCommand": "github.copilot.debug.extensionState",
-		"documentationUrl": "https://aka.ms/github-copilot-overview",
-		"termsStatementUrl": "https://aka.ms/github-copilot-terms-statement",
-		"privacyStatementUrl": "https://aka.ms/github-copilot-privacy-statement",
-		"skusDocumentationUrl": "https://aka.ms/github-copilot-plans",
-		"optimizeUsageDocumentationUrl": "https://aka.ms/token-usage-tips",
-		"publicCodeMatchesUrl": "https://aka.ms/github-copilot-match-public-code",
-		"managePlanUrl": "https://aka.ms/github-copilot-manage-plan",
-		"upgradePlanUrl": "https://aka.ms/github-copilot-upgrade-plan",
-		"signUpUrl": "https://aka.ms/github-sign-up",
-		"provider": {
-			"default": {
-				"id": "github",
-				"name": "GitHub"
-			},
-			"enterprise": {
-				"id": "github-enterprise",
-				"name": "GHE"
-			},
-			"google": {
-				"id": "google",
-				"name": "Google"
-			},
-			"apple": {
-				"id": "apple",
-				"name": "Apple"
-			}
-		},
-		"providerExtensionId": "vscode.github-authentication",
-		"providerUriSetting": "github-enterprise.uri",
-		"providerScopes": [
-			[
-				"read:user",
-				"user:email",
-				"repo",
-				"workflow"
-			],
-			[
-				"user:email"
-			],
-			[
-				"read:user"
-			]
-		],
-		"entitlementUrl": "https://api.github.com/copilot_internal/user",
-		"entitlementSignupLimitedUrl": "https://api.github.com/copilot_internal/subscribe_limited_user",
-		"chatQuotaExceededContext": "github.copilot.chat.quotaExceeded",
-		"completionsQuotaExceededContext": "github.copilot.completions.quotaExceeded",
-		"walkthroughCommand": "github.copilot.open.walkthrough",
-		"completionsMenuCommand": "github.copilot.toggleStatusMenu",
-		"chatRefreshTokenCommand": "github.copilot.refreshToken",
-		"generateCommitMessageCommand": "github.copilot.git.generateCommitMessage",
-		"resolveMergeConflictsCommand": "github.copilot.git.resolveMergeConflicts",
-		"completionsAdvancedSetting": "github.copilot.advanced",
-		"completionsEnablementSetting": "github.copilot.enable",
-		"nextEditSuggestionsSetting": "github.copilot.nextEditSuggestions.enabled",
-		"tokenEntitlementUrl": "https://api.github.com/copilot_internal/v2/token",
-		"mcpRegistryDataUrl": "https://api.github.com/copilot/mcp_registry",
-		"managedSettingsUrl": "https://api.github.com/copilot_internal/managed_settings"
-	},
-	"trustedExtensionAuthAccess": {
-		"github": [
-			"GitHub.copilot-chat"
-		],
-		"github-enterprise": [
-			"GitHub.copilot-chat"
-		]
-	},
 	"onboardingKeymaps": [
 		{
 			"id": "vscode",
 			"label": "VS Code",
 			"description": "Default keyboard mapping"
-		},
-		{
-			"id": "sublime",
-			"label": "Sublime Text",
-			"extensionId": "ms-vscode.sublime-keybindings",
-			"description": "Keyboard mapping from Sublime Text"
 		},
 		{
 			"id": "intellij",
@@ -187,12 +107,6 @@
 			"label": "Eclipse",
 			"extensionId": "alphabotsec.vscode-eclipse-keybindings",
 			"description": "Keyboard mapping from Eclipse"
-		},
-		{
-			"id": "notepadpp",
-			"label": "Notepad++",
-			"extensionId": "ms-vscode.notepadplusplus-keybindings",
-			"description": "Keyboard mapping from Notepad++"
 		}
 	],
 	"onboardingThemes": [
@@ -233,9 +147,13 @@
 			"type": "light"
 		}
 	],
-	"builtInExtensionsEnabledWithAutoUpdates": [
-		"GitHub.copilot-chat"
-	],
 	"sessionsWindowAllowedExtensions": [],
-	"voiceWsUrl": "wss://falcon-caas.mai.microsoft.com/voice-code/api/v1/realtime/voice"
+	"extensionsGallery": {
+		"serviceUrl": "https://open-vsx.org/vscode/gallery",
+		"itemUrl": "https://open-vsx.org/vscode/item",
+		"resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+		"controlUrl": "",
+		"nlsBaseUrl": "",
+		"publisherUrl": ""
+	}
 }

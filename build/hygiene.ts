@@ -92,10 +92,11 @@ export function hygiene(some: NodeJS.ReadWriteStream | string[] | undefined, run
 	const productJson = es.through(function (file: VinylFile) {
 		const product = JSON.parse(file.contents!.toString('utf8'));
 
-		if (product.extensionsGallery) {
-			console.error(`product.json: Contains 'extensionsGallery'`);
-			errorCount++;
-		}
+		// Upstream forbids a committed extensionsGallery because Microsoft injects
+		// their own from a private distro repo, and an OSS build must not ship it.
+		// Primal Code is a fork with its own gallery (Open VSX, the only one a
+		// non-Microsoft product may lawfully use), so ours is committed on purpose
+		// and primal/rebrand.ts --check asserts it is present and correct.
 
 		this.emit('data', file);
 	});
