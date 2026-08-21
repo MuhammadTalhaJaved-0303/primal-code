@@ -12,7 +12,6 @@ import tseslint from 'typescript-eslint';
 
 import stylistic from '@stylistic/eslint-plugin';
 import * as pluginLocal from './.eslint-plugin-local/index.ts';
-import * as pluginCopilotLocal from './extensions/copilot/.eslintplugin/index.ts';
 import pluginImport from 'eslint-plugin-import';
 import pluginJsdoc from 'eslint-plugin-jsdoc';
 
@@ -2534,7 +2533,6 @@ export default defineConfig(
 		},
 		plugins: {
 			'import': fixupPluginRules(pluginImport),
-			'copilot-local': pluginCopilotLocal,
 		},
 		rules: {
 			'local/code-no-dangerous-type-assertions': 'off',
@@ -2691,7 +2689,6 @@ export default defineConfig(
 			'extensions/copilot/src/extension/**/*.tsx',
 		],
 		plugins: {
-			'copilot-local': pluginCopilotLocal,
 		},
 		rules: {
 			'copilot-local/no-missing-linebreak': 'warn'
@@ -2704,7 +2701,6 @@ export default defineConfig(
 			'extensions/copilot/**/*.test.tsx',
 		],
 		plugins: {
-			'copilot-local': pluginCopilotLocal,
 		},
 		rules: {
 			'copilot-local/no-test-only': 'warn'
