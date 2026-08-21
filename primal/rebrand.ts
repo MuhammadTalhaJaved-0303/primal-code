@@ -141,7 +141,14 @@ function verify(p) {
   const problems = [];
 
   for (const [k, v] of Object.entries(SET)) {
-    if (p[k] !== v) problems.push(`${k} is ${JSON.stringify(p[k])}, expected ${JSON.stringify(v)}`);
+    // Structural, not reference, comparison. SET holds arrays and objects as
+    // well as strings, and `!==` on two structurally identical arrays is always
+    // true, which produced the useless "is [], expected []".
+    const same =
+      typeof v === "object" && v !== null
+        ? JSON.stringify(p[k]) === JSON.stringify(v)
+        : p[k] === v;
+    if (!same) problems.push(`${k} is ${JSON.stringify(p[k])}, expected ${JSON.stringify(v)}`);
   }
   for (const k of DELETE) {
     if (k in p) problems.push(`${k} should have been removed`);
