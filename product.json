@@ -155,5 +155,6 @@
 		"controlUrl": "",
 		"nlsBaseUrl": "",
 		"publisherUrl": ""
-	}
+	},
+	"builtInExtensionsEnabledWithAutoUpdates": []
 }

@@ -62,6 +62,12 @@ const SET = {
 
   darwinBundleIdentifier: "ai.primal.code",
 
+  // Must be an array, not absent: extensionsScannerService does an unguarded
+  // `for...of` over it, so deleting the key made extension scanning throw
+  // "is not iterable" and no extensions were listed. Empty is the correct
+  // meaning here, since we ship no auto-updating built-ins.
+  builtInExtensionsEnabledWithAutoUpdates: [] as string[],
+
   licenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   serverLicenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   reportIssueUrl: `${REPO}/issues/new`,
@@ -91,7 +97,6 @@ const GALLERY = {
 const DELETE = [
   "defaultChatAgent", // GitHub Copilot
   "trustedExtensionAuthAccess", // grants Copilot our auth tokens
-  "builtInExtensionsEnabledWithAutoUpdates", // ships GitHub.copilot-chat
   "webviewContentExternalBaseUrlTemplate", // *.vscode-cdn.net
   "voiceWsUrl", // falcon-caas.mai.microsoft.com
   "agentsTelemetryAppName",
