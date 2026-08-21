@@ -88,7 +88,29 @@ interface IMcpRegistryResponse {
 	readonly mcp_registries: ReadonlyArray<IMcpRegistryProvider>;
 }
 
-function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent): IDefaultAccountConfig {
+function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent | undefined): IDefaultAccountConfig {
+	// Primal Code ships no defaultChatAgent: it is Copilot's account plumbing and
+	// a BYOK product has no account to sign in to. Return an inert config rather
+	// than dereferencing undefined, which surfaced as an unhandled rejection on
+	// every startup. Empty ids simply match no provider and no extension, which
+	// is the correct meaning of "there is no default account".
+	if (!defaultChatAgent) {
+		return {
+			preferredExtensions: [],
+			authenticationProvider: {
+				default: { id: '', name: '' },
+				enterprise: { id: '', name: '' },
+				enterpriseProviderConfig: '',
+				enterpriseProviderUriSetting: '',
+				scopes: [],
+			},
+			entitlementUrl: '',
+			tokenEntitlementUrl: '',
+			mcpRegistryDataUrl: '',
+			managedSettingsUrl: '',
+		};
+	}
+
 	return {
 		preferredExtensions: [
 			defaultChatAgent.chatExtensionId,

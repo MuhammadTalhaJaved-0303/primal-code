@@ -10,7 +10,6 @@ import { isCancellationError } from '../../../../base/common/errors.js';
 import { StopWatch } from '../../../../base/common/stopwatch.js';
 import { URI } from '../../../../base/common/uri.js';
 import { isWindows, isMacintosh, isLinux } from '../../../../base/common/platform.js';
-import { assertDefined } from '../../../../base/common/types.js';
 import { FileAccess } from '../../../../base/common/network.js';
 import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
 import { KeyCode } from '../../../../base/common/keyCodes.js';
@@ -77,7 +76,13 @@ type OnboardingActionEvent = {
 
 type EnterpriseSignInUiState = 'options' | 'instance' | 'progress';
 
-assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');
+// Primal Code: upstream asserts here at module top level, so a missing
+// defaultChatAgent throws during import and takes the entire workbench bundle
+// down as a blank window. We deliberately ship no default chat agent: that field
+// is Copilot's account plumbing (sign-up, billing, quota, OAuth providers) and a
+// BYOK agent has none of it. Read it softly and skip the wizard in show().
+// Typed non-optional upstream, but genuinely absent in our product.json, so
+// show() guards at runtime before any of the wizard UI can touch it.
 const defaultChat = product.defaultChatAgent;
 
 /**
@@ -166,6 +171,12 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	show(): void {
+		if (!defaultChat) {
+			// Nothing to sign in to. Returning leaves the welcome page visible
+			// underneath, the same outcome as the user dismissing the wizard.
+			return;
+		}
+
 		if (this.overlay) {
 			return;
 		}
