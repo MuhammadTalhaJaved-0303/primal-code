@@ -93,5 +93,10 @@ jobs:
           # touching this workflow.
           name: primal-code-windows-${{ inputs.arch || 'x64' }}-unsigned
           path: .build/win32-*/**/*.exe
+          # `.build` is a dot-directory, and upload-artifact treats every path
+          # segment beginning with a dot as hidden. Without this the glob
+          # matches both installers and then silently discards them, failing
+          # with "No files were found" on a build that in fact succeeded.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
