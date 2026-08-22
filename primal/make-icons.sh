@@ -23,7 +23,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-RENDERER="${PUPPETEER_PROJECT:-/Users/mtj-s2s/Desktop/primal-ai-migration-2026-08-15/project}"
+# Puppeteer lives in the sibling studio repo, so this tree does not have to
+# carry a Chrome download. Resolved relative to this repo rather than absolute,
+# so the path survives the workspace being moved or renamed.
+RENDERER="${PUPPETEER_PROJECT:-$ROOT/../primal-studio}"
+if [[ ! -d "$RENDERER/node_modules/puppeteer" ]]; then
+  echo "error: puppeteer not found under $RENDERER" >&2
+  echo "set PUPPETEER_PROJECT to a project that has puppeteer installed" >&2
+  exit 1
+fi
 
 echo "rasterising $SVG at 1024px"
 cat > "$WORK/render.mjs" <<'JS'
