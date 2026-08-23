@@ -42,6 +42,19 @@ ln -s /Applications "$STAGE/Applications"
 # A .background dir would go here if we add artwork later; a plain window is
 # still the conventional macOS install experience.
 
+# Ad-hoc sign the staged bundle. The bare build carries only linker-generated
+# signatures with no sealed resources; codesign reports that as "code has no
+# resources but signature indicates they must be present", and Apple Silicon
+# macOS refuses to launch such an app on any other machine. An ad-hoc deep
+# sign (identity "-") seals the bundle so it verifies and launches. Gatekeeper
+# still warns on first open because there is no Developer ID behind it — that
+# needs an Apple Developer account and notarization, not a build change — so
+# the right-click-Open note below stays.
+echo "ad-hoc signing"
+codesign --force --deep --sign - "$STAGE/Primal Code.app"
+codesign --verify --deep --strict "$STAGE/Primal Code.app"
+echo "signature verified"
+
 rm -f "$OUT"
 echo "building dmg"
 hdiutil create \
@@ -56,6 +69,7 @@ SIZE="$(du -h "$OUT" | cut -f1 | tr -d ' ')"
 echo ""
 echo "wrote $OUT ($SIZE)"
 echo ""
-echo "Note: this build is unsigned. On first launch macOS Gatekeeper will refuse"
-echo "it. Right-click the app and choose Open, or run:"
+echo "Note: this build is ad-hoc signed (valid signature, no Developer ID)."
+echo "On first launch macOS Gatekeeper will warn. Right-click the app and"
+echo "choose Open, or run:"
 echo "  xattr -dr com.apple.quarantine '/Applications/Primal Code.app'"
