@@ -484,6 +484,9 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	// =====================================================================
 
 	private _renderSignInStep(container: HTMLElement): void {
+		// Unreachable when the product has no default chat agent — show()
+		// returns before the wizard opens — but each entry point must prove it.
+		if (!defaultChat) { return; }
 		const wrapper = append(container, $('.onboarding-a-signin'));
 		const brand = append(wrapper, $('.onboarding-a-signin-brand'));
 		const brandIcon = append(brand, $('span.onboarding-a-signin-brand-icon'));
@@ -581,6 +584,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	private static readonly GHE_INPUT_ACTION_PADDING = 28;
 
 	private _renderEnterpriseInstanceForm(actions: HTMLElement): void {
+		if (!defaultChat) { return; }
 		const enterprisePromptLabel = this._getEnterpriseInstancePromptLabel();
 
 		const container = append(actions, $('.onboarding-a-signin-ghe-input'));
@@ -668,6 +672,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	private _renderEnterpriseSignInProgress(actions: HTMLElement): void {
+		if (!defaultChat) { return; }
 		const container = append(actions, $('.onboarding-a-signin-ghe-progress'));
 		container.setAttribute('aria-live', 'polite');
 		const spinner = append(container, $('span'));
@@ -678,6 +683,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	private _getEnterpriseInstancePromptLabel(): string {
+		if (!defaultChat) { return ''; }
 		return localize('onboarding.signIn.enterprise.prompt', "What is your {0} instance?", defaultChat.provider.enterprise.name);
 	}
 
@@ -750,6 +756,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	private async _handleEnterpriseSignIn(): Promise<void> {
+		if (!defaultChat) { return; }
 		const existingUri = this.configurationService.getValue<string>(defaultChat.providerUriSetting);
 		if (typeof existingUri !== 'string' || !GHE_FULL_URI_REGEX.test(existingUri)) {
 			this.enterpriseInstanceValue = existingUri ?? '';
@@ -763,6 +770,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	private async _submitEnterpriseInstance(resolvedUri: string): Promise<void> {
+		if (!defaultChat) { return; }
 		try {
 			await this.configurationService.updateValue(defaultChat.providerUriSetting, resolvedUri, ConfigurationTarget.USER);
 			this.enterpriseInstanceValue = resolvedUri;
@@ -775,6 +783,7 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
 	}
 
 	private async _runEnterpriseSignInSetup(): Promise<void> {
+		if (!defaultChat) { return; }
 		const watch = this.enterpriseSignInWatch ?? StopWatch.create();
 		const provider = defaultChat.provider.enterprise.id;
 		this._setEnterpriseSignInUiState('progress');

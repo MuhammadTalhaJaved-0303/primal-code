@@ -1429,9 +1429,13 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			if (!numItems) {
 				const defaultAgent = this.chatAgentService.getDefaultAgent(this.location, this.input.currentModeKind);
 				let additionalMessage: string | IMarkdownString | undefined;
-				if (this.chatEntitlementService.anonymous && !this.chatEntitlementService.sentiment.completed) {
-					const providers = product.defaultChatAgent.provider;
-					additionalMessage = new MarkdownString(localize({ key: 'settings', comment: ['{Locked="]({2})"}', '{Locked="]({3})"}'] }, "By continuing with {0} Copilot, you agree to {1}'s [Terms]({2}) and [Privacy Statement]({3}).", providers.default.name, providers.default.name, product.defaultChatAgent.termsStatementUrl, product.defaultChatAgent.privacyStatementUrl), { isTrusted: true });
+				// The Copilot terms notice only makes sense when the product has
+				// a default chat agent; without one, fall through to the agent's
+				// own welcome message.
+				const defaultChatAgent = product.defaultChatAgent;
+				if (defaultChatAgent && this.chatEntitlementService.anonymous && !this.chatEntitlementService.sentiment.completed) {
+					const providers = defaultChatAgent.provider;
+					additionalMessage = new MarkdownString(localize({ key: 'settings', comment: ['{Locked="]({2})"}', '{Locked="]({3})"}'] }, "By continuing with {0} Copilot, you agree to {1}'s [Terms]({2}) and [Privacy Statement]({3}).", providers.default.name, providers.default.name, defaultChatAgent.termsStatementUrl, defaultChatAgent.privacyStatementUrl), { isTrusted: true });
 				} else {
 					additionalMessage = defaultAgent?.metadata.additionalWelcomeMessage;
 				}

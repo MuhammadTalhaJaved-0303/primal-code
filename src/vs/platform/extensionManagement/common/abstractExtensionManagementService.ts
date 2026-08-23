@@ -984,7 +984,10 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
 		if (checked.indexOf(extension) !== -1) {
 			return [];
 		}
-		if (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {
+		// No default chat agent in this product means there is nothing to
+		// shield from pack uninstalls; every extension is treated normally.
+		const defaultChatAgentId = this.productService.defaultChatAgent?.extensionId;
+		if (defaultChatAgentId && areSameExtensions(extension.identifier, { id: defaultChatAgentId })) {
 			return [];
 		}
 		checked.push(extension);

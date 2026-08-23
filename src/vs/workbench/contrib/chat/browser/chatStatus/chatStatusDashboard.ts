@@ -419,6 +419,9 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private renderInlineSuggestionsSection(hasContentAbove: boolean): void {
+		// Completions and setup UI belong to the default chat agent; without
+		// one (our product.json ships none) the section simply does not render.
+		if (!defaultChat) { return; }
 		const nonCollapsible = !!this.options?.disableQuickSettingsCollapsible;
 		const collapsed = !nonCollapsible && this.storageService.getBoolean(ChatStatusDashboard.QUICK_SETTINGS_COLLAPSED_KEY, StorageScope.PROFILE, true);
 
@@ -580,6 +583,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private renderSetupSection(): void {
+		if (!defaultChat) { return; }
 		const hasByokModels = this.chatEntitlementService.hasByokModels;
 		const newUser = isNewUser(this.chatEntitlementService) && !hasByokModels;
 		const anonymousUser = this.chatEntitlementService.anonymous;
@@ -969,6 +973,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private createSettings(container: HTMLElement): void {
+		if (!defaultChat) { return; }
 		const modeId = this.editorService.activeTextEditorLanguageId;
 		const settings = container.appendChild($('div.settings'));
 
@@ -1038,10 +1043,12 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private createInlineSuggestionsSetting(container: HTMLElement, label: string, modeId: string | undefined): void {
+		if (!defaultChat) { return; }
 		this.createSetting(container, [defaultChat.completionsEnablementSetting], label, this.getCompletionsSettingAccessor(modeId));
 	}
 
 	private createTriStateLanguageSetting(container: HTMLElement, label: string, modeId: string, onStateChange: () => void): void {
+		if (!defaultChat) { return; }
 		const settingId = defaultChat.completionsEnablementSetting;
 
 		const getState = (): boolean | 'mixed' => {
@@ -1144,6 +1151,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private findConfiguredCompletionsValues(modeId?: string): { target: ConfigurationTarget; value: Record<string, boolean> }[] {
+		if (!defaultChat) { return []; }
 		const inspected = this.configurationService.inspect<Record<string, boolean>>(defaultChat.completionsEnablementSetting);
 		const result: { target: ConfigurationTarget; value: Record<string, boolean> }[] = [];
 		for (const target of completionsConfigurationTargets) {
@@ -1156,6 +1164,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private getCompletionsSettingAccessor(modeId = '*'): ISettingsAccessor {
+		if (!defaultChat) { return { readSetting: () => false, writeSetting: async () => undefined }; }
 		const settingId = defaultChat.completionsEnablementSetting;
 
 		return {
@@ -1178,6 +1187,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private createNextEditSuggestionsSetting(container: HTMLElement, label: string, completionsSettingAccessor: ISettingsAccessor): void {
+		if (!defaultChat) { return; }
 		const nesSettingId = defaultChat.nextEditSuggestionsSetting;
 		const completionsSettingId = defaultChat.completionsEnablementSetting;
 		const resource = EditorResourceAccessor.getOriginalUri(this.editorService.activeEditor, { supportSideBySide: SideBySideEditor.PRIMARY });
@@ -1215,6 +1225,7 @@ export class ChatStatusDashboard extends DomWidget {
 	}
 
 	private createCompletionsSnooze(container: HTMLElement, label: string): void {
+		if (!defaultChat) { return; }
 		const isEnabled = () => {
 			const completionsEnabled = isCompletionsEnabled(this.configurationService);
 			const completionsEnabledActiveLanguage = isCompletionsEnabled(this.configurationService, this.editorService.activeTextEditorLanguageId);

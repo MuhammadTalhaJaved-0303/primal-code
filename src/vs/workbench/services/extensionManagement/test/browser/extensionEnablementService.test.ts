@@ -1186,8 +1186,14 @@ suite('ExtensionEnablementService Test', () => {
 		assert.deepStrictEqual((<IExtension>target.args[0][0][0]).identifier, { id: 'pub.a' });
 	});
 
-	test('test chat extension is disabled on profile switch when setup is not completed', async () => {
-		const chatExtensionId = productService.defaultChatAgent!.chatExtensionId;
+	test('test chat extension is disabled on profile switch when setup is not completed', async function () {
+		const chatExtensionId = productService.defaultChatAgent?.chatExtensionId;
+		if (!chatExtensionId) {
+			// The behavior under test only exists in products that ship a
+			// default chat agent; ours does not. The old `!` assertion made
+			// this test throw at runtime instead of skipping.
+			this.skip();
+		}
 		const chatExtension = aLocalExtension(chatExtensionId, undefined, ExtensionType.System);
 		installed.push(chatExtension);
 

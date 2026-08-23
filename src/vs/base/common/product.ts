@@ -269,7 +269,12 @@ export interface IProductConfiguration {
 	readonly commonlyUsedSettings?: string[];
 	readonly aiGeneratedWorkspaceTrust?: IAiGeneratedWorkspaceTrust;
 
-	readonly defaultChatAgent: IDefaultChatAgent;
+	// Optional because our product.json ships without it (the rebrand deletes
+	// the Copilot default agent). Upstream declares it required, which is how
+	// two unguarded-deref crashes reached the packaged app: the compiler could
+	// not see the deletion. Keep it optional so every use site must handle
+	// absence.
+	readonly defaultChatAgent?: IDefaultChatAgent;
 	readonly chatParticipantRegistry?: string;
 	readonly chatSessionRecommendations?: IChatSessionRecommendation[];
 	readonly emergencyAlertUrl?: string;
