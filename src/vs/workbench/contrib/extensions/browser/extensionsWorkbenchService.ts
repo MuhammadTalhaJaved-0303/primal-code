@@ -2864,7 +2864,12 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
 		}
 
 		const extensionsToUninstall: UninstallExtensionInfo[] = [{ extension: extension.local }];
-		if (!areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {
+		// Pack expansion is skipped only when the uninstalled extension IS the
+		// default chat agent. With no default chat agent in the product, no
+		// extension can be it, so expansion always runs — the guard must keep
+		// the negation intact (a bare `?.` here would invert the behavior).
+		const defaultChatAgentId = this.productService.defaultChatAgent?.extensionId;
+		if (!defaultChatAgentId || !areSameExtensions(extension.identifier, { id: defaultChatAgentId })) {
 			for (const packExtension of this.getAllPackedExtensions(extension, this.local)) {
 				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
 					extensionsToUninstall.push({ extension: packExtension.local });
