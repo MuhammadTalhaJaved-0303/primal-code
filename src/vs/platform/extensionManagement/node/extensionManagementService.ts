@@ -340,7 +340,15 @@ export class ExtensionManagementService extends AbstractExtensionManagementServi
 	private async downloadExtension(extension: IGalleryExtension, operation: InstallOperation, verifySignature: boolean, clientTargetPlatform?: TargetPlatform): Promise<{ readonly location: URI; readonly verificationStatus: ExtensionSignatureVerificationCode | undefined }> {
 		if (verifySignature) {
 			const value = this.configurationService.getValue(VerifyExtensionSignatureConfigKey);
-			verifySignature = isBoolean(value) ? value : true;
+			// Fall back to NOT verifying when the setting is unregistered. The
+			// workbench registers extensions.verifySignature (default false in
+			// this product — the proprietary verifier is not shipped), but the
+			// CLI process (`code --install-extension`, cliProcessMain) builds a
+			// bare ConfigurationService without workbench contributions, so the
+			// value is undefined there. Falling back to true made every CLI
+			// install throw "Signature verification was not executed" while GUI
+			// installs worked.
+			verifySignature = isBoolean(value) ? value : false;
 		}
 		const { location, verificationStatus } = await this.extensionsDownloader.download(extension, operation, verifySignature, clientTargetPlatform);
 		const shouldRequireSignature = shouldRequireRepositorySignatureFor(extension.private, await this.extensionGalleryManifestService.getExtensionGalleryManifest());
