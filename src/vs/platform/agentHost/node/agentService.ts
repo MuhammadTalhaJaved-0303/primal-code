@@ -1322,7 +1322,7 @@ export class AgentService extends Disposable implements IAgentService {
 	private async _awaitInitialProviderMigration(): Promise<void> {
 		const providers = [...this._providers.values()];
 		const results = await Promise.allSettled(providers.map(provider => this._initialProviderMigrations.get(provider.id) ?? Promise.resolve()));
-		const retries: Promise<void>[] = [];
+		const retries: { providerId: string; promise: Promise<void> }[] = [];
 		for (let index = 0; index < results.length; index++) {
 			const result = results[index];
 			if (result.status === 'rejected') {
@@ -1330,10 +1330,20 @@ export class AgentService extends Disposable implements IAgentService {
 				this._logService.warn(`[AgentService] initial provider catalog for ${provider.id} was unavailable; retrying before listing sessions`, result.reason);
 				const retry = this._ensureLegacyChatsMigrated(provider, true);
 				this._initialProviderMigrations.set(provider.id, retry);
-				retries.push(retry);
+				retries.push({ providerId: provider.id, promise: retry });
 			}
 		}
-		await Promise.all(retries);
+		// A provider whose retry also fails must not take the whole session
+		// list down with it: Promise.all here re-threw one provider's rejection
+		// into _computeSessions, so a single broken provider (e.g. a missing
+		// CLI) left the Agents view permanently empty for every provider.
+		const retryResults = await Promise.allSettled(retries.map(retry => retry.promise));
+		for (let index = 0; index < retryResults.length; index++) {
+			const result = retryResults[index];
+			if (result.status === 'rejected') {
+				this._logService.warn(`[AgentService] initial provider catalog for ${retries[index].providerId} is still unavailable after retry; listing sessions without it`, result.reason);
+			}
+		}
 	}
 
 	/**

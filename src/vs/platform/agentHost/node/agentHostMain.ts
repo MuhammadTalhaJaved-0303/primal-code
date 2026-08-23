@@ -30,7 +30,7 @@ import { IAgentHostManagedSettingsService } from './agentHostManagedSettingsServ
 import { IAgentHostGitHubEndpointService } from './agentHostGitHubEndpointService.js';
 import { IAgentHostCompletions } from './agentHostCompletions.js';
 import { IAgentHostTerminalManager } from './agentHostTerminalManager.js';
-import { CopilotAgent } from './copilot/copilotAgent.js';
+import { CopilotAgent, copilotCliAvailable } from './copilot/copilotAgent.js';
 import { IAgentHostWorktreeIsolation, WorktreeIsolation } from './shared/worktreeIsolation.js';
 import { CopilotApiService, ICopilotApiService } from './shared/copilotApiService.js';
 import { ClaudeAgent } from './claude/claudeAgent.js';
@@ -252,7 +252,16 @@ async function startAgentHost(): Promise<void> {
 		diServices.set(IClaudeProxyService, claudeProxyService);
 		const codexProxyService = disposables.add(instantiationService.createInstance(CodexProxyService));
 		diServices.set(ICodexProxyService, codexProxyService);
-		agentService.registerProvider(instantiationService.createInstance(CopilotAgent));
+		// Copilot gets the same treatment as Claude and Codex below: only
+		// register the provider when its runtime is actually shipped. Our build
+		// strips @github/copilot, and an unconditionally registered provider
+		// fails on every Agents-view poll and (via the migration await in
+		// AgentService) empties the session list for every other provider too.
+		if (!environmentService.isBuilt || await copilotCliAvailable()) {
+			agentService.registerProvider(instantiationService.createInstance(CopilotAgent));
+		} else {
+			logService.info('[AgentHost] @github/copilot CLI is not bundled; skipping Copilot provider registration');
+		}
 		// Claude and Codex providers are gated on two things:
 		//  1. The user-facing enable toggle (`chat.agentHost.<x>Agent.enabled`,
 		//     forwarded as an env var by the starters). Claude defaults to on,

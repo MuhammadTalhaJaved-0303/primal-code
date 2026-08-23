@@ -227,6 +227,20 @@ async function resolveCopilotCliPath(nodeModulesUri: URI): Promise<string> {
 	throw new Error(`Unable to resolve @github/copilot CLI path. Tried: ${tried.join(', ')}`);
 }
 
+/**
+ * Whether the bundled Copilot CLI can be resolved. Builds that do not ship
+ * `@github/copilot` (ours strips it) use this to skip registering the Copilot
+ * provider at all, instead of registering it and failing on every poll.
+ */
+export async function copilotCliAvailable(): Promise<boolean> {
+	try {
+		await resolveCopilotCliPath(FileAccess.asFileUri(getAppNodeModulesPath()));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export type ICopilotPluginInfo = IParsedPlugin & {
 	readonly pluginDir?: URI;
 	readonly sourceUri?: URI;
