@@ -331,7 +331,12 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
 			[VerifyExtensionSignatureConfigKey]: {
 				type: 'boolean',
 				description: localize('extensions.verifySignature', "When enabled, extensions are verified to be signed before getting installed."),
-				default: true,
+				// Signature verification needs @vscode/vsce-sign, which is
+				// Microsoft-proprietary and absent from OSS builds like ours. With
+				// the default on, every install throws "Signature verification was
+				// not executed" and no extension can be installed at all. Same
+				// default VSCodium ships.
+				default: false,
 				scope: ConfigurationScope.APPLICATION,
 				included: isNative
 			},
