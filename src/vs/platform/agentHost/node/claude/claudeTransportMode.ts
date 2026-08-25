@@ -3,7 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { readFileSync } from 'fs';
+import { execFileSync } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
 import { parse as parseJSONC, type ParseError } from '../../../../base/common/json.js';
 import { join } from '../../../../base/common/path.js';
 import { isFalsyOrWhitespace } from '../../../../base/common/strings.js';
@@ -111,13 +112,51 @@ type ClaudeNativeEnv = NonNullable<ValidatorType<typeof claudeSettingsEnvValidat
  * that file's `apiKeyHelper`. Each source is read independently, so a malformed
  * value never masks a usable one.
  */
-export function detectExistingClaudeSetup(homeDir: string, env: NodeJS.ProcessEnv = process.env): boolean {
+export function detectExistingClaudeSetup(homeDir: string, env: NodeJS.ProcessEnv = process.env, probeStoredCliCredentials = true): boolean {
 	if (hasNativeClaudeEnv(env)) {
 		return true;
 	}
 	const settings = readJsonFile(join(homeDir, '.claude', 'settings.json'));
 	return hasNativeClaudeEnv(claudeSettingsEnvValidator.validate(settings).content?.env)
-		|| hasValue(claudeApiKeyHelperValidator.validate(settings).content?.apiKeyHelper);
+		|| hasValue(claudeApiKeyHelperValidator.validate(settings).content?.apiKeyHelper)
+		|| (probeStoredCliCredentials && hasStoredClaudeCliCredentials(homeDir));
+}
+
+/**
+ * Whether the Claude Code CLI has a stored login on this machine — the
+ * subscription (claude.ai) sign-in that `claude login` writes to the macOS
+ * keychain ("Claude Code-credentials") or, elsewhere, to
+ * `~/.claude/.credentials.json`. The SDK subprocess resolves these on its own,
+ * so their presence makes a native setup usable without any env credential.
+ * The probe result is cached for the process lifetime (an agent-host restart
+ * re-probes); tests opt out via the parameter above to stay machine-independent.
+ */
+let storedCliCredentialsCache: boolean | undefined;
+
+/**
+ * Test-only: pins the stored-CLI-credentials probe so suites running on a
+ * machine with a real Claude Code login stay deterministic. Pass `undefined`
+ * to restore probing.
+ */
+export function overrideStoredClaudeCliCredentialsForTests(value: boolean | undefined): void {
+	storedCliCredentialsCache = value;
+}
+
+function hasStoredClaudeCliCredentials(homeDir: string): boolean {
+	if (storedCliCredentialsCache !== undefined) {
+		return storedCliCredentialsCache;
+	}
+	try {
+		if (process.platform === 'darwin') {
+			execFileSync('security', ['find-generic-password', '-s', 'Claude Code-credentials'], { stdio: 'ignore', timeout: 5000 });
+			storedCliCredentialsCache = true;
+		} else {
+			storedCliCredentialsCache = existsSync(join(homeDir, '.claude', '.credentials.json'));
+		}
+	} catch {
+		storedCliCredentialsCache = false;
+	}
+	return storedCliCredentialsCache;
 }
 
 /** True when any recognized native-Claude key carries a usable value. */

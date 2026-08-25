@@ -253,6 +253,29 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 	 * environment wins — a user who exports their own keeps it.
 	 */
 	private async _resolveAnthropicKeyEnv(inheritedEnv: typeof process.env): Promise<typeof process.env> {
+		const claudeEnv = await this._resolveClaudeHarnessEnv(inheritedEnv);
+		const openaiEnv = await this._resolveOpenAiKeyEnv(inheritedEnv);
+		return { ...claudeEnv, ...openaiEnv };
+	}
+
+	/**
+	 * The stored OpenAI key as `OPENAI_API_KEY` for the Codex harness and any
+	 * terminal tooling the agent spawns; an inherited value wins.
+	 */
+	private async _resolveOpenAiKeyEnv(inheritedEnv: typeof process.env): Promise<typeof process.env> {
+		if (!isFalsyOrWhitespace(inheritedEnv['OPENAI_API_KEY'])) {
+			return {};
+		}
+		try {
+			const key = await this._readProviderKey('openai');
+			return key ? { OPENAI_API_KEY: key } : {};
+		} catch (error) {
+			this._logService.error('[AgentHostStarter] Failed to read the stored OpenAI API key.', error);
+			return {};
+		}
+	}
+
+	private async _resolveClaudeHarnessEnv(inheritedEnv: typeof process.env): Promise<typeof process.env> {
 		const hasExistingCredential = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN']
 			.some(name => !isFalsyOrWhitespace(inheritedEnv[name]));
 		if (hasExistingCredential) {
@@ -269,6 +292,12 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 				return {};
 			}
 			if (provider.id === 'anthropic') {
+				// A Claude subscription token from `claude setup-token` is not an
+				// API key — the SDK reads it from its own variable.
+				if (key.startsWith('sk-ant-oat')) {
+					this._logService.info('[AgentHostStarter] Forwarding the stored Claude subscription token to the agent host environment.');
+					return { CLAUDE_CODE_OAUTH_TOKEN: key };
+				}
 				this._logService.info('[AgentHostStarter] Forwarding the stored Anthropic API key to the agent host environment.');
 				return { ANTHROPIC_API_KEY: key };
 			}

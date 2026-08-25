@@ -10,6 +10,7 @@ import type { CCAModel } from '@vscode/copilot-api';
 
 import assert from 'assert';
 import { isCustomizationEnabled } from '../../common/customizationEnablement.js';
+import { overrideStoredClaudeCliCredentialsForTests } from '../../node/claude/claudeTransportMode.js';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import {
@@ -1241,6 +1242,11 @@ function reducerBackedEnablementService(stateManager: AgentHostStateManager): IC
 }
 
 // #endregion
+
+// Pin the stored-CLI-credentials probe off for every suite in this file: on a
+// developer machine with a real Claude Code login, the keychain would otherwise
+// make "no native setup" scenarios impossible to construct.
+overrideStoredClaudeCliCredentialsForTests(false);
 
 suite('ClaudeAgent', () => {
 

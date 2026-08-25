@@ -61,43 +61,43 @@ suite('claudeTransportMode', () => {
 
 		test('detects each env-var credential (and ignores a blank value)', () => {
 			assert.deepStrictEqual({
-				none: detectExistingClaudeSetup(homeDir, {}),
-				apiKey: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: 'sk-ant-api-x' }),
-				authToken: detectExistingClaudeSetup(homeDir, { ANTHROPIC_AUTH_TOKEN: 'sk-ant-auth-x' }),
-				baseUrl: detectExistingClaudeSetup(homeDir, { ANTHROPIC_BASE_URL: 'https://gateway.example/v1' }),
-				oauthToken: detectExistingClaudeSetup(homeDir, { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-x' }),
-				emptyValue: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: '' }),
-				whitespaceValue: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: '   ' }),
+				none: detectExistingClaudeSetup(homeDir, {}, false),
+				apiKey: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: 'sk-ant-api-x' }, false),
+				authToken: detectExistingClaudeSetup(homeDir, { ANTHROPIC_AUTH_TOKEN: 'sk-ant-auth-x' }, false),
+				baseUrl: detectExistingClaudeSetup(homeDir, { ANTHROPIC_BASE_URL: 'https://gateway.example/v1' }, false),
+				oauthToken: detectExistingClaudeSetup(homeDir, { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-x' }, false),
+				emptyValue: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: '' }, false),
+				whitespaceValue: detectExistingClaudeSetup(homeDir, { ANTHROPIC_API_KEY: '   ' }, false),
 			}, { none: false, apiKey: true, authToken: true, baseUrl: true, oauthToken: true, emptyValue: false, whitespaceValue: false });
 		});
 
 		test('detects a credential in the settings.json env block (empty env injected)', () => {
 			const results: Record<string, boolean> = {};
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_API_KEY: 'sk-ant-api-x' } }));
-			results.apiKey = detectExistingClaudeSetup(homeDir, {});
+			results.apiKey = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'sk-ant-auth-x' } }));
-			results.authToken = detectExistingClaudeSetup(homeDir, {});
+			results.authToken = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'https://gateway.example/v1' } }));
-			results.baseUrl = detectExistingClaudeSetup(homeDir, {});
+			results.baseUrl = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-x' } }));
-			results.oauthToken = detectExistingClaudeSetup(homeDir, {});
+			results.oauthToken = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_API_KEY: '' } }));
-			results.emptyValue = detectExistingClaudeSetup(homeDir, {});
+			results.emptyValue = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_API_KEY: '   ' } }));
-			results.whitespaceValue = detectExistingClaudeSetup(homeDir, {});
+			results.whitespaceValue = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ model: 'claude-sonnet-4-5' }));
-			results.noEnvBlock = detectExistingClaudeSetup(homeDir, {});
+			results.noEnvBlock = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings('not json');
-			results.malformed = detectExistingClaudeSetup(homeDir, {});
+			results.malformed = detectExistingClaudeSetup(homeDir, {}, false);
 			// The tolerant parser salvages a partial object from a truncated file
 			// rather than failing, so the credential it recovers must not count —
 			// the CLI reading the same file would not get one.
 			writeSettings('{ "env": { "ANTHROPIC_API_KEY": "sk-ant-api-x"');
-			results.truncated = detectExistingClaudeSetup(homeDir, {});
+			results.truncated = detectExistingClaudeSetup(homeDir, {}, false);
 			// Read with the same tolerant parser VS Code uses for every other
 			// hand-edited config, so comments and a trailing comma still resolve.
 			writeSettings('{\n\t// my key\n\t"env": { "ANTHROPIC_API_KEY": "sk-ant-api-x", },\n}');
-			results.jsonc = detectExistingClaudeSetup(homeDir, {});
+			results.jsonc = detectExistingClaudeSetup(homeDir, {}, false);
 
 			assert.deepStrictEqual(results, { apiKey: true, authToken: true, baseUrl: true, oauthToken: true, emptyValue: false, whitespaceValue: false, noEnvBlock: false, malformed: false, truncated: false, jsonc: true });
 		});
@@ -105,15 +105,15 @@ suite('claudeTransportMode', () => {
 		test('detects the top-level apiKeyHelper alongside unrecognized settings', () => {
 			const results: Record<string, boolean> = {};
 			writeSettings(JSON.stringify({ apiKeyHelper: '/bin/mint-key.sh' }));
-			results.helper = detectExistingClaudeSetup(homeDir, {});
+			results.helper = detectExistingClaudeSetup(homeDir, {}, false);
 			// A real settings file carries keys the validator doesn't declare; they
 			// must be ignored rather than fail validation for the whole file.
 			writeSettings(JSON.stringify({ apiKeyHelper: '/bin/mint-key.sh', model: 'claude-sonnet-4-5', permissions: { allow: [] } }));
-			results.helperAmongOthers = detectExistingClaudeSetup(homeDir, {});
+			results.helperAmongOthers = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ apiKeyHelper: '' }));
-			results.emptyValue = detectExistingClaudeSetup(homeDir, {});
+			results.emptyValue = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ apiKeyHelper: 42 }));
-			results.wrongType = detectExistingClaudeSetup(homeDir, {});
+			results.wrongType = detectExistingClaudeSetup(homeDir, {}, false);
 
 			assert.deepStrictEqual(results, { helper: true, helperAmongOthers: true, emptyValue: false, wrongType: false });
 		});
@@ -121,13 +121,13 @@ suite('claudeTransportMode', () => {
 		test('a malformed source never masks a usable one', () => {
 			const results: Record<string, boolean> = {};
 			writeSettings(JSON.stringify({ apiKeyHelper: '/bin/mint-key.sh', env: { ANTHROPIC_API_KEY: 42 } }));
-			results.helperWithMistypedEnvKey = detectExistingClaudeSetup(homeDir, {});
+			results.helperWithMistypedEnvKey = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ apiKeyHelper: 42, env: { ANTHROPIC_API_KEY: 'sk-ant-api-x' } }));
-			results.apiKeyWithMistypedHelper = detectExistingClaudeSetup(homeDir, {});
+			results.apiKeyWithMistypedHelper = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ env: { ANTHROPIC_API_KEY: 'sk-ant-api-x', ANTHROPIC_BASE_URL: 8080 } }));
-			results.apiKeyWithMistypedSibling = detectExistingClaudeSetup(homeDir, {});
+			results.apiKeyWithMistypedSibling = detectExistingClaudeSetup(homeDir, {}, false);
 			writeSettings(JSON.stringify({ apiKeyHelper: '/bin/mint-key.sh', env: 'not an object' }));
-			results.helperWithNonObjectEnv = detectExistingClaudeSetup(homeDir, {});
+			results.helperWithNonObjectEnv = detectExistingClaudeSetup(homeDir, {}, false);
 
 			assert.deepStrictEqual(results, { helperWithMistypedEnvKey: true, apiKeyWithMistypedHelper: true, apiKeyWithMistypedSibling: true, helperWithNonObjectEnv: true });
 		});
