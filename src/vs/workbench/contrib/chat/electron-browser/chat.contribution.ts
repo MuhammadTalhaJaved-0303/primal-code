@@ -43,6 +43,7 @@ import { IChatService } from '../common/chatService/chatService.js';
 import { ChatModeKind } from '../common/constants.js';
 import { IPluginGitService } from '../common/plugins/pluginGitService.js';
 import { registerChatDeveloperActions } from './actions/chatDeveloperActions.js';
+import { registerPrimalAnthropicKeyActions } from './actions/primalAnthropicKeyActions.js';
 import { registerChatExportZipAction } from './actions/chatExportZip.js';
 import { registerExportAgentTracesDbAction } from './actions/exportAgentTracesDb.js';
 import { registerInstallDictationModelAction } from './actions/installDictationModelAction.js';
@@ -253,6 +254,7 @@ registerAction2(StopReadChatItemAloud);
 registerAction2(StopReadAloud);
 
 registerChatDeveloperActions();
+registerPrimalAnthropicKeyActions();
 registerChatExportZipAction();
 registerExportAgentTracesDbAction();
 registerInstallDictationModelAction();

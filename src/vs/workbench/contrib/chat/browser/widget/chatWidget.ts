@@ -38,7 +38,9 @@ import { MenuId } from '../../../../../platform/actions/common/actions.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { IContextKey, IContextKeyService } from '../../../../../platform/contextkey/common/contextkey.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
+import { ICommandService } from '../../../../../platform/commands/common/commands.js';
 import { IDialogService } from '../../../../../platform/dialogs/common/dialogs.js';
+import Severity from '../../../../../base/common/severity.js';
 
 import { ITextResourceEditorInput } from '../../../../../platform/editor/common/editor.js';
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
@@ -519,6 +521,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IDialogService private readonly dialogService: IDialogService,
+		@ICommandService private readonly commandService: ICommandService,
 		@IContextKeyService private readonly contextKeyService: IContextKeyService,
 		@IInstantiationService private readonly instantiationService: IInstantiationService,
 		@IChatService private readonly chatService: IChatService,
@@ -3268,6 +3271,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 					this.setModel(newModel);
 				}
 			}
+			this._surfaceSendRejection(result.reason);
 			return;
 		}
 
@@ -3319,6 +3323,28 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		});
 
 		return sent.data.responseCreatedPromise;
+	}
+
+	/**
+	 * A rejected send must never be silent: without this, the message stays in
+	 * the input box and nothing happens, which reads as the app being broken.
+	 * The common rejection in a build without a configured backend is
+	 * 'No default agent available'.
+	 */
+	private _surfaceSendRejection(reason: string): void {
+		if (reason !== 'No default agent available') {
+			return; // other rejections (queueing, session replacement) have their own flows
+		}
+		this.dialogService.prompt({
+			type: Severity.Info,
+			message: localize('chat.noAgentConfigured', "No AI agent is set up yet"),
+			detail: localize('chat.noAgentConfigured.detail', "Primal Code runs on your own API keys. Add your Anthropic API key to turn on the Claude agent, then send your message again."),
+			buttons: [{
+				label: localize('chat.noAgentConfigured.addKey', "Add API Key"),
+				run: () => this.commandService.executeCommand('primalCode.setAnthropicApiKey'),
+			}],
+			cancelButton: true,
+		});
 	}
 
 	private _getAttachedContextForConcurrentSlashCommand(preserveInput: boolean | undefined): IChatRequestVariableEntry[] {

@@ -93,8 +93,10 @@ export const agentHostCustomizationConfigSchema = createSchema({
 	[AgentHostConfigKey.AllowSignedOutWhenUsable]: schemaProperty<boolean>({
 		type: 'boolean',
 		title: localize('agentHost.config.allowSignedOutWhenUsable.title', "Allow Signed-Out Agent Host"),
-		description: localize('agentHost.config.allowSignedOutWhenUsable.description', "Experimental. When enabled, Agent Host sessions remain available while signed out as long as the selected agent has a usable model and authentication (for example Codex with ChatGPT authentication or Claude in native mode with your own Anthropic credentials). When disabled (the default), GitHub sign-in is required."),
-		default: false,
+		description: localize('agentHost.config.allowSignedOutWhenUsable.description', "Experimental. When enabled, Agent Host sessions remain available while signed out as long as the selected agent has a usable model and authentication (for example Codex with ChatGPT authentication or Claude in native mode with your own Anthropic credentials). When disabled, GitHub sign-in is required."),
+		// Primal Code is BYOK-first: mirror the workbench default so a host
+		// started without a pushed config behaves the same way.
+		default: true,
 	}),
 	[AgentHostConfigKey.SessionCustomizationDiscoveryMode]: schemaProperty<SessionCustomizationDiscoveryMode>({
 		type: 'string',

@@ -156,5 +156,11 @@
 		"nlsBaseUrl": "",
 		"publisherUrl": ""
 	},
-	"builtInExtensionsEnabledWithAutoUpdates": []
+	"builtInExtensionsEnabledWithAutoUpdates": [],
+	"agentSdks": {
+		"claude": {
+			"version": "0.3.220",
+			"urlTemplate": "https://github.com/MuhammadTalhaJaved-0303/primal-code-sdks/releases/download/agent-sdk-claude-0.3.220/{sdkTarget}.tgz"
+		}
+	}
 }

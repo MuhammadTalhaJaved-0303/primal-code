@@ -25,6 +25,12 @@ import { buildAgentHostTelemetryIdEnv, IAgentHostForwardedTelemetryIds } from '.
 import { AgentHostLaunchKind, AgentHostLaunchKindEnvVar, telemetryLevelToAgentHostValue } from '../common/agentHostTelemetry.js';
 import { AgentHostClaudeAgentEnabledSettingId, AgentHostCodexAgentBinaryArgsSettingId, AgentHostCodexAgentEnabledSettingId, AgentHostCodexAgentSdkRootSettingId, AgentHostCodexAgentCodexHomeSettingId, AgentHostIpcChannels, AgentHostOTelCaptureContentSettingId, AgentHostOTelDbSpanExporterEnabledSettingId, AgentHostOTelEnabledSettingId, AgentHostOTelExporterTypeSettingId, AgentHostOTelOtlpEndpointSettingId, AgentHostOTelOtlpProtocolSettingId, AgentHostOTelOutfileSettingId, AgentHostOTelResourceAttributesSettingId, AgentHostOTelServiceNameSettingId, AgentHostOTelPolicyIpcChannel, AgentHostRestartIpcChannel, AgentHostWillRestartIpcChannel, buildAgentHostOTelEnv, buildAgentSdkEnv, IAgentHostManagementService, IAgentHostOTelSettings, sanitizeAgentHostOTelPolicySettings } from '../common/agentService.js';
 import { deepClone } from '../../../base/common/objects.js';
+import { IEncryptionMainService } from '../../encryption/common/encryptionService.js';
+import { readEncryptedSecret } from '../../secrets/common/secrets.js';
+import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
+import { StorageScope } from '../../storage/common/storage.js';
+import { isFalsyOrWhitespace } from '../../../base/common/strings.js';
+import { PRIMAL_ANTHROPIC_API_KEY_SECRET_KEY } from '../common/primalAnthropicKey.js';
 import '../common/agentHostStarter.config.contribution.js';
 
 export class ElectronAgentHostStarter extends Disposable implements IAgentHostStarter {
@@ -56,6 +62,8 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 		@ILifecycleMainService private readonly _lifecycleMainService: ILifecycleMainService,
 		@ILogService private readonly _logService: ILogService,
 		@ITelemetryService private readonly _telemetryService: ITelemetryService,
+		@IApplicationStorageMainService private readonly _applicationStorageMainService: IApplicationStorageMainService,
+		@IEncryptionMainService private readonly _encryptionMainService: IEncryptionMainService,
 	) {
 		super();
 
@@ -109,6 +117,7 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 		// Resolve user shell environment so spawned tools/terminals inherit
 		// PATH and other vars from the user's login shell (macOS/Linux GUI launches).
 		const shellEnv = await this._resolveShellEnv();
+		const anthropicKeyEnv = await this._resolveAnthropicKeyEnv({ ...process.env, ...shellEnv });
 		if (this._store.isDisposed) {
 			throw new Error('Agent Host starter was disposed during startup.');
 		}
@@ -179,6 +188,7 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 				env: {
 					...deepClone(process.env),
 					...shellEnv,
+					...anthropicKeyEnv,
 					// Announce that everything spawned below this process is driven by
 					// VS Code's agent, so `gh` inherits it. Set after the inherited
 					// env so it wins.
@@ -230,6 +240,37 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 			return await getResolvedShellEnv(this._configurationService, this._logService, this._environmentMainService.args, process.env);
 		} catch (error) {
 			this._logService.error('AgentHostStarter was unable to resolve shell environment', error);
+			return {};
+		}
+	}
+
+	/**
+	 * The user's Anthropic API key, entered in the workbench (see
+	 * `primalCode.setAnthropicApiKey`) and held encrypted in APPLICATION storage,
+	 * handed to the agent host as `ANTHROPIC_API_KEY` so the Claude agent's
+	 * native transport can use it. An Anthropic credential already present in the
+	 * inherited environment wins — a user who exports their own key keeps it.
+	 */
+	private async _resolveAnthropicKeyEnv(inheritedEnv: typeof process.env): Promise<typeof process.env> {
+		const hasExistingCredential = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN']
+			.some(name => !isFalsyOrWhitespace(inheritedEnv[name]));
+		if (hasExistingCredential) {
+			return {};
+		}
+		try {
+			const key = await readEncryptedSecret(
+				PRIMAL_ANTHROPIC_API_KEY_SECRET_KEY,
+				fullKey => this._applicationStorageMainService.get(fullKey, StorageScope.APPLICATION),
+				value => this._encryptionMainService.decrypt(value),
+				this._logService,
+			);
+			if (!key || isFalsyOrWhitespace(key)) {
+				return {};
+			}
+			this._logService.info('[AgentHostStarter] Forwarding stored Anthropic API key to the agent host environment.');
+			return { ANTHROPIC_API_KEY: key };
+		} catch (error) {
+			this._logService.error('[AgentHostStarter] Failed to read the stored Anthropic API key; the Claude agent will rely on the inherited environment.', error);
 			return {};
 		}
 	}
