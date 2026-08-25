@@ -46,6 +46,28 @@ exports.PROVIDERS = {
         prefix: "sk-",
         consoleUrl: "https://platform.openai.com/api-keys",
     },
+    google: {
+        label: "Google (Gemini)",
+        consoleUrl: "https://aistudio.google.com/apikey",
+    },
+    deepseek: {
+        label: "DeepSeek",
+        prefix: "sk-",
+        consoleUrl: "https://platform.deepseek.com/api_keys",
+    },
+    kimi: {
+        label: "Kimi (Moonshot)",
+        prefix: "sk-",
+        consoleUrl: "https://platform.moonshot.ai/console/api-keys",
+    },
+    glm: {
+        label: "GLM (Zhipu / Z.ai)",
+        consoleUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+    },
+    minimax: {
+        label: "MiniMax",
+        consoleUrl: "https://platform.minimax.io/user-center/basic-information/interface-key",
+    },
 };
 const storageKey = (provider) => `primal.${provider}ApiKey`;
 class SecretStore {

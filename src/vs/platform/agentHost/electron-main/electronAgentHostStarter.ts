@@ -30,7 +30,7 @@ import { readEncryptedSecret } from '../../secrets/common/secrets.js';
 import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
 import { StorageScope } from '../../storage/common/storage.js';
 import { isFalsyOrWhitespace } from '../../../base/common/strings.js';
-import { PRIMAL_ANTHROPIC_API_KEY_SECRET_KEY } from '../common/primalAnthropicKey.js';
+import { PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, providerById, providerSecretKey } from '../common/primalProviders.js';
 import '../common/agentHostStarter.config.contribution.js';
 
 export class ElectronAgentHostStarter extends Disposable implements IAgentHostStarter {
@@ -245,11 +245,12 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 	}
 
 	/**
-	 * The user's Anthropic API key, entered in the workbench (see
-	 * `primalCode.setAnthropicApiKey`) and held encrypted in APPLICATION storage,
-	 * handed to the agent host as `ANTHROPIC_API_KEY` so the Claude agent's
-	 * native transport can use it. An Anthropic credential already present in the
-	 * inherited environment wins — a user who exports their own key keeps it.
+	 * Credentials for the Claude agent harness, from the provider the user
+	 * selected (`primalCode.agent.provider`) and its keychain-stored key:
+	 * Anthropic natively via `ANTHROPIC_API_KEY`, Anthropic-compatible providers
+	 * (DeepSeek, Kimi, GLM, MiniMax, custom endpoints) via `ANTHROPIC_BASE_URL`
+	 * + `ANTHROPIC_AUTH_TOKEN`. A credential already present in the inherited
+	 * environment wins — a user who exports their own keeps it.
 	 */
 	private async _resolveAnthropicKeyEnv(inheritedEnv: typeof process.env): Promise<typeof process.env> {
 		const hasExistingCredential = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN']
@@ -258,21 +259,47 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
 			return {};
 		}
 		try {
-			const key = await readEncryptedSecret(
-				PRIMAL_ANTHROPIC_API_KEY_SECRET_KEY,
-				fullKey => this._applicationStorageMainService.get(fullKey, StorageScope.APPLICATION),
-				value => this._encryptionMainService.decrypt(value),
-				this._logService,
-			);
-			if (!key || isFalsyOrWhitespace(key)) {
+			const providerId = this._configurationService.getValue<string>(PRIMAL_HARNESS_PROVIDER_SETTING_ID) || 'anthropic';
+			const provider = providerById(providerId);
+			if (!provider?.canDriveClaudeHarness) {
 				return {};
 			}
-			this._logService.info('[AgentHostStarter] Forwarding stored Anthropic API key to the agent host environment.');
-			return { ANTHROPIC_API_KEY: key };
+			const key = await this._readProviderKey(provider.id);
+			if (!key) {
+				return {};
+			}
+			if (provider.id === 'anthropic') {
+				this._logService.info('[AgentHostStarter] Forwarding the stored Anthropic API key to the agent host environment.');
+				return { ANTHROPIC_API_KEY: key };
+			}
+			const baseUrl = provider.id === 'custom'
+				? this._configurationService.getValue<string>(PRIMAL_CUSTOM_BASE_URL_SETTING_ID)
+				: provider.anthropicCompatibleBaseUrl;
+			if (!baseUrl || isFalsyOrWhitespace(baseUrl)) {
+				this._logService.warn(`[AgentHostStarter] Provider '${provider.id}' has no Anthropic-compatible base URL configured; the coding agent will not receive credentials.`);
+				return {};
+			}
+			this._logService.info(`[AgentHostStarter] Forwarding stored '${provider.id}' credentials to the agent host (Anthropic-compatible endpoint).`);
+			return { ANTHROPIC_AUTH_TOKEN: key, ANTHROPIC_BASE_URL: baseUrl };
 		} catch (error) {
-			this._logService.error('[AgentHostStarter] Failed to read the stored Anthropic API key; the Claude agent will rely on the inherited environment.', error);
+			this._logService.error('[AgentHostStarter] Failed to read stored provider credentials; the coding agent will rely on the inherited environment.', error);
 			return {};
 		}
+	}
+
+	/** One provider's key from encrypted APPLICATION storage (with the legacy Anthropic fallback). */
+	private async _readProviderKey(providerId: string): Promise<string | undefined> {
+		const read = (secretKey: string) => readEncryptedSecret(
+			secretKey,
+			fullKey => this._applicationStorageMainService.get(fullKey, StorageScope.APPLICATION),
+			value => this._encryptionMainService.decrypt(value),
+			this._logService,
+		);
+		let key = await read(providerSecretKey(providerId));
+		if ((!key || isFalsyOrWhitespace(key)) && providerId === 'anthropic') {
+			key = await read(PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY);
+		}
+		return key && !isFalsyOrWhitespace(key) ? key : undefined;
 	}
 
 	private async _onWindowConnection(e: IpcMainEvent, nonce: string): Promise<void> {

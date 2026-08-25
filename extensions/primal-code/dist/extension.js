@@ -61,6 +61,14 @@ function activate(context) {
         })), { title: `Primal Code · ${purpose}`, placeHolder: "Choose a provider" });
         return choice?.id;
     }
+    // Keys can be written from the core "Manage AI Providers" command (it writes
+    // into this extension's secret namespace); refresh the model list whenever
+    // any of our secrets change, wherever the change came from.
+    context.subscriptions.push(context.secrets.onDidChange(e => {
+        if (e.key.startsWith("primal.")) {
+            provider.refresh();
+        }
+    }));
     context.subscriptions.push(vscode.lm.registerLanguageModelChatProvider("primal", provider), vscode.commands.registerCommand("primal.setApiKey", async (preselected) => {
         const id = preselected ?? (await pickProvider("Set API key"));
         if (!id)
@@ -70,7 +78,7 @@ function activate(context) {
             return;
         // Tell VS Code to re-query: the model list was missing this provider.
         provider.refresh();
-        void vscode.window.showInformationMessage(`Primal Code is ready. Pick a ${id === "openai" ? "GPT" : "Claude"} model in Chat.`);
+        void vscode.window.showInformationMessage(`Primal Code is ready. Pick a ${secrets_1.PROVIDERS[id].label} model in Chat.`);
     }), vscode.commands.registerCommand("primal.clearApiKey", async () => {
         const id = await pickProvider("Sign out");
         if (!id)

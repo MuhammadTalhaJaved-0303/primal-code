@@ -57,6 +57,54 @@ const CLAUDE_MODELS = [
     { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", maxInputTokens: 200_000, maxOutputTokens: 64_000 },
     { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", maxInputTokens: 200_000, maxOutputTokens: 32_000 },
 ];
+/**
+ * Every provider besides Anthropic speaks the OpenAI protocol on its own host.
+ * OpenAI itself keeps its dynamic /models discovery; the others ship curated
+ * lists because their /models responses are inconsistent about which entries
+ * are chat-capable.
+ */
+const OPENAI_COMPAT = {
+    google: {
+        base: "https://generativelanguage.googleapis.com/v1beta/openai",
+        family: "Gemini",
+        imageInput: true,
+        models: [
+            { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", maxInputTokens: 1_000_000, maxOutputTokens: 65_000 },
+            { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", maxInputTokens: 1_000_000, maxOutputTokens: 65_000 },
+        ],
+    },
+    deepseek: {
+        base: "https://api.deepseek.com/v1",
+        family: "DeepSeek",
+        models: [
+            { id: "deepseek-chat", name: "DeepSeek Chat", maxInputTokens: 128_000, maxOutputTokens: 8_000 },
+            { id: "deepseek-reasoner", name: "DeepSeek Reasoner", maxInputTokens: 128_000, maxOutputTokens: 64_000 },
+        ],
+    },
+    kimi: {
+        base: "https://api.moonshot.ai/v1",
+        family: "Kimi",
+        models: [
+            { id: "kimi-k2-0905-preview", name: "Kimi K2", maxInputTokens: 256_000, maxOutputTokens: 32_000 },
+            { id: "kimi-k2-turbo-preview", name: "Kimi K2 Turbo", maxInputTokens: 256_000, maxOutputTokens: 32_000 },
+        ],
+    },
+    glm: {
+        base: "https://open.bigmodel.cn/api/paas/v4",
+        family: "GLM",
+        models: [
+            { id: "glm-4.6", name: "GLM-4.6", maxInputTokens: 200_000, maxOutputTokens: 96_000 },
+            { id: "glm-4.5-air", name: "GLM-4.5 Air", maxInputTokens: 128_000, maxOutputTokens: 96_000 },
+        ],
+    },
+    minimax: {
+        base: "https://api.minimax.io/v1",
+        family: "MiniMax",
+        models: [
+            { id: "MiniMax-M2", name: "MiniMax M2", maxInputTokens: 200_000, maxOutputTokens: 32_000 },
+        ],
+    },
+};
 const namespaced = (provider, id) => `${provider}:${id}`;
 function splitId(value) {
     const at = value.indexOf(":");
@@ -95,9 +143,17 @@ class PrimalChatProvider {
                 // models; the failure surfaces properly on the first request instead.
             }
         }
+        for (const [providerId, compat] of Object.entries(OPENAI_COMPAT)) {
+            const key = await this.secrets.get(providerId);
+            if (!key)
+                continue;
+            for (const model of compat.models) {
+                models.push(this.describe(providerId, model, compat.family, compat.imageInput));
+            }
+        }
         return models;
     }
-    describe(provider, model, family) {
+    describe(provider, model, family, imageInput) {
         return {
             id: namespaced(provider, model.id),
             name: model.name,
@@ -107,7 +163,7 @@ class PrimalChatProvider {
             maxOutputTokens: Math.min(model.maxOutputTokens, readMaxOutputTokens()),
             tooltip: "Runs on your own API key. Primal never sees your code.",
             detail: "Primal Code · BYOK",
-            capabilities: { toolCalling: true, imageInput: provider === "anthropic" },
+            capabilities: { toolCalling: true, imageInput: imageInput ?? provider === "anthropic" },
         };
     }
     async provideLanguageModelChatResponse(model, messages, options, progress, token) {
@@ -120,11 +176,14 @@ class PrimalChatProvider {
         const abort = new AbortController();
         const cancelSub = token.onCancellationRequested(() => abort.abort());
         try {
-            if (provider === "openai") {
-                await (0, openai_1.streamOpenAi)(key, modelId, messages, options.tools, model.maxOutputTokens, progress, abort.signal);
+            if (provider === "anthropic") {
+                await this.streamAnthropic(key, modelId, messages, options, model.maxOutputTokens, progress, abort.signal);
             }
             else {
-                await this.streamAnthropic(key, modelId, messages, options, model.maxOutputTokens, progress, abort.signal);
+                // openai and every OpenAI-compatible provider (Gemini, DeepSeek,
+                // Kimi, GLM, MiniMax) share one streaming client; only the host differs.
+                const base = OPENAI_COMPAT[provider]?.base;
+                await (0, openai_1.streamOpenAi)(key, modelId, messages, options.tools, model.maxOutputTokens, progress, abort.signal, base);
             }
         }
         catch (error) {

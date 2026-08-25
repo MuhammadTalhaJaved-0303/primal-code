@@ -54,8 +54,8 @@ function displayName(id) {
  * Ask the account which models it can actually use, rather than shipping a
  * hardcoded list that goes stale and offers models the user cannot call.
  */
-async function listOpenAiModels(key) {
-    const res = await fetch(`${BASE}/models`, { headers: { Authorization: `Bearer ${key}` } });
+async function listOpenAiModels(key, base = BASE) {
+    const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } });
     if (!res.ok)
         throw new Error(await describeFailure(res));
     const body = (await res.json());
@@ -69,8 +69,12 @@ async function listOpenAiModels(key) {
         maxOutputTokens: 16_384,
     }));
 }
-/** Run one streaming completion, reporting parts as they arrive. */
-async function streamOpenAi(key, model, messages, tools, maxOutputTokens, progress, signal) {
+/**
+ * Run one streaming completion, reporting parts as they arrive. `base` selects
+ * the OpenAI-compatible endpoint — every non-Anthropic provider (Gemini,
+ * DeepSeek, Kimi, GLM, MiniMax) speaks this same protocol on its own host.
+ */
+async function streamOpenAi(key, model, messages, tools, maxOutputTokens, progress, signal, base = BASE) {
     const converted = (0, openai_messages_1.toOpenAiTools)(tools);
     const body = {
         model,
@@ -80,7 +84,7 @@ async function streamOpenAi(key, model, messages, tools, maxOutputTokens, progre
     };
     if (converted.length > 0)
         body.tools = converted;
-    const res = await fetch(`${BASE}/chat/completions`, {
+    const res = await fetch(`${base}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify(body),
