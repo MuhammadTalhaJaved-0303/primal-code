@@ -69,7 +69,11 @@ configurationRegistry.registerConfiguration({
 		'chat.editor.localAgent.enabled': {
 			type: 'boolean',
 			description: nls.localize('chat.editor.localAgent.enabled', "When enabled, shows the VS Code local chat harness in the chat picker. This setting is ignored in virtual workspaces, where the local chat harness is always available."),
-			default: true,
+			// Primal Code has no extension-backed local chat harness (no default
+			// chat agent is shipped), so a "local" panel chat can never answer.
+			// Defaulting this off routes new panel chats to the first agent-host
+			// session type (Claude) instead.
+			default: false,
 			tags: ['experimental'],
 			experiment: { mode: 'startup' },
 		},
