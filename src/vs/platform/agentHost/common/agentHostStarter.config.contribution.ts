@@ -255,7 +255,8 @@ configurationRegistry.registerConfiguration({
 		[AgentHostCodexAgentEnabledSettingId]: {
 			type: 'boolean',
 			description: nls.localize('chat.agentHost.codexAgent.enabled', "When enabled, the agent host registers the Codex provider (subject to the Codex SDK being reachable). Enabling takes effect without restarting the agent host."),
-			default: false,
+			// Primal Code ships Codex on: it is the harness for OpenAI keys.
+			default: true,
 			tags: ['experimental', 'advanced'],
 			// Allow the default to be overridden by an experiment. Uses `startup`
 			// to match the sibling agent-host provider settings.
