@@ -3,9 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { Disposable } from '../../../../../base/common/lifecycle.js';
 import { ServicesAccessor } from '../../../../../editor/browser/editorExtensions.js';
 import { localize, localize2 } from '../../../../../nls.js';
 import { Action2, registerAction2 } from '../../../../../platform/actions/common/actions.js';
+import { IStatusbarService, StatusbarAlignment } from '../../../../services/statusbar/browser/statusbar.js';
+import { IWorkbenchContribution, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../../common/contributions.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
 import { IPrimalProvider, PRIMAL_CLEAR_ANTHROPIC_KEY_COMMAND_ID, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_MANAGE_PROVIDERS_COMMAND_ID, PRIMAL_PROVIDERS, PRIMAL_SET_ANTHROPIC_KEY_COMMAND_ID, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
@@ -202,8 +205,30 @@ class ClearAnthropicApiKeyAction extends Action2 {
 	}
 }
 
+/**
+ * A permanent status-bar button for provider/key management. Key entry must be
+ * discoverable without knowing a command name — this is the front door.
+ */
+class PrimalProviderStatusBarContribution extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.primalProviderStatusBar';
+
+	constructor(
+		@IStatusbarService statusbarService: IStatusbarService,
+	) {
+		super();
+		this._register(statusbarService.addEntry({
+			name: localize('primalCode.statusbar.name', "AI Providers"),
+			text: '$(key) AI Providers',
+			ariaLabel: localize('primalCode.statusbar.aria', "Manage AI provider API keys"),
+			tooltip: localize('primalCode.statusbar.tooltip', "Add or change the API keys that power chat and the coding agent"),
+			command: PRIMAL_MANAGE_PROVIDERS_COMMAND_ID,
+		}, 'primalCode.providers', StatusbarAlignment.RIGHT, 100));
+	}
+}
+
 export function registerPrimalProviderActions(): void {
 	registerAction2(ManageProvidersAction);
 	registerAction2(SetAnthropicApiKeyAction);
 	registerAction2(ClearAnthropicApiKeyAction);
+	registerWorkbenchContribution2(PrimalProviderStatusBarContribution.ID, PrimalProviderStatusBarContribution, WorkbenchPhase.AfterRestored);
 }
