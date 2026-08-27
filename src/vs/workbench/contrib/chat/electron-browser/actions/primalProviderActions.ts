@@ -10,7 +10,7 @@ import { Action2, registerAction2 } from '../../../../../platform/actions/common
 import { IStatusbarService, StatusbarAlignment } from '../../../../services/statusbar/browser/statusbar.js';
 import { IWorkbenchContribution, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../../common/contributions.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
-import { IPrimalProvider, PRIMAL_CLEAR_ANTHROPIC_KEY_COMMAND_ID, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_MANAGE_PROVIDERS_COMMAND_ID, PRIMAL_PROVIDERS, PRIMAL_SET_ANTHROPIC_KEY_COMMAND_ID, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
+import { IPrimalProvider, PRIMAL_CLEAR_ANTHROPIC_KEY_COMMAND_ID, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_MANAGE_PROVIDERS_COMMAND_ID, PRIMAL_OPEN_SETTINGS_COMMAND_ID, PRIMAL_PROVIDERS, PRIMAL_SET_ANTHROPIC_KEY_COMMAND_ID, providerExtensionSecretKey, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { ConfigurationScope, Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../../platform/configuration/common/configurationRegistry.js';
 import { INotificationService, Severity } from '../../../../../platform/notification/common/notification.js';
@@ -106,7 +106,7 @@ async function runManageProviders(accessor: ServicesAccessor, preselectedProvide
 	// secrets live in the same encrypted store under a composite key (see
 	// mainThreadSecretState). 'custom' has no picker analog.
 	if (provider.id !== 'custom') {
-		await secretStorageService.set(JSON.stringify({ extensionId: 'primal-ai.primal-code', key: `primal.${provider.id}ApiKey` }), entered.trim());
+		await secretStorageService.set(providerExtensionSecretKey(provider.id), entered.trim());
 	}
 
 	if (provider.id === 'custom') {
@@ -221,7 +221,7 @@ class PrimalProviderStatusBarContribution extends Disposable implements IWorkben
 			text: '$(key) AI Providers',
 			ariaLabel: localize('primalCode.statusbar.aria', "Manage AI provider API keys"),
 			tooltip: localize('primalCode.statusbar.tooltip', "Add or change the API keys that power chat and the coding agent"),
-			command: PRIMAL_MANAGE_PROVIDERS_COMMAND_ID,
+			command: PRIMAL_OPEN_SETTINGS_COMMAND_ID,
 		}, 'primalCode.providers', StatusbarAlignment.RIGHT, 100));
 	}
 }

@@ -11,7 +11,7 @@ import { ActionListItemKind, IActionListItem } from '../../../../../../../platfo
 import { IActionWidgetDropdownAction } from '../../../../../../../platform/actionWidget/browser/actionWidgetDropdown.js';
 import { ICommandService } from '../../../../../../../platform/commands/common/commands.js';
 import { ChatEntitlement, IChatEntitlementService, isProUser } from '../../../../../../services/chat/common/chatEntitlementService.js';
-import { PRIMAL_MANAGE_PROVIDERS_COMMAND_ID } from '../../../../../../../platform/agentHost/common/primalProviders.js';
+import { PRIMAL_OPEN_SETTINGS_COMMAND_ID } from '../../../../../../../platform/agentHost/common/primalProviders.js';
 import { IModelControlEntry, ILanguageModelChatMetadataAndIdentifier, IModelsControlManifest } from '../../../../common/languageModels.js';
 import { buildFlatModelItems, buildGroupedModelItems, buildUnavailableStateItems, RESTRICTED_MODE_TRUST_ACTION_ID, SETUP_REQUIRED_SIGN_IN_ACTION_ID } from './modelPickerItemSections.js';
 import type { IBuildModelPickerItemsOptions } from './modelPickerItemTypes.js';
@@ -72,7 +72,7 @@ export function createManageModelsAction(commandService: ICommandService): IActi
 		// leads straight to Primal Code's provider/key manager — the reason a
 		// model is missing is almost always a missing key.
 		label: localize('chat.manageModels', "Add API Keys & Models..."),
-		run: () => { commandService.executeCommand(PRIMAL_MANAGE_PROVIDERS_COMMAND_ID); },
+		run: () => { commandService.executeCommand(PRIMAL_OPEN_SETTINGS_COMMAND_ID); },
 	};
 }
 

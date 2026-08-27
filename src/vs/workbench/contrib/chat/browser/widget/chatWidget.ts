@@ -3341,7 +3341,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			detail: localize('chat.noAgentConfigured.detail', "Primal Code runs on your own API keys. Add your Anthropic API key to turn on the Claude agent, then send your message again."),
 			buttons: [{
 				label: localize('chat.noAgentConfigured.addKey', "Add API Key"),
-				run: () => this.commandService.executeCommand('primalCode.setAnthropicApiKey'),
+				run: () => this.commandService.executeCommand('primalCode.openSettings'),
 			}],
 			cancelButton: true,
 		});

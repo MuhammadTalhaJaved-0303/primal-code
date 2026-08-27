@@ -1,0 +1,127 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.primal-settings-editor {
+	height: 100%;
+	overflow-y: auto;
+	user-select: text;
+}
+
+.primal-settings-editor .primal-settings-page {
+	max-width: 760px;
+	margin: 0 auto;
+	padding: 28px 32px 64px;
+}
+
+.primal-settings-editor h1 {
+	font-size: 22px;
+	font-weight: 600;
+	margin: 0 0 4px;
+}
+
+.primal-settings-editor .primal-settings-subtitle {
+	color: var(--vscode-descriptionForeground);
+	margin: 0 0 28px;
+}
+
+.primal-settings-editor h2 {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 32px 0 4px;
+	padding-top: 20px;
+	border-top: 1px solid var(--vscode-settings-headerBorder, var(--vscode-widget-border));
+}
+
+.primal-settings-editor .primal-section-note {
+	color: var(--vscode-descriptionForeground);
+	margin: 0 0 16px;
+}
+
+.primal-settings-editor .primal-provider-row {
+	margin: 0 0 22px;
+}
+
+.primal-settings-editor .primal-provider-label {
+	font-weight: 600;
+	margin-bottom: 2px;
+}
+
+.primal-settings-editor .primal-provider-desc {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	margin-bottom: 6px;
+}
+
+.primal-settings-editor .primal-provider-controls {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.primal-settings-editor input[type="password"],
+.primal-settings-editor input[type="text"],
+.primal-settings-editor select {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 10px;
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 4px;
+	outline: none;
+	font-family: inherit;
+	font-size: 13px;
+}
+
+.primal-settings-editor input:focus,
+.primal-settings-editor select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.primal-settings-editor select {
+	flex: 0 1 320px;
+}
+
+.primal-settings-editor button.primal-btn {
+	padding: 6px 14px;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+	white-space: nowrap;
+}
+
+.primal-settings-editor button.primal-btn:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+.primal-settings-editor button.primal-btn.secondary {
+	color: var(--vscode-button-secondaryForeground);
+	background: var(--vscode-button-secondaryBackground);
+}
+
+.primal-settings-editor button.primal-btn.secondary:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.primal-settings-editor .primal-provider-status {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+	min-height: 16px;
+}
+
+.primal-settings-editor .primal-provider-status.ok {
+	color: var(--vscode-charts-green, var(--vscode-testing-iconPassed));
+}
+
+.primal-settings-editor .primal-agent-note,
+.primal-settings-editor .primal-anthropic-note {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 6px;
+}

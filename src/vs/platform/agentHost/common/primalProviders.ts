@@ -47,6 +47,17 @@ export function providerSecretKey(providerId: string): string {
 }
 
 /**
+ * The built-in primal extension's own secret for the same key (extension
+ * secrets share the core store under a composite key — see
+ * mainThreadSecretState). Writing both makes one key entry light up the
+ * picker's chat models and the coding agent alike. 'custom' has no picker
+ * analog and is not mirrored.
+ */
+export function providerExtensionSecretKey(providerId: string): string {
+	return JSON.stringify({ extensionId: 'primal-ai.primal-code', key: `primal.${providerId}ApiKey` });
+}
+
+/**
  * Setting naming which configured provider drives the Claude agent harness.
  * Plain (non-secret) — it holds an id, never a key.
  */
@@ -56,6 +67,7 @@ export const PRIMAL_HARNESS_PROVIDER_SETTING_ID = 'primalCode.agent.provider';
 export const PRIMAL_CUSTOM_BASE_URL_SETTING_ID = 'primalCode.agent.customBaseUrl';
 
 /** Command ids (referenced from chat UX). */
+export const PRIMAL_OPEN_SETTINGS_COMMAND_ID = 'primalCode.openSettings';
 export const PRIMAL_MANAGE_PROVIDERS_COMMAND_ID = 'primalCode.manageProviders';
 export const PRIMAL_SET_ANTHROPIC_KEY_COMMAND_ID = 'primalCode.setAnthropicApiKey';
 export const PRIMAL_CLEAR_ANTHROPIC_KEY_COMMAND_ID = 'primalCode.clearAnthropicApiKey';
