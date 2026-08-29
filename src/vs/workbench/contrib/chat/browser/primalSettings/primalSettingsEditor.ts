@@ -11,7 +11,6 @@ import { DisposableStore } from '../../../../../base/common/lifecycle.js';
 import { localize } from '../../../../../nls.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
 import { IPrimalProvider, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_PROVIDERS, providerExtensionSecretKey, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
-import { ICommandService } from '../../../../../platform/commands/common/commands.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
@@ -22,10 +21,13 @@ import { IThemeService } from '../../../../../platform/theme/common/themeService
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../../common/editor.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
-import { MANAGE_CHAT_COMMAND_ID } from '../../common/constants.js';
+import { ChatModelsWidget } from '../chatManagement/chatModelsWidget.js';
 import { PrimalSettingsEditorInput } from './primalSettingsEditorInput.js';
 
 const $ = DOM.$;
+
+/** Fixed height of the embedded models table; the table scrolls internally. */
+const MODELS_EMBED_HEIGHT = 460;
 
 /**
  * The Primal Code Settings page: one organized surface for provider API keys,
@@ -39,6 +41,8 @@ export class PrimalSettingsEditor extends EditorPane {
 	private readonly editorDisposables = this._register(new DisposableStore());
 	private dimension: Dimension | undefined;
 	private scrollContainer: HTMLElement | undefined;
+	private modelsContainer: HTMLElement | undefined;
+	private modelsWidget: ChatModelsWidget | undefined;
 
 	constructor(
 		group: IEditorGroup,
@@ -49,11 +53,8 @@ export class PrimalSettingsEditor extends EditorPane {
 		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IAgentHostService private readonly agentHostService: IAgentHostService,
-		@ICommandService private readonly commandService: ICommandService,
 	) {
 		super(PrimalSettingsEditor.ID, group, telemetryService, themeService, storageService);
-		// instantiationService kept for future sub-widgets (e.g. embedding the models list).
-		void this.instantiationService;
 	}
 
 	protected override createEditor(parent: HTMLElement): void {
@@ -217,15 +218,17 @@ export class PrimalSettingsEditor extends EditorPane {
 	private _renderModelsSection(page: HTMLElement): void {
 		DOM.append(page, $('h2', undefined, localize('primalSettings.models', "Models")));
 		DOM.append(page, $('p.primal-section-note', undefined,
-			localize('primalSettings.models.note', "Every model your keys unlock shows in the chat model picker. Hide the ones you never use:")));
-		const button = DOM.append(page, $('button.primal-btn.secondary', undefined, localize('primalSettings.models.open', "Open Model List")));
-		this.editorDisposables.add(DOM.addDisposableListener(button, 'click', () => {
-			void this.commandService.executeCommand(MANAGE_CHAT_COMMAND_ID);
-		}));
+			localize('primalSettings.models.note', "Choose which models appear in the chat model picker. Models show up here once their provider has a key above (Claude also via your Claude Code sign-in). The eye toggles hide a model from the picker.")));
+		// The full models table — the same widget as the standalone Language
+		// Models editor — embedded so keys and model toggles live on one page.
+		this.modelsContainer = DOM.append(page, $('.primal-models-embed'));
+		this.modelsWidget = this.editorDisposables.add(this.instantiationService.createInstance(ChatModelsWidget));
+		this.modelsContainer.appendChild(this.modelsWidget.element);
 	}
 
 	override async setInput(input: PrimalSettingsEditorInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
+		this.modelsWidget?.render();
 		if (this.dimension) {
 			this.layout(this.dimension);
 		}
@@ -233,5 +236,10 @@ export class PrimalSettingsEditor extends EditorPane {
 
 	override layout(dimension: Dimension): void {
 		this.dimension = dimension;
+		if (this.modelsWidget && this.modelsContainer) {
+			const height = MODELS_EMBED_HEIGHT;
+			this.modelsContainer.style.height = `${height}px`;
+			this.modelsWidget.layout(height, this.modelsContainer.clientWidth);
+		}
 	}
 }
