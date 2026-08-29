@@ -1086,7 +1086,7 @@ export class ChatService extends Disposable implements IChatService {
 		const location = options?.location ?? model.initialLocation;
 		const attempt = options?.attempt ?? 0;
 		const enableCommandDetection = !options?.noCommandDetection;
-		const defaultAgent = this.chatAgentService.getDefaultAgent(location, options?.modeInfo?.kind)!;
+		const defaultAgent = (this.chatAgentService.getAgent(getChatSessionType(model.sessionResource)) ?? this.chatAgentService.getDefaultAgent(location, options?.modeInfo?.kind))!;
 
 		model.removeRequest(request.id, ChatRequestRemovalReason.Resend);
 
@@ -1209,14 +1209,21 @@ export class ChatService extends Disposable implements IChatService {
 		const location = options?.location ?? model.initialLocation;
 		const attempt = options?.attempt ?? 0;
 		const defaultAgent = this.chatAgentService.getDefaultAgent(location, options?.modeInfo?.kind);
-		if (!defaultAgent) {
+		// A session bound to its own (dynamic) agent must be able to answer even
+		// when no default agent is contributed: this product ships no default
+		// chat extension, and agent-host sessions register their agent under the
+		// session type id. Upstream could assume a default always exists; we
+		// cannot.
+		const silentAgent = options?.agentIdSilent ? this.chatAgentService.getAgent(options.agentIdSilent) : undefined;
+		const sessionAgent = silentAgent ?? this.chatAgentService.getAgent(getChatSessionType(sessionResource));
+		const requestAgent = sessionAgent ?? defaultAgent;
+		if (!requestAgent) {
 			this.logService.warn('sendRequest', `No default agent for location ${location}`);
 			return { kind: 'rejected', reason: 'No default agent available' };
 		}
 
 		const parsedRequest = this.parseChatRequest(sessionResource, request, location, options);
-		const silentAgent = options?.agentIdSilent ? this.chatAgentService.getAgent(options.agentIdSilent) : undefined;
-		const agent = silentAgent ?? parsedRequest.parts.find((r): r is ChatRequestAgentPart => r instanceof ChatRequestAgentPart)?.agent ?? defaultAgent;
+		const agent = silentAgent ?? parsedRequest.parts.find((r): r is ChatRequestAgentPart => r instanceof ChatRequestAgentPart)?.agent ?? requestAgent;
 		const agentSlashCommandPart = parsedRequest.parts.find((r): r is ChatRequestAgentSubcommandPart => r instanceof ChatRequestAgentSubcommandPart);
 
 		// This method is only returning whether the request was accepted - don't block on the actual request
@@ -1224,7 +1231,7 @@ export class ChatService extends Disposable implements IChatService {
 			kind: 'sent',
 			newSessionResource,
 			data: {
-				...this._sendRequestAsync(model, sessionResource, parsedRequest, attempt, !options?.noCommandDetection, silentAgent ?? defaultAgent, location, options),
+				...this._sendRequestAsync(model, sessionResource, parsedRequest, attempt, !options?.noCommandDetection, requestAgent, location, options),
 				agent,
 				slashCommand: agentSlashCommandPart?.command,
 			},
@@ -1917,7 +1924,9 @@ export class ChatService extends Disposable implements IChatService {
 		};
 
 		const location = sendOptions.location ?? sendOptions.locationData?.type ?? model.initialLocation;
-		const defaultAgent = this.chatAgentService.getDefaultAgent(location, sendOptions.modeInfo?.kind);
+		// Same fallback as sendRequest: a session-bound agent answers even when
+		// no default agent is contributed.
+		const defaultAgent = this.chatAgentService.getAgent(getChatSessionType(model.sessionResource)) ?? this.chatAgentService.getDefaultAgent(location, sendOptions.modeInfo?.kind);
 		if (!defaultAgent) {
 			this.logService.warn('processNextPendingRequest', `No default agent for location ${location}`);
 			for (const deferred of deferreds) {
