@@ -1658,6 +1658,12 @@ export class CodexAgent extends Disposable implements IAgent {
 		if (!allowSignedOutWhenUsable) {
 			return false;
 		}
+		// An OpenAI API key in the environment (forwarded from Primal Code's
+		// key vault by the starter) is a complete credential for Codex — no
+		// ChatGPT account needed. BYOK-first: sessions must be usable on it.
+		if (typeof process.env['OPENAI_API_KEY'] === 'string' && process.env['OPENAI_API_KEY'].trim().length > 0) {
+			return true;
+		}
 		if (this._openAIAccountState.status === 'signedIn') {
 			return this._openAIAccountState.authType === 'chatgpt';
 		}
