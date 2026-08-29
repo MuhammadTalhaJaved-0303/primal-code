@@ -126,14 +126,105 @@
 	margin-top: 6px;
 }
 
-.primal-settings-editor .primal-models-embed {
-	height: 460px;
+/* ---------- Cursor-style model list: name + pill toggle ---------- */
+
+.primal-settings-editor .primal-model-list {
 	border: 1px solid var(--vscode-widget-border, var(--vscode-input-border));
-	border-radius: 6px;
+	border-radius: 8px;
 	overflow: hidden;
-	margin-bottom: 24px;
+	margin-bottom: 8px;
 }
 
-.primal-settings-editor .primal-models-embed .models-widget {
+.primal-settings-editor .primal-model-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-input-border));
+	background: var(--vscode-editorWidget-background, transparent);
+}
+
+.primal-settings-editor .primal-model-row:last-child {
+	border-bottom: none;
+}
+
+.primal-settings-editor .primal-model-row.preview .primal-model-name {
+	color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+}
+
+.primal-settings-editor .primal-model-name {
+	font-size: 13.5px;
+	font-weight: 500;
+}
+
+.primal-settings-editor .primal-model-tag {
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 1px;
+}
+
+.primal-settings-editor .primal-toggle {
+	position: relative;
+	display: inline-block;
+	width: 38px;
+	height: 22px;
+	flex: none;
+	cursor: pointer;
+}
+
+.primal-settings-editor .primal-toggle input {
+	position: absolute;
+	opacity: 0;
+	width: 100%;
 	height: 100%;
+	margin: 0;
+	cursor: pointer;
+}
+
+.primal-settings-editor .primal-toggle input:disabled {
+	cursor: default;
+}
+
+.primal-settings-editor .primal-toggle-slider {
+	position: absolute;
+	inset: 0;
+	border-radius: 11px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-widget-border, var(--vscode-input-border));
+	transition: background 0.15s ease;
+	pointer-events: none;
+}
+
+.primal-settings-editor .primal-toggle-slider::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var(--vscode-foreground);
+	opacity: 0.55;
+	transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.primal-settings-editor .primal-toggle input:checked + .primal-toggle-slider {
+	background: var(--vscode-button-background);
+	border-color: var(--vscode-button-background);
+}
+
+.primal-settings-editor .primal-toggle input:checked + .primal-toggle-slider::after {
+	transform: translateX(16px);
+	background: var(--vscode-button-foreground);
+	opacity: 1;
+}
+
+.primal-settings-editor .primal-toggle input:focus-visible + .primal-toggle-slider {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.primal-settings-editor .primal-toggle input:disabled + .primal-toggle-slider {
+	opacity: 0.4;
 }

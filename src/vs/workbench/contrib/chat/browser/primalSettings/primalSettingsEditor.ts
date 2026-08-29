@@ -10,10 +10,9 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { DisposableStore } from '../../../../../base/common/lifecycle.js';
 import { localize } from '../../../../../nls.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
-import { IPrimalProvider, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_PROVIDERS, providerExtensionSecretKey, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
+import { IPrimalProvider, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_PROVIDERS, PRIMAL_PROVIDER_MODEL_PREVIEWS, providerExtensionSecretKey, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { IEditorOptions } from '../../../../../platform/editor/common/editor.js';
-import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
 import { ISecretStorageService } from '../../../../../platform/secrets/common/secrets.js';
 import { IStorageService } from '../../../../../platform/storage/common/storage.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
@@ -21,38 +20,45 @@ import { IThemeService } from '../../../../../platform/theme/common/themeService
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../../common/editor.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
-import { ChatModelsWidget } from '../chatManagement/chatModelsWidget.js';
+import { ILanguageModelChatMetadata, ILanguageModelsService } from '../../common/languageModels.js';
 import { PrimalSettingsEditorInput } from './primalSettingsEditorInput.js';
 
 const $ = DOM.$;
 
-/** Fixed height of the embedded models table; the table scrolls internally. */
-const MODELS_EMBED_HEIGHT = 460;
+/** One row of the Cursor-style model list. */
+interface IModelRow {
+	readonly label: string;
+	readonly tag: string;
+	/** Undefined for greyed preview rows (provider key missing). */
+	readonly identifier?: string;
+	readonly providerOrder: number;
+}
 
 /**
  * The Primal Code Settings page: one organized surface for provider API keys,
- * the coding-agent provider, and model visibility — modeled on the settings
- * pages of the leading agent IDEs so nothing needs a command name to find.
+ * the coding-agent provider, and the model list with visibility toggles —
+ * modeled on the settings pages of the leading agent IDEs so nothing needs a
+ * command name to find.
  */
 export class PrimalSettingsEditor extends EditorPane {
 
 	static readonly ID: string = 'workbench.editor.primalSettings';
 
 	private readonly editorDisposables = this._register(new DisposableStore());
+	private readonly modelRowDisposables = this._register(new DisposableStore());
 	private dimension: Dimension | undefined;
 	private scrollContainer: HTMLElement | undefined;
-	private modelsContainer: HTMLElement | undefined;
-	private modelsWidget: ChatModelsWidget | undefined;
+	private modelsListContainer: HTMLElement | undefined;
 
 	constructor(
 		group: IEditorGroup,
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
 		@IStorageService storageService: IStorageService,
-		@IInstantiationService private readonly instantiationService: IInstantiationService,
 		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IAgentHostService private readonly agentHostService: IAgentHostService,
+		@ILanguageModelsService private readonly languageModelsService: ILanguageModelsService,
 	) {
 		super(PrimalSettingsEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -66,15 +72,131 @@ export class PrimalSettingsEditor extends EditorPane {
 		DOM.append(page, $('p.primal-settings-subtitle', undefined,
 			localize('primalSettings.subtitle', "Bring your own keys. They are stored encrypted on this machine and only ever sent to the provider itself — never to us.")));
 
+		this._renderModelsSection(page);
 		this._renderApiKeysSection(page);
 		this._renderAgentSection(page);
-		this._renderModelsSection(page);
 	}
+
+	// #region Models — Cursor-style list: model name + on/off switch
+
+	private _renderModelsSection(page: HTMLElement): void {
+		DOM.append(page, $('h2', undefined, localize('primalSettings.models', "Models")));
+		DOM.append(page, $('p.primal-section-note', undefined,
+			localize('primalSettings.models.note', "Choose which models appear in the chat's model picker. Greyed models need their provider's API key — add it in the API Keys section below.")));
+		this.modelsListContainer = DOM.append(page, $('.primal-model-list'));
+		this._renderModelRows();
+		// Live refresh: saving a key registers models a moment later; the list
+		// updates itself without reopening the page.
+		this.editorDisposables.add(this.languageModelsService.onDidChangeLanguageModels(() => this._renderModelRows()));
+	}
+
+	private _renderModelRows(): void {
+		const container = this.modelsListContainer;
+		if (!container) {
+			return;
+		}
+		this.modelRowDisposables.clear();
+		DOM.clearNode(container);
+
+		const rows = this._collectModelRows();
+		for (const row of rows) {
+			const rowElement = DOM.append(container, $(row.identifier ? '.primal-model-row' : '.primal-model-row.preview'));
+			const info = DOM.append(rowElement, $('.primal-model-info'));
+			DOM.append(info, $('.primal-model-name', undefined, row.label));
+			DOM.append(info, $('.primal-model-tag', undefined, row.identifier ? row.tag : localize('primalSettings.models.needsKey', "{0} — add API key below", row.tag)));
+
+			const toggle = DOM.append(rowElement, $('label.primal-toggle')) as HTMLLabelElement;
+			const checkbox = DOM.append(toggle, $('input')) as HTMLInputElement;
+			checkbox.type = 'checkbox';
+			DOM.append(toggle, $('span.primal-toggle-slider'));
+			if (row.identifier) {
+				const identifier = row.identifier;
+				checkbox.checked = !this.languageModelsService.isModelHidden(identifier);
+				checkbox.ariaLabel = localize('primalSettings.models.toggleAria', "Show {0} in the chat model picker", row.label);
+				this.modelRowDisposables.add(DOM.addDisposableListener(checkbox, 'change', () => {
+					this.languageModelsService.setModelHidden(identifier, !checkbox.checked);
+				}));
+			} else {
+				checkbox.checked = false;
+				checkbox.disabled = true;
+			}
+		}
+	}
+
+	/** Live models first (ordered by provider), then greyed previews for keyless providers. */
+	private _collectModelRows(): IModelRow[] {
+		const providerOrder = new Map<string, number>(PRIMAL_PROVIDERS.map((p, i) => [p.id, i]));
+		const providerLabel = new Map<string, string>(PRIMAL_PROVIDERS.map(p => [p.id, p.label]));
+		const liveRows: IModelRow[] = [];
+		const liveProviders = new Set<string>();
+
+		for (const identifier of this.languageModelsService.getLanguageModelIds()) {
+			const metadata = this.languageModelsService.lookupLanguageModel(identifier);
+			if (!metadata || metadata.id === 'auto') {
+				continue;
+			}
+			// Agent-host copies of BYOK models already appear under their real
+			// provider; listing them again would duplicate the catalogue.
+			if (ILanguageModelChatMetadata.getAgentHostByokManageModelsIdentifier(metadata) !== undefined) {
+				continue;
+			}
+			const providerId = this._providerIdForMetadata(metadata);
+			if (providerId) {
+				liveProviders.add(providerId);
+			}
+			liveRows.push({
+				label: metadata.name,
+				tag: providerId ? (providerLabel.get(providerId) ?? providerId) : this._friendlyVendor(metadata.vendor),
+				identifier,
+				providerOrder: providerId !== undefined ? (providerOrder.get(providerId) ?? 90) : 95,
+			});
+		}
+		liveRows.sort((a, b) => a.providerOrder - b.providerOrder || a.label.localeCompare(b.label));
+
+		const previewRows: IModelRow[] = [];
+		for (const [providerId, models] of Object.entries(PRIMAL_PROVIDER_MODEL_PREVIEWS)) {
+			if (liveProviders.has(providerId)) {
+				continue;
+			}
+			for (const label of models) {
+				previewRows.push({
+					label,
+					tag: providerLabel.get(providerId) ?? providerId,
+					providerOrder: providerOrder.get(providerId) ?? 90,
+				});
+			}
+		}
+		previewRows.sort((a, b) => a.providerOrder - b.providerOrder);
+
+		return [...liveRows, ...previewRows];
+	}
+
+	/** Maps a live model back to one of our provider ids, when recognizable. */
+	private _providerIdForMetadata(metadata: ILanguageModelChatMetadata): string | undefined {
+		if (metadata.vendor === 'primal') {
+			// The primal extension namespaces model ids as `<provider>:<model>`.
+			const at = metadata.id.indexOf(':');
+			return at > 0 ? metadata.id.slice(0, at) : 'anthropic';
+		}
+		if (metadata.vendor.startsWith('agent-host-claude') || metadata.vendor === 'agent-host-copilot') {
+			return 'anthropic';
+		}
+		return undefined;
+	}
+
+	private _friendlyVendor(vendor: string): string {
+		if (vendor.startsWith('agent-host-')) {
+			return localize('primalSettings.models.agentTag', "Coding agent");
+		}
+		return vendor;
+	}
+
+	// #endregion
 
 	private _renderApiKeysSection(page: HTMLElement): void {
 		DOM.append(page, $('h2', undefined, localize('primalSettings.apiKeys', "API Keys")));
 		DOM.append(page, $('p.primal-section-note', undefined,
-			localize('primalSettings.apiKeys.note', "Add a key to light up that provider's models in the chat model picker.")));
+			localize('primalSettings.apiKeys.note', "Add a key to light up that provider's models in the list above.")));
 
 		for (const provider of PRIMAL_PROVIDERS) {
 			if (provider.id === 'custom') {
@@ -143,7 +265,7 @@ export class PrimalSettingsEditor extends EditorPane {
 			status.textContent = localize('primalSettings.status.saving', "Key saved — restarting the agent…");
 			try {
 				await this.agentHostService.restartAgentHost();
-				status.textContent = localize('primalSettings.status.ready', "Key saved — models will appear in the picker in a few seconds.");
+				status.textContent = localize('primalSettings.status.ready', "Key saved — the models above will light up in a few seconds.");
 			} catch {
 				status.textContent = localize('primalSettings.status.savedRestart', "Key saved — restart Primal Code to finish.");
 			}
@@ -215,20 +337,9 @@ export class PrimalSettingsEditor extends EditorPane {
 		}));
 	}
 
-	private _renderModelsSection(page: HTMLElement): void {
-		DOM.append(page, $('h2', undefined, localize('primalSettings.models', "Models")));
-		DOM.append(page, $('p.primal-section-note', undefined,
-			localize('primalSettings.models.note', "Choose which models appear in the chat model picker. Models show up here once their provider has a key above (Claude also via your Claude Code sign-in). The eye toggles hide a model from the picker.")));
-		// The full models table — the same widget as the standalone Language
-		// Models editor — embedded so keys and model toggles live on one page.
-		this.modelsContainer = DOM.append(page, $('.primal-models-embed'));
-		this.modelsWidget = this.editorDisposables.add(this.instantiationService.createInstance(ChatModelsWidget));
-		this.modelsContainer.appendChild(this.modelsWidget.element);
-	}
-
 	override async setInput(input: PrimalSettingsEditorInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
-		this.modelsWidget?.render();
+		this._renderModelRows();
 		if (this.dimension) {
 			this.layout(this.dimension);
 		}
@@ -236,10 +347,5 @@ export class PrimalSettingsEditor extends EditorPane {
 
 	override layout(dimension: Dimension): void {
 		this.dimension = dimension;
-		if (this.modelsWidget && this.modelsContainer) {
-			const height = MODELS_EMBED_HEIGHT;
-			this.modelsContainer.style.height = `${height}px`;
-			this.modelsWidget.layout(height, this.modelsContainer.clientWidth);
-		}
 	}
 }

@@ -77,3 +77,19 @@ export const PRIMAL_CLEAR_ANTHROPIC_KEY_COMMAND_ID = 'primalCode.clearAnthropicA
  * fallback for the Anthropic provider so early testers keep working.
  */
 export const PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY = 'primalCode.anthropicApiKey';
+
+/**
+ * Preview model names shown greyed-out in Settings for a provider whose key is
+ * not set yet — so the full model landscape is visible before any setup, the
+ * way Cursor lists all models. Once a key is saved the real, live model list
+ * replaces the preview rows.
+ */
+export const PRIMAL_PROVIDER_MODEL_PREVIEWS: Readonly<Record<string, readonly string[]>> = {
+	anthropic: ['Claude Opus', 'Claude Sonnet', 'Claude Haiku'],
+	openai: ['GPT models from your OpenAI account'],
+	google: ['Gemini 2.5 Pro', 'Gemini 2.5 Flash'],
+	deepseek: ['DeepSeek Chat', 'DeepSeek Reasoner'],
+	kimi: ['Kimi K2', 'Kimi K2 Turbo'],
+	glm: ['GLM-4.6', 'GLM-4.5 Air'],
+	minimax: ['MiniMax M2'],
+};
