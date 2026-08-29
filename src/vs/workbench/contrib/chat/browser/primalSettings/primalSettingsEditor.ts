@@ -20,6 +20,8 @@ import { IThemeService } from '../../../../../platform/theme/common/themeService
 import { EditorPane } from '../../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../../common/editor.js';
 import { IEditorGroup } from '../../../../services/editor/common/editorGroupsService.js';
+import { AgentSessionProviders } from '../agentSessions/agentSessions.js';
+import { getRememberedSessionType, storeUserSelectedSessionType } from '../../common/chatSessionTypePreference.js';
 import { ILanguageModelChatMetadata, ILanguageModelsService } from '../../common/languageModels.js';
 import { PrimalSettingsEditorInput } from './primalSettingsEditorInput.js';
 
@@ -54,7 +56,7 @@ export class PrimalSettingsEditor extends EditorPane {
 		group: IEditorGroup,
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
-		@IStorageService storageService: IStorageService,
+		@IStorageService private readonly storageService: IStorageService,
 		@ISecretStorageService private readonly secretStorageService: ISecretStorageService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IAgentHostService private readonly agentHostService: IAgentHostService,
@@ -85,6 +87,7 @@ export class PrimalSettingsEditor extends EditorPane {
 			localize('primalSettings.models.note', "Choose which models appear in the chat's model picker. Greyed models need their provider's API key — add it in the API Keys section below.")));
 		this.modelsListContainer = DOM.append(page, $('.primal-model-list'));
 		this._renderModelRows();
+		this._pullProviderModels();
 		// Live refresh: saving a key registers models a moment later; the list
 		// updates itself without reopening the page.
 		this.editorDisposables.add(this.languageModelsService.onDidChangeLanguageModels(() => this._renderModelRows()));
@@ -121,6 +124,15 @@ export class PrimalSettingsEditor extends EditorPane {
 				checkbox.disabled = true;
 			}
 		}
+	}
+
+	/**
+	 * Wakes the bundled model-provider extension and resolves its models, so a
+	 * key saved a moment ago unlocks its models here and in the chat picker
+	 * without any other UI having to be opened first. Errors surface on use.
+	 */
+	private _pullProviderModels(): void {
+		void this.languageModelsService.selectLanguageModels({ vendor: 'primal' }).catch(() => { });
 	}
 
 	/** Live models first (ordered by provider), then greyed previews for keyless providers. */
@@ -260,11 +272,13 @@ export class PrimalSettingsEditor extends EditorPane {
 			}
 			await this.secretStorageService.set(providerSecretKey(provider.id), value);
 			await this.secretStorageService.set(providerExtensionSecretKey(provider.id), value);
+			this._pullProviderModels();
 			input.value = '';
 			status.classList.add('ok');
 			status.textContent = localize('primalSettings.status.saving', "Key saved — restarting the agent…");
 			try {
 				await this.agentHostService.restartAgentHost();
+				this._pullProviderModels();
 				status.textContent = localize('primalSettings.status.ready', "Key saved — the models above will light up in a few seconds.");
 			} catch {
 				status.textContent = localize('primalSettings.status.savedRestart', "Key saved — restart Primal Code to finish.");
@@ -285,6 +299,7 @@ export class PrimalSettingsEditor extends EditorPane {
 			try {
 				await this.agentHostService.restartAgentHost();
 			} catch { /* picked up on next start */ }
+			this._pullProviderModels();
 		}));
 	}
 
@@ -295,12 +310,18 @@ export class PrimalSettingsEditor extends EditorPane {
 
 		const controls = DOM.append(page, $('.primal-provider-controls'));
 		const select = DOM.append(controls, $('select')) as HTMLSelectElement;
-		for (const provider of PRIMAL_PROVIDERS.filter(p => p.canDriveClaudeHarness)) {
+		for (const provider of PRIMAL_PROVIDERS.filter(p => p.canDriveClaudeHarness || p.id === 'openai')) {
 			const option = DOM.append(select, $('option')) as HTMLOptionElement;
 			option.value = provider.id;
-			option.textContent = provider.label;
+			option.textContent = provider.id === 'openai'
+				? localize('primalSettings.agent.openaiOption', "OpenAI (Codex agent)")
+				: provider.label;
 		}
-		select.value = this.configurationService.getValue<string>(PRIMAL_HARNESS_PROVIDER_SETTING_ID) || 'anthropic';
+		// OpenAI rides the separate Codex session type; everything else drives
+		// the Claude harness selected by the provider setting.
+		select.value = getRememberedSessionType(this.storageService) === AgentSessionProviders.AgentHostCodex
+			? 'openai'
+			: (this.configurationService.getValue<string>(PRIMAL_HARNESS_PROVIDER_SETTING_ID) || 'anthropic');
 
 		const status = DOM.append(page, $('.primal-agent-note'));
 
@@ -319,6 +340,12 @@ export class PrimalSettingsEditor extends EditorPane {
 
 		this.editorDisposables.add(DOM.addDisposableListener(select, 'change', async () => {
 			updateCustomVisibility();
+			if (select.value === 'openai') {
+				storeUserSelectedSessionType(this.storageService, AgentSessionProviders.AgentHostCodex);
+				status.textContent = localize('primalSettings.agent.codex', "New chats now use the Codex agent on your OpenAI key.");
+				return;
+			}
+			storeUserSelectedSessionType(this.storageService, AgentSessionProviders.AgentHostClaude);
 			await this.configurationService.updateValue(PRIMAL_HARNESS_PROVIDER_SETTING_ID, select.value);
 			status.textContent = localize('primalSettings.agent.switching', "Coding agent switching to {0}…", select.selectedOptions[0]?.textContent ?? select.value);
 			try {
