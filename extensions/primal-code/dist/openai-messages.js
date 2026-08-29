@@ -119,10 +119,27 @@ function toOpenAiTools(tools) {
  */
 const CHAT_MODEL = /^(gpt-[45]|o[1-9])/i;
 const NOT_CHAT = /(audio|realtime|image|embedding|tts|whisper|moderation|transcribe|search|dall-e|codex-mini)/i;
+/**
+ * Dated snapshots ("-2024-05-13", "-0613") and legacy generations make the
+ * picker read like an API dump. Curate the way Cursor does: current
+ * generation only, canonical ids only.
+ */
+const DATED_SNAPSHOT = /-\d{4}(-\d{2}-\d{2})?$/;
+const CURRENT_GENERATION = /^(gpt-5|o[34])/;
 function selectChatModels(ids) {
-    return ids
+    const curated = ids
         .filter((id) => CHAT_MODEL.test(id) && !NOT_CHAT.test(id))
+        .filter((id) => !DATED_SNAPSHOT.test(id))
+        .filter((id) => CURRENT_GENERATION.test(id))
         // Newest generation first, then alphabetically for a stable picker order.
         .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    // A key scoped to older models only should still show something usable.
+    if (curated.length > 0) {
+        return curated;
+    }
+    return ids
+        .filter((id) => CHAT_MODEL.test(id) && !NOT_CHAT.test(id) && !DATED_SNAPSHOT.test(id))
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+        .slice(0, 8);
 }
 //# sourceMappingURL=openai-messages.js.map
