@@ -534,7 +534,10 @@ export class OpenSessionTargetPickerAction extends Action2 {
 					group: 'navigation',
 				},
 				{
-					id: MenuId.ChatInputSecondary,
+					// Primal Code: the agent picker must be visible on the input bar in
+					// the main window too — switching agents is a first-class action,
+					// not an overflow item (upstream hid it behind ChatInputSecondary).
+					id: MenuId.ChatInput,
 					order: 0,
 					when: ContextKeyExpr.and(
 						ChatContextKeys.enabled,

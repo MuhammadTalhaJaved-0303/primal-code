@@ -920,6 +920,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 				this.chatSessionSupportsDelegationKey.set(this.chatSessionsService.supportsDelegationForSessionType(newSessionType));
 				this.updateWidgetLockStateFromSessionType(newSessionType);
 				this.checkModeInSessionPool(newSessionType);
+				this.checkModelInSessionPool(newSessionType);
 				this._modelSelectionController.revalidateForSessionType(() => this.initSelectedModel());
 				this.refreshChatSessionPickers();
 			}));
@@ -1732,7 +1733,9 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	 */
 	private _pullModelsForSessionType(sessionType: string | undefined): void {
 		if (sessionType && sessionType !== 'local') {
-			void this.languageModelsService.selectLanguageModels({ vendor: sessionType }).catch(() => { });
+			void this.languageModelsService.selectLanguageModels({ vendor: sessionType })
+				.then(() => this.checkModelInSessionPool(sessionType))
+				.catch(() => { });
 		}
 	}
 
@@ -1950,6 +1953,26 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		const modeTarget = currentMode.target.get();
 		if (modeTarget !== customAgentTarget && modeTarget !== Target.Undefined) {
 			this.setChatMode(ChatModeKind.Agent, false);
+		}
+	}
+
+	/**
+	 * A selected model the session cannot serve (e.g. a BYOK chat model kept
+	 * from another context inside an agent session) makes Enter silently
+	 * no-op. When that happens, fall back to the session's default model.
+	 */
+	private checkModelInSessionPool(sessionType?: string): void {
+		sessionType ??= this.getCurrentSessionType();
+		const current = this._currentLanguageModel.get();
+		if (!current) {
+			return;
+		}
+		const valid = this.getModelsForSessionType(sessionType);
+		if (valid.length === 0) {
+			return; // nothing to switch to yet; later model events re-validate
+		}
+		if (!valid.some(m => m.identifier === current.identifier)) {
+			this.setCurrentLanguageModelToDefault(sessionType);
 		}
 	}
 
@@ -2975,6 +2998,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			// Mode first: model validity depends on the mode (agent-capable models are a subset),
 			// so validating the model against the outgoing mode would judge it by the wrong rule.
 			this.checkModeInSessionPool();
+			this.checkModelInSessionPool();
 			this._modelSelectionController.ensureCurrentModelSupported();
 		} else if (e.currentSessionResource) {
 			logChangesToStateModel(this._inputModel, `[CVVM].2 onDidChangeViewModel -> session change: ${this._currentSessionType} -> ${newSessionType} in ${this._currentSessionKey}, ${e.currentSessionResource.toString()}`, undefined, this._inputModel?.state.get(), this.logService);
