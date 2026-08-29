@@ -914,6 +914,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			this._register(this.options.sessionTypePickerDelegate.onDidChangeActiveSessionProvider(async (newSessionType) => {
 				// Seed the destination type before the welcome widget asynchronously replaces its outgoing view model.
 				this._currentSessionType = newSessionType;
+				this._pullModelsForSessionType(newSessionType);
 				this.getVisibleOptionGroupsModeAndUpdateContextKeys(this.getCurrentSessionResource());
 				this.agentSessionTypeKey.set(newSessionType);
 				this.chatSessionSupportsDelegationKey.set(this.chatSessionsService.supportsDelegationForSessionType(newSessionType));
@@ -1505,6 +1506,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		}
 
 		this._currentSessionType = getChatSessionType(forSessionResource);
+		this._pullModelsForSessionType(this._currentSessionType);
 		// The incoming chat model lands with the view model change; drop the outgoing one now so
 		// session-scoped notices are never judged against the model this input is letting go of.
 		this._currentSessionModelObservable.set(undefined, undefined);
@@ -1721,6 +1723,19 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	/**
 	 * Sync current input state to the input model
 	 */
+	/**
+	 * Model providers register lazily and answer only when queried; nothing else
+	 * queries an agent-host session type's provider for the panel, which left
+	 * the picker at "No models available" even while the agent host advertised
+	 * models. Pull whenever the input binds a session type. Cheap when already
+	 * resolved; failures surface on use.
+	 */
+	private _pullModelsForSessionType(sessionType: string | undefined): void {
+		if (sessionType && sessionType !== 'local') {
+			void this.languageModelsService.selectLanguageModels({ vendor: sessionType }).catch(() => { });
+		}
+	}
+
 	private _syncInputStateToModel(): void {
 		if (this._isSyncingToOrFromInputModel) {
 			return;
