@@ -3337,10 +3337,13 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		}
 		this.dialogService.prompt({
 			type: Severity.Info,
-			message: localize('chat.noAgentConfigured', "No AI agent is set up yet"),
-			detail: localize('chat.noAgentConfigured.detail', "Primal Code runs on your own API keys. Add your Anthropic API key to turn on the Claude agent, then send your message again."),
+			message: localize('chat.noAgentConfigured', "This chat can't be answered"),
+			detail: localize('chat.noAgentConfigured.detail', "This conversation has no AI agent behind it — it was likely started before an agent was set up. Start a new chat to use the coding agent, or open Settings to add an API key."),
 			buttons: [{
-				label: localize('chat.noAgentConfigured.addKey', "Add API Key"),
+				label: localize('chat.noAgentConfigured.newChat', "Start New Chat"),
+				run: () => this.commandService.executeCommand('workbench.action.chat.newChat'),
+			}, {
+				label: localize('chat.noAgentConfigured.openSettings', "Open Settings"),
 				run: () => this.commandService.executeCommand('primalCode.openSettings'),
 			}],
 			cancelButton: true,

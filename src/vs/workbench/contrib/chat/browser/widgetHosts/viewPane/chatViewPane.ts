@@ -280,6 +280,15 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		// Agent changes
 		this._register(this.chatAgentService.onDidChangeAgents(() => this.onDidChangeAgents()));
 
+		// Agent session types register asynchronously after the agent host
+		// connects. When the pane restored an empty local session before they
+		// arrived (a session nothing can answer in this product, which ships no
+		// local chat harness), swap it for the default agent session as soon as
+		// one becomes available.
+		this._register(this.chatSessionsService.onDidChangeAvailability(() => {
+			void this.maybeReplaceDeadLocalSession();
+		}));
+
 		// Session changes
 		this._register(this.chatSessionsService.onDidCommitSession(async (e) => {
 			if (!this.modelRef.value) {
@@ -1338,6 +1347,26 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		}
 
 		return modelRef;
+	}
+
+	/**
+	 * Replaces an empty, unanswerable local session with the default agent
+	 * session once one is available — the startup race resolved after the fact.
+	 * Idempotent: after the swap the session is non-local, so later
+	 * availability events fall through immediately.
+	 */
+	private async maybeReplaceDeadLocalSession(): Promise<void> {
+		if (this.restoringSession) {
+			return; // the initial resolution is still in flight and picks the right default itself
+		}
+		const model = this._widget?.viewModel?.model;
+		if (!model || !this.shouldSkipRestoredLocalSession(model.sessionResource, model)) {
+			return;
+		}
+		const ref = await this.acquireDefaultNewSession(CancellationToken.None);
+		if (ref) {
+			await this.showModel(CancellationToken.None, ref);
+		}
 	}
 
 	private shouldSkipRestoredLocalSession(sessionResource: URI, model: IChatModel): boolean {
