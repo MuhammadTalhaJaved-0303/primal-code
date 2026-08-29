@@ -421,10 +421,17 @@ export class ChatAgentService extends Disposable implements IChatAgentService {
 		data.isDynamic = true;
 		const agent = { data, impl: agentImpl };
 		this._agents.set(data.id, agent);
+		// `chatIsEnabled` upstream means "a default chat participant is
+		// activated" — Primal Code ships no default participant, so a dynamic
+		// agent with an implementation (agent-host Claude/Codex) is what makes
+		// chat real here. Without this, every UI gated on ChatContextKeys.enabled
+		// stays hidden forever.
+		this._hasDefaultAgent.set(true);
 		this._onDidChangeAgents.fire(new MergedChatAgent(data, agentImpl));
 
 		return toDisposable(() => {
 			this._agents.delete(data.id);
+			this._hasDefaultAgent.set(Iterable.some(this._agents.values(), agent => !!agent.impl && (agent.data.isDefault || agent.data.isDynamic)));
 			this._onDidChangeAgents.fire(undefined);
 		});
 	}

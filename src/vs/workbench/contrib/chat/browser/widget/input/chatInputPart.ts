@@ -1073,6 +1073,10 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			// possible (a `requiresCustomModels` session may now have, or have
 			// lost, its models).
 			this._updateInputContentContextKeys();
+			// And re-validate the selection: a BYOK model picked while the
+			// session's targeted models were still registering becomes invalid
+			// the moment they land, and would otherwise silently disable Enter.
+			this.checkModelInSessionPool();
 		};
 		this._register(this.languageModelsService.onDidChangeLanguageModels(() => updateAfterModelListChange(false)));
 		this._register(this.languageModelsService.onDidChangeModelVisibility(() => updateAfterModelListChange(true)));
