@@ -33,6 +33,7 @@ import { ILifecycleService, ShutdownReason } from '../../../services/lifecycle/c
 import { ACTION_ID_NEW_CHAT, CHAT_OPEN_ACTION_ID, IChatViewOpenOptions } from '../browser/actions/chatActions.js';
 import './codexCustomizationSettings.contribution.js';
 import '../browser/primalSettings/primalSettings.contribution.js';
+import '../../primalVibes/browser/primalVibes.contribution.js';
 import { AgentSessionProviders, getAgentSessionProviderName } from '../browser/agentSessions/agentSessions.js';
 import { IAgentSessionsService } from '../browser/agentSessions/agentSessionsService.js';
 import { ChatViewPaneTarget, IChatWidgetService } from '../browser/chat.js';
