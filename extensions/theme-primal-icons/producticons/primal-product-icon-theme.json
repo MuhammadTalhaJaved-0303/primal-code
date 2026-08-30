@@ -1,0 +1,109 @@
+{
+	"$comment": "Primal Icons product icon theme. Glyphs from Tabler Icons 3.46.0 (@tabler/icons-webfont, MIT — see ../LICENSE-tabler-icons.txt). Codepoints taken verbatim from the package's dist/tabler-icons.css and dist/tabler-icons-filled.css. Only codicons with a faithful Tabler counterpart are mapped; everything else falls back to the default codicon on purpose (a wrong-meaning glyph is worse than a default one).",
+	"fonts": [
+		{
+			"id": "primal",
+			"src": [
+				{
+					"path": "../fonts/tabler-icons.woff2",
+					"format": "woff2"
+				}
+			],
+			"weight": "normal",
+			"style": "normal"
+		},
+		{
+			"id": "primal-filled",
+			"src": [
+				{
+					"path": "../fonts/tabler-icons-filled.woff2",
+					"format": "woff2"
+				}
+			],
+			"weight": "normal",
+			"style": "normal"
+		}
+	],
+	"iconDefinitions": {
+		"files": { "fontCharacter": "\\edef" },
+		"search": { "fontCharacter": "\\eb1c" },
+		"source-control": { "fontCharacter": "\\eb8f" },
+		"debug": { "fontCharacter": "\\ea48" },
+		"debug-alt": { "fontCharacter": "\\ea48" },
+		"extensions": { "fontCharacter": "\\eb10" },
+		"settings-gear": { "fontCharacter": "\\eb20" },
+		"gear": { "fontCharacter": "\\eb20" },
+		"settings": { "fontCharacter": "\\ec38" },
+		"account": { "fontCharacter": "\\ef68" },
+
+		"layout": { "fontCharacter": "\\eadb" },
+		"layout-sidebar-left": { "fontCharacter": "\\fe18", "fontId": "primal-filled" },
+		"layout-sidebar-left-off": { "fontCharacter": "\\eada" },
+		"layout-sidebar-right": { "fontCharacter": "\\fe19", "fontId": "primal-filled" },
+		"layout-sidebar-right-off": { "fontCharacter": "\\ead9" },
+		"layout-panel": { "fontCharacter": "\\fc37", "fontId": "primal-filled" },
+		"layout-panel-off": { "fontCharacter": "\\ead3" },
+
+		"git-branch": { "fontCharacter": "\\eab2" },
+		"sync": { "fontCharacter": "\\eb13" },
+		"refresh": { "fontCharacter": "\\f3ae" },
+		"error": { "fontCharacter": "\\ea6a" },
+		"warning": { "fontCharacter": "\\ea06" },
+		"info": { "fontCharacter": "\\eac5" },
+		"bell": { "fontCharacter": "\\ea35" },
+		"bell-dot": { "fontCharacter": "\\f819" },
+
+		"close": { "fontCharacter": "\\eb55" },
+		"x": { "fontCharacter": "\\eb55" },
+		"close-small": { "fontCharacter": "\\eb55" },
+		"circle-filled": { "fontCharacter": "\\f671", "fontId": "primal-filled" },
+		"circle-outline": { "fontCharacter": "\\ea6b" },
+		"split-horizontal": { "fontCharacter": "\\ead4" },
+		"ellipsis": { "fontCharacter": "\\ea95" },
+		"kebab-vertical": { "fontCharacter": "\\ea94" },
+		"menu": { "fontCharacter": "\\ec42" },
+
+		"chevron-right": { "fontCharacter": "\\ea61" },
+		"chevron-down": { "fontCharacter": "\\ea5f" },
+		"chevron-left": { "fontCharacter": "\\ea60" },
+		"chevron-up": { "fontCharacter": "\\ea62" },
+		"arrow-left": { "fontCharacter": "\\ea19" },
+		"arrow-right": { "fontCharacter": "\\ea1f" },
+		"arrow-up": { "fontCharacter": "\\ea25" },
+		"arrow-down": { "fontCharacter": "\\ea16" },
+
+		"send": { "fontCharacter": "\\eb1e" },
+		"add": { "fontCharacter": "\\eb0b" },
+		"plus": { "fontCharacter": "\\eb0b" },
+		"history": { "fontCharacter": "\\ebea" },
+		"tools": { "fontCharacter": "\\ebca" },
+		"sparkle": { "fontCharacter": "\\f6d7" },
+		"chat-sparkle": { "fontCharacter": "\\f6d7" },
+		"attach": { "fontCharacter": "\\eb02" },
+		"mic": { "fontCharacter": "\\eaf0" },
+		"copy": { "fontCharacter": "\\ea7a" },
+		"trash": { "fontCharacter": "\\eb41" },
+		"edit": { "fontCharacter": "\\eb04" },
+		"comment": { "fontCharacter": "\\eaef" },
+		"comment-discussion": { "fontCharacter": "\\eb6c" },
+		"check": { "fontCharacter": "\\ea5e" },
+		"loading": { "fontCharacter": "\\f226" },
+
+		"file": { "fontCharacter": "\\eaa4" },
+		"folder": { "fontCharacter": "\\eaad" },
+		"folder-opened": { "fontCharacter": "\\faf7" },
+		"new-file": { "fontCharacter": "\\eaa0" },
+		"new-folder": { "fontCharacter": "\\eaab" },
+		"save": { "fontCharacter": "\\eb62" },
+		"eye": { "fontCharacter": "\\ea9a" },
+		"eye-closed": { "fontCharacter": "\\ecf0" },
+		"globe": { "fontCharacter": "\\eb54" },
+		"lock": { "fontCharacter": "\\eae2" },
+		"book": { "fontCharacter": "\\ea39" },
+		"lightbulb": { "fontCharacter": "\\ea51" },
+		"pin": { "fontCharacter": "\\ec9c" },
+		"pinned": { "fontCharacter": "\\ed60" },
+		"play": { "fontCharacter": "\\ed46" },
+		"terminal": { "fontCharacter": "\\ebef" }
+	}
+}

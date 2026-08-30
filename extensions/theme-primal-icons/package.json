@@ -1,0 +1,28 @@
+{
+	"name": "theme-primal-icons",
+	"private": true,
+	"version": "1.0.0",
+	"displayName": "%displayName%",
+	"description": "%description%",
+	"publisher": "vscode",
+	"license": "MIT",
+	"engines": {
+		"vscode": "*"
+	},
+	"categories": [
+		"Themes"
+	],
+	"contributes": {
+		"productIconThemes": [
+			{
+				"id": "primal-icons",
+				"label": "%themeLabel%",
+				"path": "./producticons/primal-product-icon-theme.json"
+			}
+		]
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/microsoft/vscode.git"
+	}
+}

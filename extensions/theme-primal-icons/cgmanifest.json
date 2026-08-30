@@ -1,0 +1,16 @@
+{
+	"registrations": [
+		{
+			"component": {
+				"type": "npm",
+				"npm": {
+					"name": "@tabler/icons-webfont",
+					"version": "3.46.0"
+				}
+			},
+			"license": "MIT",
+			"version": "3.46.0"
+		}
+	],
+	"version": 1
+}
