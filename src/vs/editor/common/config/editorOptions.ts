@@ -1905,7 +1905,8 @@ export class EditorFontLigatures extends BaseEditorOption<EditorOption.fontLigat
 
 	constructor() {
 		super(
-			EditorOption.fontLigatures, 'fontLigatures', EditorFontLigatures.OFF,
+			// Primal Code: font ligatures on by default (users can disable)
+			EditorOption.fontLigatures, 'fontLigatures', EditorFontLigatures.ON,
 			{
 				anyOf: [
 					{
@@ -1918,7 +1919,7 @@ export class EditorFontLigatures extends BaseEditorOption<EditorOption.fontLigat
 					}
 				],
 				description: nls.localize('fontLigaturesGeneral', "Configures font ligatures or font features. Can be either a boolean to enable/disable ligatures or a string for the value of the CSS 'font-feature-settings' property."),
-				default: false
+				default: true
 			}
 		);
 	}
@@ -3442,7 +3443,7 @@ class EditorMinimap extends BaseEditorOption<EditorOption.minimap, IEditorMinima
 
 	constructor() {
 		const defaults: EditorMinimapOptions = {
-			enabled: true,
+			enabled: false, // Primal Code: chrome restraint — minimap off by default (users can re-enable)
 			size: 'proportional',
 			side: 'right',
 			showSlider: 'mouseover',

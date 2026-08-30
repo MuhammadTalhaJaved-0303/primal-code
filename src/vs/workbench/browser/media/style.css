@@ -7,30 +7,82 @@
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* Primal Code identity fonts (bundled, SIL OFL 1.1 — see ./fonts/) */
+
+@font-face {
+	font-family: "Public Sans";
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url("./fonts/PublicSans-Regular.ttf") format("truetype");
+}
+@font-face {
+	font-family: "Public Sans";
+	font-style: normal;
+	font-weight: 500;
+	font-display: block;
+	src: url("./fonts/PublicSans-Medium.ttf") format("truetype");
+}
+@font-face {
+	font-family: "Public Sans";
+	font-style: normal;
+	font-weight: 600 700;
+	font-display: block;
+	src: url("./fonts/PublicSans-SemiBold.ttf") format("truetype");
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-weight: normal;
+	font-display: block;
+	src: url("./fonts/IBMPlexMono-Regular.ttf") format("truetype");
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: italic;
+	font-weight: normal;
+	font-display: block;
+	src: url("./fonts/IBMPlexMono-Italic.ttf") format("truetype");
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: normal;
+	font-weight: bold;
+	font-display: block;
+	src: url("./fonts/IBMPlexMono-Bold.ttf") format("truetype");
+}
+@font-face {
+	font-family: "IBM Plex Mono";
+	font-style: italic;
+	font-weight: bold;
+	font-display: block;
+	src: url("./fonts/IBMPlexMono-BoldItalic.ttf") format("truetype");
+}
+
 /* Font Families (with CJK support) */
 
-.monaco-workbench.mac { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-.monaco-workbench.mac:lang(zh-Hans) { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
-.monaco-workbench.mac:lang(zh-Hant) { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
-.monaco-workbench.mac:lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
-.monaco-workbench.mac:lang(ko) { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
+.monaco-workbench.mac { font-family: "Public Sans", -apple-system, BlinkMacSystemFont, sans-serif; }
+.monaco-workbench.mac:lang(zh-Hans) { font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif; }
+.monaco-workbench.mac:lang(zh-Hant) { font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif; }
+.monaco-workbench.mac:lang(ja) { font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif; }
+.monaco-workbench.mac:lang(ko) { font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Nanum Gothic", "AppleGothic", sans-serif; }
 
-.monaco-workbench.windows { font-family: "Segoe WPC", "Segoe UI", sans-serif; }
-.monaco-workbench.windows:lang(zh-Hans) { font-family: "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
-.monaco-workbench.windows:lang(zh-Hant) { font-family: "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
-.monaco-workbench.windows:lang(ja) { font-family: "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
-.monaco-workbench.windows:lang(ko) { font-family: "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
+.monaco-workbench.windows { font-family: "Public Sans", "Segoe WPC", "Segoe UI", sans-serif; }
+.monaco-workbench.windows:lang(zh-Hans) { font-family: "Public Sans", "Segoe WPC", "Segoe UI", "Microsoft YaHei", sans-serif; }
+.monaco-workbench.windows:lang(zh-Hant) { font-family: "Public Sans", "Segoe WPC", "Segoe UI", "Microsoft Jhenghei", sans-serif; }
+.monaco-workbench.windows:lang(ja) { font-family: "Public Sans", "Segoe WPC", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif; }
+.monaco-workbench.windows:lang(ko) { font-family: "Public Sans", "Segoe WPC", "Segoe UI", "Malgun Gothic", "Dotom", sans-serif; }
 
-/* Linux: add `system-ui` as first font and not `Ubuntu` to allow other distribution pick their standard OS font */
-.monaco-workbench.linux { font-family: system-ui, "Ubuntu", "Droid Sans", sans-serif; }
-.monaco-workbench.linux:lang(zh-Hans) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
-.monaco-workbench.linux:lang(zh-Hant) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
-.monaco-workbench.linux:lang(ja) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
-.monaco-workbench.linux:lang(ko) { font-family: system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
+/* Linux: add `system-ui` as first fallback font and not `Ubuntu` to allow other distribution pick their standard OS font */
+.monaco-workbench.linux { font-family: "Public Sans", system-ui, "Ubuntu", "Droid Sans", sans-serif; }
+.monaco-workbench.linux:lang(zh-Hans) { font-family: "Public Sans", system-ui, "Ubuntu", "Droid Sans", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", sans-serif; }
+.monaco-workbench.linux:lang(zh-Hant) { font-family: "Public Sans", system-ui, "Ubuntu", "Droid Sans", "Source Han Sans TC", "Source Han Sans TW", "Source Han Sans", sans-serif; }
+.monaco-workbench.linux:lang(ja) { font-family: "Public Sans", system-ui, "Ubuntu", "Droid Sans", "Source Han Sans J", "Source Han Sans JP", "Source Han Sans", sans-serif; }
+.monaco-workbench.linux:lang(ko) { font-family: "Public Sans", system-ui, "Ubuntu", "Droid Sans", "Source Han Sans K", "Source Han Sans JR", "Source Han Sans", "UnDotum", "FBaekmuk Gulim", sans-serif; }
 
-.monaco-workbench.mac { --monaco-monospace-font: "SF Mono", Monaco, Menlo, Courier, monospace; }
-.monaco-workbench.windows { --monaco-monospace-font: Consolas, "Courier New", monospace; }
-.monaco-workbench.linux { --monaco-monospace-font: "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace; }
+.monaco-workbench.mac { --monaco-monospace-font: "IBM Plex Mono", "SF Mono", Monaco, Menlo, Courier, monospace; }
+.monaco-workbench.windows { --monaco-monospace-font: "IBM Plex Mono", Consolas, "Courier New", monospace; }
+.monaco-workbench.linux { --monaco-monospace-font: "IBM Plex Mono", "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace; }
 
 /* Global Styles */
 
