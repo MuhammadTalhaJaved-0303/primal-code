@@ -1,0 +1,103 @@
+{
+  "$comment": "Shared contract for the Vibes system. Theme extension, icon theme, and vibe engine all build against these IDs and palettes. Palettes are seeds — theme JSONs expand them into full token sets, keeping relationships (chrome darker than editor in dark vibes, lighter in light vibes; selection/accent from `accent`).",
+  "version": 1,
+  "colorThemeExtension": "theme-primal",
+  "productIconTheme": "primal-icons",
+  "vibes": [
+    {
+      "id": "ink",
+      "label": "Primal Ink",
+      "mode": "light",
+      "default": true,
+      "seed": {
+        "editorBg": "#FAF9F6", "editorFg": "#1C1A18",
+        "chromeBg": "#EFECE6", "chromeFg": "#3A3733",
+        "sideBg": "#F2EFE9", "panelBg": "#F2EFE9",
+        "border": "#E0DCD4", "accent": "#1C1A18",
+        "selectionBg": "#DDD8CE", "lineHighlight": "#F1EEE7",
+        "comment": "#8A847C", "string": "#4F4A44", "keyword": "#1C1A18", "function": "#3A342C",
+        "terminalAnsiSeed": "warm-mono"
+      }
+    },
+    {
+      "id": "basalt",
+      "label": "Primal Basalt",
+      "mode": "dark",
+      "default": true,
+      "seed": {
+        "editorBg": "#131211", "editorFg": "#E8E4DE",
+        "chromeBg": "#1C1A19", "chromeFg": "#B8B2AA",
+        "sideBg": "#191817", "panelBg": "#191817",
+        "border": "#2B2826", "accent": "#E8E4DE",
+        "selectionBg": "#37332F", "lineHighlight": "#1A1918",
+        "comment": "#807A73", "string": "#C9C2B8", "keyword": "#E8E4DE", "function": "#D8D2C8",
+        "terminalAnsiSeed": "warm-mono"
+      }
+    },
+    {
+      "id": "tide",
+      "label": "Primal Tide",
+      "mode": "dark",
+      "seed": {
+        "editorBg": "#0E1621", "editorFg": "#D6E2F0",
+        "chromeBg": "#152030", "chromeFg": "#9FB4CC",
+        "sideBg": "#111B29", "panelBg": "#111B29",
+        "border": "#22344C", "accent": "#7FB4E8",
+        "selectionBg": "#28405C", "lineHighlight": "#14202F",
+        "comment": "#4A6B92", "string": "#9CC3E8", "keyword": "#7FB4E8", "function": "#B8D4F0",
+        "terminalAnsiSeed": "cool-blue"
+      }
+    },
+    {
+      "id": "dusk",
+      "label": "Primal Dusk",
+      "mode": "dark",
+      "seed": {
+        "editorBg": "#191521", "editorFg": "#E2DAEC",
+        "chromeBg": "#221D2E", "chromeFg": "#A99DC0",
+        "sideBg": "#1E1928", "panelBg": "#1E1928",
+        "border": "#332C44", "accent": "#C4A9E0",
+        "selectionBg": "#3D3450", "lineHighlight": "#1E1927",
+        "comment": "#71618C", "string": "#D4BEE8", "keyword": "#C4A9E0", "function": "#E0CFF0",
+        "terminalAnsiSeed": "violet"
+      }
+    },
+    {
+      "id": "fern",
+      "label": "Primal Fern",
+      "mode": "dark",
+      "seed": {
+        "editorBg": "#121A15", "editorFg": "#D8E6DC",
+        "chromeBg": "#18241C", "chromeFg": "#9DB8A6",
+        "sideBg": "#15201A", "panelBg": "#15201A",
+        "border": "#28392E", "accent": "#9CCDAA",
+        "selectionBg": "#2C4436", "lineHighlight": "#16211B",
+        "comment": "#5B7D67", "string": "#B4DCC0", "keyword": "#9CCDAA", "function": "#CCE8D4",
+        "terminalAnsiSeed": "forest"
+      }
+    },
+    {
+      "id": "ridge",
+      "label": "Primal Ridge",
+      "mode": "light",
+      "seed": {
+        "editorBg": "#F8F3EC", "editorFg": "#4A3B2A",
+        "chromeBg": "#EFE6D9", "chromeFg": "#6B5B45",
+        "sideBg": "#F2EAE0", "panelBg": "#F2EAE0",
+        "border": "#E0D3C0", "accent": "#4A3B2A",
+        "selectionBg": "#E4D6BE", "lineHighlight": "#F2ECE2",
+        "comment": "#93826C", "string": "#5F4E38", "keyword": "#4A3B2A", "function": "#6B5638",
+        "terminalAnsiSeed": "warm-stone"
+      }
+    }
+  ],
+  "shortcuts": {
+    "cycleVibe": "ctrl+cmd+.",
+    "pickVibe": "cmd+k cmd+v"
+  },
+  "rules": [
+    "Meaning is never encoded in hue alone (owner is color blind): errors/warnings pair color with icon shape and text.",
+    "High-contrast themes are never modified.",
+    "Diff/error/warning semantic colors stay near VS Code conventions for familiarity, tinted toward the vibe."
+  ]
+}
