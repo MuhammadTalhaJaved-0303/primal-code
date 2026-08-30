@@ -68,6 +68,18 @@ const SET = {
   // meaning here, since we ship no auto-updating built-ins.
   builtInExtensionsEnabledWithAutoUpdates: [] as string[],
 
+  // The onboarding theme grid shows our six vibes, not the stock VS Code
+  // themes. Ids/labels must match extensions/theme-primal (see
+  // primal/design/vibe-tokens.json, the binding contract for the vibe system).
+  onboardingThemes: [
+    { id: "primal-basalt", label: "Primal Basalt", themeId: "Primal Basalt", type: "dark" },
+    { id: "primal-tide", label: "Primal Tide", themeId: "Primal Tide", type: "dark" },
+    { id: "primal-dusk", label: "Primal Dusk", themeId: "Primal Dusk", type: "dark" },
+    { id: "primal-fern", label: "Primal Fern", themeId: "Primal Fern", type: "dark" },
+    { id: "primal-ink", label: "Primal Ink", themeId: "Primal Ink", type: "light" },
+    { id: "primal-ridge", label: "Primal Ridge", themeId: "Primal Ridge", type: "light" },
+  ],
+
   licenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   serverLicenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   reportIssueUrl: `${REPO}/issues/new`,

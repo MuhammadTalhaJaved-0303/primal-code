@@ -1,0 +1,58 @@
+{
+  "name": "theme-primal",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "categories": [
+    "Themes"
+  ],
+  "version": "1.0.0",
+  "publisher": "vscode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "*"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "id": "Primal Ink",
+        "label": "%inkThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-ink-color-theme.json"
+      },
+      {
+        "id": "Primal Basalt",
+        "label": "%basaltThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-basalt-color-theme.json"
+      },
+      {
+        "id": "Primal Tide",
+        "label": "%tideThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tide-color-theme.json"
+      },
+      {
+        "id": "Primal Dusk",
+        "label": "%duskThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-dusk-color-theme.json"
+      },
+      {
+        "id": "Primal Fern",
+        "label": "%fernThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-fern-color-theme.json"
+      },
+      {
+        "id": "Primal Ridge",
+        "label": "%ridgeThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-ridge-color-theme.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MuhammadTalhaJaved-0303/primal-code"
+  }
+}

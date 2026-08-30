@@ -111,39 +111,39 @@
 	],
 	"onboardingThemes": [
 		{
-			"id": "dark-2026",
-			"label": "Dark 2026",
-			"themeId": "Dark 2026",
+			"id": "primal-basalt",
+			"label": "Primal Basalt",
+			"themeId": "Primal Basalt",
 			"type": "dark"
 		},
 		{
-			"id": "hc-dark",
-			"label": "Dark High Contrast",
-			"themeId": "Default High Contrast",
-			"type": "hcDark"
-		},
-		{
-			"id": "solarized-dark",
-			"label": "Solarized Dark",
-			"themeId": "Solarized Dark",
+			"id": "primal-tide",
+			"label": "Primal Tide",
+			"themeId": "Primal Tide",
 			"type": "dark"
 		},
 		{
-			"id": "light-2026",
-			"label": "Light 2026",
-			"themeId": "Light 2026",
+			"id": "primal-dusk",
+			"label": "Primal Dusk",
+			"themeId": "Primal Dusk",
+			"type": "dark"
+		},
+		{
+			"id": "primal-fern",
+			"label": "Primal Fern",
+			"themeId": "Primal Fern",
+			"type": "dark"
+		},
+		{
+			"id": "primal-ink",
+			"label": "Primal Ink",
+			"themeId": "Primal Ink",
 			"type": "light"
 		},
 		{
-			"id": "hc-light",
-			"label": "Light High Contrast",
-			"themeId": "Default High Contrast Light",
-			"type": "hcLight"
-		},
-		{
-			"id": "solarized-light",
-			"label": "Solarized Light",
-			"themeId": "Solarized Light",
+			"id": "primal-ridge",
+			"label": "Primal Ridge",
+			"themeId": "Primal Ridge",
 			"type": "light"
 		}
 	],

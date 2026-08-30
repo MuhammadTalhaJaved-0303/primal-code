@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 82" fill="none">
+	<rect width="280" height="82" rx="4" fill="#FAF9F6"/>
+	<rect width="22" height="82" fill="#F2EFE9"/>
+	<rect x="5" y="5" width="12" height="12" rx="2" fill="#8A847C" opacity="0.5"/>
+	<rect x="5" y="21" width="12" height="12" rx="2" fill="#8A847C" opacity="0.5"/>
+	<rect x="5" y="37" width="12" height="12" rx="2" fill="#8A847C" opacity="0.5"/>
+	<rect x="22" y="0" width="258" height="18" fill="#EFECE6"/>
+	<line x1="22" y1="18" x2="280" y2="18" stroke="#E0DCD4"/>
+	<text x="30" y="12" font-family="monospace" font-size="7" fill="#1C1A18">index.ts</text>
+	<line x1="30" y1="16" x2="64" y2="16" stroke="#1C1A18" stroke-width="1.5"/>
+	<text x="70" y="12" font-family="monospace" font-size="7" fill="#3A3733" opacity="0.6">app.ts</text>
+	<text x="28" y="32" font-family="monospace" font-size="9"><tspan fill="#1C1A18" font-weight="bold">function </tspan><tspan fill="#3A342C">greet</tspan><tspan fill="#1C1A18">() {</tspan></text>
+	<text x="39" y="45" font-family="monospace" font-size="9"><tspan fill="#8A847C">// hello</tspan></text>
+	<text x="39" y="58" font-family="monospace" font-size="9"><tspan fill="#1C1A18" font-weight="bold">return </tspan><tspan fill="#4F4A44">'primal'</tspan></text>
+	<text x="28" y="71" font-family="monospace" font-size="9"><tspan fill="#1C1A18">}</tspan></text>
+	<rect x="150" y="40" width="120" height="6" rx="3" fill="#DDD8CE"/>
+</svg>
