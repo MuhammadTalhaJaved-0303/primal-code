@@ -1,0 +1,530 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * Primal Code — the "Slab" chrome (primal/design/chrome-spec.md).
+ *
+ * Surfaces float as rounded slabs on a recessed ground: the title bar and status
+ * bar merge into the window ground, and the editor, side bar, auxiliary bar and
+ * panel read as cards rising off it.
+ *
+ * Rules of engagement for this file:
+ *
+ * - LAYOUT IS OFF LIMITS. The workbench grid positions every `.part` absolutely
+ *   and `PartLayout.layout()` (browser/part.ts) sizes `.content` in pixels, so a
+ *   real `border` on a part would shrink its content box and clip 1-2px of the
+ *   content (upstream only compensates for that under the Modern UI experiment,
+ *   see editorPart.ts `EDITOR_FRAME_BORDER_WIDTH`). The slab edge is therefore
+ *   drawn by an absolutely positioned `::before` overlay, which costs no layout.
+ *   Nothing here changes a part's width, height, margin or position.
+ *
+ * - Corner clipping is already the status quo: `.monaco-workbench .part` sets
+ *   `overflow: hidden` (browser/media/part.css). Adding a radius only rounds what
+ *   was already clipped. Workbench sashes live in the split view's own
+ *   `.sash-container` (base/browser/ui/splitview/splitview.css), i.e. outside the
+ *   parts, so they are not affected.
+ *
+ * - EVERY color is a workbench theme token — never a literal — so all six vibes
+ *   and any user theme keep working. Radii/insets are shape, not color, and are
+ *   named as local custom properties at the top of the block.
+ *
+ * - The whole file is gated on a single guard:
+ *     .monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui)
+ *   `hc-black` / `hc-light` are the real high-contrast classes in this fork
+ *   (WorkbenchThemeService applies the theme's class names to
+ *   `layoutService.mainContainer`, i.e. the `.monaco-workbench` element) so high
+ *   contrast opts out entirely. `agent-sessions-workbench` and `modern-ui` are
+ *   the two other chrome designs that ship in this fork and already own these
+ *   selectors; we stay out of their way rather than stacking on top of them.
+ *
+ * This stylesheet is imported from primalVibes.contribution.ts and therefore
+ * loads after the parts CSS; the guard also gives every rule here two extra
+ * class-level selectors, so it wins on specificity regardless of order.
+ */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+
+	/* --- Shape constants (no colors here; see the token vars used below) --- */
+
+	/* Slab top corners. Between the design system's `cornerRadius.large` (8px)
+	 * and `cornerRadius.xLarge` (12px), so it is named locally. */
+	--primal-slab-radius: 10px;
+	--primal-slab-stroke: var(--vscode-strokeThickness, 1px);
+	--primal-slab-border: var(--vscode-editorGroup-border, transparent);
+
+	/* Pill tabs: 6px == `cornerRadius.medium`; gap/inset come off the spacing ramp. */
+	--primal-tab-radius: var(--vscode-cornerRadius-medium, 6px);
+	--primal-tab-gap: var(--vscode-spacing-size20, 2px);
+	--primal-tab-inset: var(--vscode-spacing-size40, 4px);
+
+	--primal-statusbar-pill-radius: var(--vscode-cornerRadius-medium, 6px);
+
+	/* =====================================================================
+	 * 1. Ground frame
+	 *
+	 * The window ground is the vibe's chrome color. It is what shows through
+	 * the slabs' rounded corners, and it is the same color the title bar and
+	 * status bar paint on themselves (titlebarPart.ts / statusbarPart.ts set
+	 * those backgrounds inline from `titleBar.*Background` /
+	 * `statusBar.background`), so top and bottom read as one continuous frame
+	 * once their separating hairlines are gone.
+	 * ================================================================== */
+
+	background-color: var(--vscode-titleBar-activeBackground, var(--vscode-editor-background));
+
+	/* Title bar: `titlebarPart.ts` writes `style.borderBottom` inline, so the
+	 * hairline can only be removed with `!important`. The drop shadow
+	 * (browser/parts/titlebar/media/titlebarpart.css) would also lift the bar
+	 * off the ground it is supposed to be part of. */
+	& .part.titlebar {
+		border-bottom: none !important;
+		box-shadow: none;
+	}
+
+	/* Status bar: the top border is a `::after` strip painted from the
+	 * `--status-border-top-color` property that statusbarPart.ts sets inline
+	 * alongside the `status-border-top` class. Removing the pseudo-element is
+	 * enough; the class and the property stay untouched. */
+	& .part.statusbar.status-border-top::after {
+		content: none;
+	}
+
+	/* =====================================================================
+	 * 2. Slabs
+	 *
+	 * Rounded top corners let the ground show at the head of every part, which
+	 * is what makes them read as separate cards without any layout change. The
+	 * hairline is a top edge only: full-height vertical part borders are what
+	 * the spec calls out as the VS Code silhouette, so parts are separated by
+	 * their background tone step instead (see section 3).
+	 *
+	 * ON THE MISSING INSET (chrome-spec.md line 15, "inset from the frame so
+	 * ground shows around them"). That is not implemented, and it is not
+	 * implementable from a stylesheet, because the containers the spec nominates
+	 * are sized in pixels by JavaScript rather than by their own box:
+	 *
+	 *   - `EditorGroupView.layout(width, height, …)` (editorGroupView.ts) writes
+	 *     `editorContainer.style.width/height` straight from the width and height
+	 *     the grid hands it, and passes the same numbers to `editorPane.layout()`.
+	 *     Insetting `.editor-group-container` by any means — margin, or a border
+	 *     with `box-sizing: border-box` — leaves those children at the full size
+	 *     inside a smaller box, so the editor overhangs and `overflow: hidden`
+	 *     on the part clips it.
+	 *   - `PartLayout.layout()` (part.ts) calls `size(contentArea, …)` in pixels,
+	 *     and `CompositePart.layout()` then lays the active composite out at that
+	 *     same Dimension, so `.content > .composite` fails the same way: the view
+	 *     panes and their virtualized trees would be sized past their container.
+	 *
+	 * A ground-colored ring drawn over the top of the parts would avoid the
+	 * mis-sizing but would occlude the first few pixels of the editor, the
+	 * scrollbar and the tree rows instead. So the inset needs the layout changes
+	 * that chrome-spec.md line 33 and the guardrail on line 70 both rule out; it
+	 * cannot be reconciled inside this file, and the spec is the thing that has
+	 * to move. Until then the corner radius alone carries the slab reading, which
+	 * is why the rules below are careful to give it a surface it can actually cut
+	 * against.
+	 *
+	 * The edge stays a top hairline for the same reason: with the parts flush
+	 * against each other, a left/right/bottom border is by definition the "hard
+	 * 1px full-height part border" that chrome-spec.md line 16 forbids. The full
+	 * ring and the inset are one feature, not two, and neither ships alone.
+	 * ================================================================== */
+
+	& .part.editor:not(.modal-editor-part),
+	& .part.sidebar,
+	& .part.auxiliarybar,
+	& .part.panel {
+		/* Anchors the ::before ring. Upstream only sets this on the editor part
+		 * in light themes (editorgroupview.css), so it is stated here for all. */
+		position: relative;
+		border-radius: var(--primal-slab-radius) var(--primal-slab-radius) 0 0;
+	}
+
+	/* Slab surfaces. The side bar, auxiliary bar and panel already paint these
+	 * exact tokens inline from their `updateStyles()`; repeating them here is a
+	 * harmless fallback and documents the surface. The editor part paints no
+	 * background of its own (only its group containers do), so it needs one to
+	 * fill the rounded box. */
+	& .part.editor:not(.modal-editor-part) {
+		background-color: var(--vscode-editor-background);
+	}
+
+	/* The slab's top surface — the rule that makes the editor's corner radius
+	 * visible at all.
+	 *
+	 * The topmost painted thing inside `.part.editor` is the group's `.title`,
+	 * and `EditorGroupView.updateStyles()` paints it inline from
+	 * `editorGroupHeader.tabsBackground`. Every shipped vibe sets that token to
+	 * the same hex as `titleBar.activeBackground`, which is the ground this file
+	 * paints behind the parts. Untreated, the notch cuts away a strip that is
+	 * already the ground color to reveal the ground: the radius renders, but
+	 * there is nothing to see. (basalt #1C1A19,
+	 * dusk #221D2E, fern #18241C, ink #EFECE6, ridge #EFE6D9, tide #152030 — the
+	 * two tokens are byte-identical in all six.)
+	 *
+	 * Painting the strip with the editor surface is what chrome-spec.md line 15
+	 * asks for when it says the slab is the vibe's `editorBg`: the tab strip
+	 * belongs to the slab, not to the frame. It is scoped to `.title.tabs` — the
+	 * class `updateTitleContainer()` toggles for `showTabs === 'multiple'` — so
+	 * the tabless breadcrumb header keeps its own `noTabsBackground` token (which
+	 * is already the editor color in every vibe). `!important` because the paint
+	 * is inline.
+	 *
+	 * Section 4 depends on this: the tab fills keep painting
+	 * `tab.inactiveBackground`, which is that same chrome tone, so against an
+	 * editor-colored strip they finally read as chips instead of vanishing into
+	 * it. Deliberately not narrowed to `:not(.modal-editor-part)` — tabs should
+	 * look the same wherever the editor part is hosted. */
+	& .part.editor > .content .editor-group-container > .title.tabs {
+		background-color: var(--vscode-editor-background) !important;
+	}
+
+	& .part.sidebar,
+	& .part.auxiliarybar {
+		background-color: var(--vscode-sideBar-background);
+		/* `sideBar.border` has no dark/light default, so fall back to the always
+		 * defined editor group border rather than to a literal. */
+		--primal-slab-border: var(--vscode-sideBar-border, var(--vscode-editorGroup-border, transparent));
+	}
+
+	& .part.panel {
+		background-color: var(--vscode-panel-background);
+		--primal-slab-border: var(--vscode-panel-border, var(--vscode-editorGroup-border, transparent));
+	}
+
+	/* The slab edge. Absolutely positioned so it costs no layout, non
+	 * interactive, and below the parts' drag-and-drop overlay (z-index 12). */
+	& .part.editor:not(.modal-editor-part)::before,
+	& .part.sidebar::before,
+	& .part.auxiliarybar::before,
+	& .part.panel::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 10;
+		pointer-events: none;
+		box-sizing: border-box;
+		border-radius: inherit;
+		border-top: var(--primal-slab-stroke) solid var(--primal-slab-border);
+	}
+
+	/* The light-theme depth shadow has to go with them. In `.vs` themes only —
+	 * which is both of the light vibes, Ink (the default) and Ridge —
+	 * editorgroupview.css paints `.part.editor::after` with a ring of inset
+	 * shadows "creating the illusion that sidebar, panel, and auxiliarybar float
+	 * above it". That is the inverse of the Slab hierarchy, where all four parts
+	 * are peers standing on one recessed ground (chrome-spec.md line 9), and the
+	 * top edge of that ring lands squarely on the pill strip and muddies it.
+	 * Only the shadow is dropped; the pseudo-element and its `.no-shadows`
+	 * variants are left in place. Modal editor parts keep upstream's treatment,
+	 * as they do everywhere else in this file — they are floating windows, not
+	 * slabs on the ground. */
+	& .part.editor:not(.modal-editor-part)::after {
+		box-shadow: none;
+	}
+
+	/* =====================================================================
+	 * 3. Quietness — retire the hairlines between parts
+	 * ================================================================== */
+
+	/* Side bar and auxiliary bar draw their full-height separator inline
+	 * (sidebarPart.ts / auxiliaryBarPart.ts write `border*Width` on the part
+	 * container), hence `!important`. Only the width is dropped: the parts keep
+	 * reserving that pixel in `PartLayout`, and the sliver it leaves is filled
+	 * by the part's own background. */
+	& .part.sidebar,
+	& .part.auxiliarybar {
+		border-left-width: 0 !important;
+		border-right-width: 0 !important;
+	}
+
+	/* The panel's separators are declared in panelpart.css (widths) and colored
+	 * inline (panelPart.ts), so zeroing the widths here is enough. */
+	& .part.panel.bottom .composite.title {
+		border-top-width: 0;
+	}
+
+	& .part.panel.top {
+		border-bottom-width: 0;
+	}
+
+	& .part.panel.right {
+		border-left-width: 0;
+	}
+
+	& .part.panel.left {
+		border-right-width: 0;
+	}
+
+	/* =====================================================================
+	 * 4. Pill tabs
+	 *
+	 * The pill is painted by `.tab-fill`, a real child element that
+	 * `MultiEditorTabsControl.createTab()` appends to every tab
+	 * (`$('.tab-fill', { 'aria-hidden': true })`) and that
+	 * multieditortabscontrol.css hides behind a deliberately low-specificity
+	 * rule — "so the Modern UI treatment, which renders this as a pill
+	 * background, wins without !important". This is that extension point, used
+	 * the same way modernUI/browser/media/tabs.css uses it.
+	 *
+	 * Painting the pill on a child rather than on `.tab` itself is what makes
+	 * the shape work:
+	 *
+	 *   - `.tab` carries the inline `border-right` divider, the wrapped-row
+	 *     `border-bottom` and the `--vscode-shadow-*` box shadows, all of which
+	 *     are rectangular and full-bleed. They are switched off, not recolored.
+	 *   - the fill takes its gap and vertical inset from `inset`, so the 6px
+	 *     radius is its own. Insetting `.tab` with transparent borders instead
+	 *     and clipping the background to the padding box — the previous
+	 *     approach — would shrink the corner radii by the border widths and
+	 *     square the pill off, because a padding-box corner radius is the
+	 *     border-box radius minus the border width.
+	 *
+	 * `.tab-fill` is `aria-hidden` and `pointer-events: none`, so none of this
+	 * touches hit testing or the accessibility tree, and no tab changes size:
+	 * the fill is absolutely positioned and costs no layout.
+	 * ================================================================== */
+
+	/* The full-width strip underline, and the editor title's own bottom border,
+	 * are `::after` strips fed by custom properties that the controls set inline
+	 * (multiEditorTabsControl.ts / editorGroupView.ts). Neutralize the color
+	 * rather than the element, so the controls keep their state classes. */
+	& .part.editor > .content .editor-group-container > .title > .tabs-and-actions-container {
+		--tabs-border-bottom-color: transparent !important;
+	}
+
+	& .part.editor > .content .editor-group-container > .title.title-border-bottom {
+		--title-border-bottom-color: transparent !important;
+	}
+
+	/* The tab box stops painting itself; the fill does it. Zeroing the tab's own
+	 * background has to beat the two `background-color: … !important` hover rules
+	 * the theming participant injects at runtime (multiEditorTabsControl.ts,
+	 * "Hover Background"), which is why `:hover` is spelled out as its own
+	 * selector rather than left to the base rule — the guard's four `:not()`
+	 * classes then carry it past their specificity. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab,
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab:not(.selected):hover {
+		background-color: transparent !important;
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
+		/* Kill the per-tab top border (and the active tab's bottom rule) by
+		 * blanking the colors the control sets — both are full-bleed strips on
+		 * the tab box, which is the geometry chrome-spec.md line 20 forbids.
+		 * Only the geometry is dropped: the color the control resolved for the
+		 * top strip carries the "this is the active tab" signal, and it is
+		 * re-drawn on the pill's own edge further down ("The pill's edge").
+		 * `--tab-dirty-border-top-color` is deliberately left alone: it is a
+		 * state indicator, not decoration. */
+		--tab-border-top-color: transparent !important;
+		--tab-border-bottom-color: transparent !important;
+
+		/* Retires the per-tab divider that multiEditorTabsControl.ts writes as an
+		 * inline `border-right` in `redrawTabBorders()`, and the `border-bottom`
+		 * its theming participant injects for wrapped rows. The gap between pills
+		 * separates tabs now, and the ring below re-draws the boundary on the
+		 * states that need one. */
+		border: none !important;
+
+		/* Rectangular and full-bleed (`--vscode-shadow-active-tab` /
+		 * `--vscode-shadow-sm`, style.css); the pill carries the shape instead. */
+		box-shadow: none !important;
+
+		/* The box is transparent — this is only so the focus outline follows the
+		 * pill language rather than boxing it. */
+		border-radius: var(--primal-tab-radius);
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-fill {
+		display: block;
+		position: absolute;
+		inset: var(--primal-tab-inset) var(--primal-tab-gap);
+		z-index: 0;
+		box-sizing: border-box;
+		pointer-events: none;
+		border-radius: var(--primal-tab-radius);
+		/* Reserved so the ring below can appear without resizing the pill. */
+		border: var(--primal-slab-stroke) solid transparent;
+	}
+
+	/* The fill is the tab's first child and is positioned, so it would paint over
+	 * the label and the close button, which are both in normal flow. Lifting them
+	 * only changes paint order: `position: relative` with no offsets moves
+	 * nothing. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-label,
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-actions {
+		position: relative;
+		z-index: 1;
+	}
+
+	/* The modified-file indicator is a full-bleed bar pinned to the top of the
+	 * tab box (`.tab-border-top-container`, multieditortabscontrol.css), so once
+	 * the pill is inset it would float detached above it, wider on both sides.
+	 * Put it back on the pill's top edge and round it to match. Its color is
+	 * untouched: `--tab-dirty-border-top-color` is a state indicator, and is the
+	 * one tab border this file deliberately never blanks. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-border-top-container {
+		top: var(--primal-tab-inset);
+		left: var(--primal-tab-gap);
+		right: var(--primal-tab-gap);
+		width: auto;
+		border-radius: var(--primal-tab-radius) var(--primal-tab-radius) 0 0;
+	}
+
+	/* Its mirror at the foot of the tab box. Blanking
+	 * `--tab-border-bottom-color` above only reaches the rule that reads that
+	 * property; the hover variants are injected by the theming participant with
+	 * the color spelled out inline (multiEditorTabsControl.ts, "Hover Border",
+	 * fed by `tab.hoverBorder` / `tab.unfocusedHoverBorder`), so a theme that
+	 * defines either — none of the six vibes do, both default to null, but a
+	 * user theme may — would draw a full-bleed rectangular hairline across the
+	 * bottom of the tab box, outside the pill. Same treatment as the top
+	 * container: put it on the pill's edge instead of the box's. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-border-bottom-container {
+		bottom: var(--primal-tab-inset);
+		left: var(--primal-tab-gap);
+		right: var(--primal-tab-gap);
+		width: auto;
+		border-radius: 0 0 var(--primal-tab-radius) var(--primal-tab-radius);
+	}
+
+	/* Pill fills mirror the state rules in multieditortabscontrol.css one for
+	 * one, so every theme keeps its own tab colors and the truncated-label fade
+	 * gradient — which the theming participant derives from these same tokens —
+	 * still matches the surface it fades into. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-fill {
+		background-color: var(--vscode-tab-unfocusedInactiveBackground);
+	}
+
+	& .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab > .tab-fill {
+		background-color: var(--vscode-tab-inactiveBackground);
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab.active > .tab-fill {
+		background-color: var(--vscode-tab-unfocusedActiveBackground);
+	}
+
+	& .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab.active > .tab-fill {
+		background-color: var(--vscode-tab-activeBackground);
+	}
+
+	& .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab.selected:not(.active) > .tab-fill {
+		background-color: var(--vscode-tab-selectedBackground);
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab:not(.selected):hover > .tab-fill {
+		background-color: var(--vscode-tab-unfocusedHoverBackground);
+	}
+
+	& .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover > .tab-fill {
+		background-color: var(--vscode-tab-hoverBackground);
+	}
+
+	/* The pill's edge, and the only hairline left in the tab strip. It does the
+	 * work the deleted per-tab divider used to do, on the states that need a
+	 * boundary — and on the active tab it is what carries "active = raised
+	 * contrast" (chrome-spec.md line 20).
+	 *
+	 * That signal cannot come from the fill in the shipped vibes: all six set
+	 * `tab.activeBackground`, `tab.unfocusedActiveBackground` and
+	 * `tab.hoverBackground` to the same hex as `editor.background`, which section
+	 * 2 made the strip, so those three fills are byte-identical to the surface
+	 * they sit on while `tab.inactiveBackground` is a visible chip — the active
+	 * tab reads as a hole in a row of raised chips. The fills above are faithful
+	 * to those tokens and stay that way; the tones themselves are a theme fix
+	 * (the active/hover tone has to step up from
+	 * `editorGroupHeader.tabsBackground` instead of matching the editor), which
+	 * lives in extensions/theme-primal and is tracked there. This ring is right
+	 * either way: it is the pill's edge, not a stand-in for the fill.
+	 *
+	 * Where the color comes from: `doRedrawTabActive()`
+	 * (multiEditorTabsControl.ts) already resolves the active tab's accent per
+	 * state — `tab.activeBorderTop` for a focused group,
+	 * `tab.unfocusedActiveBorderTop` for an unfocused one, `tab.selectedBorderTop`
+	 * when neither is defined — and hands it to the full-bleed
+	 * `.tab-border-top-container` strip that the blank above switches off. The
+	 * token's meaning is "this is the active tab", not the strip it was drawn as,
+	 * so the rules below put it back on the pill's own edge; this is the same
+	 * move, on the same element, that modernUI/browser/media/tabs.css makes for
+	 * its selected pills. Each rule restates one branch of that resolution so the
+	 * cascade does what the control does, including its fallback: an active tab
+	 * is always part of the selection (`EditorGroupModel.selection`, "first one
+	 * is active"), so a theme defining neither active token lands on
+	 * `tab.selectedBorderTop` — which always resolves, as it defaults to
+	 * `focusBorder` — and no theme ends up with a shapeless active pill.
+	 *
+	 * Not gated on the control's `tab-border-top` class, unlike the strip: a
+	 * modified tab drops that class so its dirty bar can own the top edge, and an
+	 * unsaved active tab must not lose its shape. The dirty bar still wins those
+	 * pixels — it paints at z-index 6, over the fill at 0.
+	 *
+	 * Hover keeps `tab.border`, the token whose meaning is exactly "the line that
+	 * separates tabs": it is the quieter state and the only boundary an unselected
+	 * tab ever gets. Hover stays `:not(.selected)` here as everywhere else in this
+	 * section, matching the theming participant, so it never competes with the
+	 * active ring. A theme that leaves a token undefined gets a ringless pill in
+	 * that state, as before. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab.active > .tab-fill {
+		border-color: var(--vscode-tab-unfocusedActiveBorderTop, var(--vscode-tab-selectedBorderTop, transparent));
+	}
+
+	& .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab.active > .tab-fill {
+		border-color: var(--vscode-tab-activeBorderTop, var(--vscode-tab-selectedBorderTop, transparent));
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab.selected:not(.active) > .tab-fill {
+		border-color: var(--vscode-tab-selectedBorderTop, transparent);
+	}
+
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab:not(.selected):hover > .tab-fill {
+		border-color: var(--vscode-tab-border, transparent);
+	}
+
+	/* The one divider that carries meaning rather than decoration: the boundary
+	 * between the pinned tabs and the rest. `redrawTabBorders()` draws it as the
+	 * last sticky tab's inline `border-right` in `tab.lastPinnedBorder`
+	 * (multiEditorTabsControl.ts), which the `border: none` above retires along
+	 * with the ordinary per-tab dividers. Put it back on the pill as an inset
+	 * shadow on the first unpinned tab — the same move, on the same element,
+	 * that modernUI/browser/media/tabs.css makes for its own pills. A theme that
+	 * leaves the token undefined gets nothing, as before. */
+	& .part.editor > .content .editor-group-container > .title .tabs-container > .tab.sticky + .tab:not(.sticky) > .tab-fill {
+		box-shadow: inset var(--primal-slab-stroke) 0 var(--vscode-tab-lastPinnedBorder, transparent);
+	}
+
+	/* Compact tab height is 22px (editorTabsControl.ts), so the pill takes a
+	 * proportionally smaller vertical inset. */
+	& .part.editor > .content .editor-group-container > .title.compact-height .tabs-container > .tab {
+		--primal-tab-inset: var(--vscode-spacing-size20, 2px);
+	}
+
+	/* =====================================================================
+	 * 5. Status bar items
+	 *
+	 * Height is owned by layout (22px, statusbarpart.css / layout.ts) and is not
+	 * touched here. Only the hover/active surface — the `a.statusbar-item-label`
+	 * that statusbarpart.css paints with `statusBarItem.hoverBackground` — is
+	 * rounded into a pill.
+	 * ================================================================== */
+
+	& .part.statusbar > .items-container > .statusbar-item > .statusbar-item-label {
+		border-radius: var(--primal-statusbar-pill-radius);
+	}
+
+	/* Compact entries are two items rendered as one unit: `compact-left` drops
+	 * its left margin to butt against its left neighbour, `compact-right` its
+	 * right one (statusbarPart.ts `updateCompactEntries`). Keep those seams
+	 * square so the pair still reads as a single pill. */
+	& .part.statusbar > .items-container > .statusbar-item.compact-left > .statusbar-item-label {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+
+	& .part.statusbar > .items-container > .statusbar-item.compact-right > .statusbar-item-label {
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+}
