@@ -1,0 +1,197 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * Primal Code — the boot sequence (primal/design/atmosphere-spec.md, section A).
+ *
+ * A short, quiet startup moment: the wordmark over a ground-colored field, with
+ * a monospace status readout revealing line by line, then a fade. It is on
+ * screen for at most 1.16s and then removes itself.
+ *
+ * Rules of engagement for this file:
+ *
+ * - EVERY color is a theme token, never a literal, so all six vibes style the
+ *   boot screen for free. The ground is the same color primalChrome.css uses for
+ *   the window frame — the title bar background falling back to the editor
+ *   background — painted over an opaque editor-background base so the overlay is
+ *   guaranteed opaque even under a theme that leaves the title bar transparent.
+ *
+ * - ALL MOTION IS CSS. The staged reveal is two keyframe animations that start
+ *   when the element enters the document; the fade-out is a transition triggered
+ *   by one class flip. There is no animation loop and no per-frame JavaScript.
+ *
+ * - THE DURATIONS COME FROM TYPESCRIPT. primalBootOverlay.ts writes
+ *   --primal-boot-reveal, --primal-boot-stagger and --primal-boot-fade onto the
+ *   overlay element, and --primal-boot-line-index onto each row, so the schedule
+ *   that disposes the overlay and the animation the user sees are one number.
+ *
+ * - The paint is gated on the same guard style as primalChrome.css:
+ *     .monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench)
+ *   `hc-black` / `hc-light` are the real high-contrast classes in this fork
+ *   (WorkbenchThemeService applies the theme's class names to
+ *   `layoutService.mainContainer`, i.e. the `.monaco-workbench` element), so high
+ *   contrast opts out entirely — and the explicit hide below makes that true
+ *   even for an overlay that was already in the DOM when the theme changed.
+ *   Unlike primalChrome.css this file does NOT exclude `modern-ui`: the overlay
+ *   is our own element and shares no selectors with any other chrome design.
+ */
+
+/*
+ * Structural only, and deliberately outside the guard: wherever this element
+ * ends up, it must never take a click, a selection or a layout slot from the
+ * workbench underneath. The overlay is also `inert` and `aria-hidden` and holds
+ * nothing focusable, so it is absent from the tab order (primalBootOverlay.ts).
+ */
+.primal-boot-overlay {
+	/* Absolute rather than fixed: the workbench container is `position: relative`
+	 * (browser/media/style.css), so this covers exactly the workbench and is
+	 * clipped by it. With no positioned ancestor it falls back to the viewport,
+	 * which is the same box. */
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	user-select: none;
+	/* Above quick input (2550), below dialogs (2575): a transient greeting must
+	 * never end up in front of something the user has to answer. */
+	z-index: 2560;
+}
+
+/* High contrast paints nothing at all; neither does the agent sessions chrome. */
+.monaco-workbench.hc-black .primal-boot-overlay,
+.monaco-workbench.hc-light .primal-boot-overlay,
+.monaco-workbench.agent-sessions-workbench .primal-boot-overlay {
+	display: none;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench) {
+
+	& .primal-boot-overlay {
+		--primal-boot-ground: var(--vscode-titleBar-activeBackground, var(--vscode-editor-background));
+
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		/* Opaque base; the ground tint is painted over it by the layer below. */
+		background-color: var(--vscode-editor-background);
+
+		opacity: 1;
+		transition: opacity var(--primal-boot-fade) ease-out;
+	}
+
+	/* The ground. A separate layer rather than a second background so the base
+	 * stays unconditionally opaque. */
+	& .primal-boot-overlay::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-color: var(--primal-boot-ground);
+	}
+
+	& .primal-boot-overlay.fading {
+		opacity: 0;
+	}
+
+	& .primal-boot-panel {
+		position: relative; /* above the ground layer */
+		display: flex;
+		flex-direction: column;
+		gap: var(--vscode-spacing-size160);
+		max-width: 100%;
+		padding: var(--vscode-spacing-size240);
+	}
+
+	/* The wordmark: letter-spaced and low-key, sitting on the same hairline the
+	 * slabs use for their top edge. */
+	& .primal-boot-wordmark {
+		color: var(--vscode-foreground);
+		font-size: var(--vscode-fontSize-heading2);
+		font-weight: var(--vscode-fontWeight-regular);
+		letter-spacing: 0.38em;
+		text-transform: uppercase;
+		white-space: nowrap;
+		padding-bottom: var(--vscode-spacing-size120);
+		border-bottom: var(--vscode-strokeThickness, 1px) solid var(--vscode-editorGroup-border, transparent);
+		animation: primal-boot-wordmark-in var(--primal-boot-reveal) ease-out both;
+	}
+
+	& .primal-boot-lines {
+		display: flex;
+		flex-direction: column;
+		gap: var(--vscode-spacing-size60);
+		font-family: var(--monaco-monospace-font);
+		font-size: var(--vscode-fontSize-label1);
+	}
+
+	& .primal-boot-line {
+		display: flex;
+		gap: var(--vscode-spacing-size80);
+		white-space: nowrap;
+		animation: primal-boot-line-in var(--primal-boot-reveal) ease-out both;
+		animation-delay: calc(var(--primal-boot-line-index) * var(--primal-boot-stagger));
+	}
+
+	/* Wide enough to hold the longest key at the monospace advance width, so the
+	 * values line up in a column. A longer key in another locale simply widens
+	 * its own row rather than breaking anything. */
+	& .primal-boot-key {
+		flex: 0 0 auto;
+		min-width: 6.5em;
+		color: var(--vscode-descriptionForeground);
+	}
+
+	& .primal-boot-value {
+		flex: 0 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		color: var(--vscode-foreground);
+	}
+
+	/*
+	 * Reduced motion: no staged reveal and no transform — the readout renders
+	 * complete and only the fade remains, which is a change of opacity rather
+	 * than motion. Both sources are honored, because they are genuinely
+	 * different: the media query is the OS preference, and `monaco-reduce-motion`
+	 * is what AccessibilityService puts on the workbench container once the
+	 * `workbench.reduceMotion` setting has been folded in. primalBootOverlay.ts
+	 * reads the same pair and shortens the hold to match.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		& .primal-boot-wordmark,
+		& .primal-boot-line {
+			animation: none;
+		}
+	}
+
+	&.monaco-reduce-motion {
+		& .primal-boot-wordmark,
+		& .primal-boot-line {
+			animation: none;
+		}
+	}
+}
+
+@keyframes primal-boot-wordmark-in {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes primal-boot-line-in {
+	from {
+		opacity: 0;
+		transform: translateY(3px);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}

@@ -1,0 +1,145 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * Primal Code — the wallpaper layer (primal/design/atmosphere-spec.md, B).
+ *
+ * The slab chrome recessed the window into a ground; this puts something in it.
+ *
+ * WHERE THE LAYER SITS. `primalWallpaperService.ts` appends one element per
+ * workbench container. `.monaco-workbench` is `position: relative; z-index: 1`
+ * (browser/media/style.css), so it forms a stacking context, and a child at
+ * `z-index: -1` paints in exactly one place: above that element's own
+ * background — the ground primalChrome.css paints from the title bar token —
+ * and below every other descendant. Nothing about DOM order or the grid matters,
+ * and no part changes size or position. The four slabs (editor, side bar,
+ * auxiliary bar, panel) stay opaque on top of it, so the wallpaper is never
+ * behind body text; legibility is structural here, not a tuning exercise.
+ *
+ * WHAT MAKES IT VISIBLE. Every pixel of the workbench belongs to some part, so
+ * a layer behind all of them would only show through the slabs' rounded corner
+ * notches. The ground the spec is talking about is the frame the title bar and
+ * status bar merge into (primalChrome.css section 1 removes their separating
+ * hairlines so top and bottom read as one continuous frame). Those two strips
+ * therefore stop painting their own fill while the wallpaper is on — and only
+ * then, because every rule below is scoped to `.primal-wallpaper-on`, the class
+ * the contribution toggles when it actually paints something.
+ *
+ * NO MOTION AT ALL. This is a static paint: no animation, no transition, no
+ * timer, nothing that runs per frame. There is consequently nothing for
+ * `prefers-reduced-motion` to degrade, which is why this file declares no
+ * reduced-motion block rather than declaring an empty one.
+ *
+ * EVERY color comes from a workbench theme token or from the layer's own
+ * background-image, which the contribution composes from the active theme at
+ * runtime. There is not a single color literal in this file.
+ *
+ * The guard is the one primalChrome.css uses, for the same reasons: `hc-black`
+ * and `hc-light` are this fork's high-contrast classes, so high contrast opts
+ * out entirely, and `agent-sessions-workbench` / `modern-ui` are the other two
+ * chrome designs that ship here and already own these selectors.
+ */
+
+/*
+ * Inert unless the guard below matches. High contrast and the other chrome
+ * designs therefore paint nothing at all, whatever the contribution wrote onto
+ * the element.
+ */
+.primal-wallpaper {
+	display: none;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+
+	/* --- Intensity constants (no colors here; see the tokens used below) ---
+	 *
+	 * The grain is subordinate to the wash rather than an equal partner, and it
+	 * is additionally scaled by the layer's own opacity, so its effective
+	 * strength at the default intensity is a few percent.
+	 */
+	--primal-wallpaper-grain-strength: 0.5;
+
+	/* How much of its own surface a slab keeps when `tintSlabs` is on. */
+	--primal-wallpaper-slab-tint: 88%;
+
+	/* =====================================================================
+	 * 1. The layer
+	 * ================================================================== */
+
+	&.primal-wallpaper-on > .primal-wallpaper {
+		display: block;
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
+
+		/* The clamped intensity lives here, so the composed background-image is
+		 * pure shape and never has to be rebuilt when the setting changes. */
+		opacity: var(--primal-wallpaper-opacity, 0);
+
+		background-image: var(--primal-wallpaper-image, none);
+		background-size: var(--primal-wallpaper-size, auto);
+		background-position: center center;
+		background-repeat: no-repeat;
+	}
+
+	/* The grain, on its own sub-layer so it can tile while the wash stretches.
+	 * `none` in image mode, so a user's own art is never speckled. The SVG tile
+	 * carries its own intrinsic size, so `background-size` is left alone. */
+	&.primal-wallpaper-on > .primal-wallpaper::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-image: var(--primal-wallpaper-grain, none);
+		background-repeat: repeat;
+		opacity: var(--primal-wallpaper-grain-strength);
+	}
+
+	/* =====================================================================
+	 * 2. The frame lets the ground through
+	 *
+	 * Both bars paint their fill inline — titlebarPart.ts writes
+	 * `style.backgroundColor` on the part element, statusbarPart.ts writes it on
+	 * the part container — so dropping it takes `!important`. Nothing else
+	 * changes: no geometry, no DOM, no part is resized or moved, and the
+	 * foreground tokens both bars resolve for their text are untouched.
+	 *
+	 * Only these two parts. The slabs stay opaque, and so does the activity bar,
+	 * which paints the side bar's tone rather than the ground's in every vibe.
+	 * ================================================================== */
+
+	&.primal-wallpaper-on .part.titlebar {
+		background-color: transparent !important;
+	}
+
+	/* The status bar's drop shadow is drawn from its own background color when
+	 * floating panels are on (statusbarPart.ts), and would survive as a hard
+	 * line once the fill is gone. Inline too, hence `!important`. */
+	&.primal-wallpaper-on .part.statusbar {
+		background-color: transparent !important;
+		box-shadow: none !important;
+	}
+
+	/* =====================================================================
+	 * 3. Tinted slabs — `primalCode.wallpaper.tintSlabs`, default off
+	 *
+	 * Lets a hint bleed through the panel slabs. Never the editor slab: code
+	 * always sits on a fully opaque surface, which is the whole reason the
+	 * wallpaper lives in the ground in the first place.
+	 *
+	 * Each part keeps its own token and gives up only a few percent of it, so
+	 * the tint follows whatever theme is active. `!important` because all three
+	 * paint their background inline from `updateStyles()`.
+	 * ================================================================== */
+
+	&.primal-wallpaper-on.primal-wallpaper-tint .part.sidebar,
+	&.primal-wallpaper-on.primal-wallpaper-tint .part.auxiliarybar {
+		background-color: color-mix(in srgb, var(--vscode-sideBar-background) var(--primal-wallpaper-slab-tint), transparent) !important;
+	}
+
+	&.primal-wallpaper-on.primal-wallpaper-tint .part.panel {
+		background-color: color-mix(in srgb, var(--vscode-panel-background) var(--primal-wallpaper-slab-tint), transparent) !important;
+	}
+}
