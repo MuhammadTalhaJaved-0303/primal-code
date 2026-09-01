@@ -1,11 +1,7 @@
 {
 	"editor": [
 		{
-			"name": "vs/platform",
-			"project": "vscode-editor"
-		},
-		{
-			"name": "vs/editor/contrib",
+			"name": "vs/base",
 			"project": "vscode-editor"
 		},
 		{
@@ -13,7 +9,11 @@
 			"project": "vscode-editor"
 		},
 		{
-			"name": "vs/base",
+			"name": "vs/editor/contrib",
+			"project": "vscode-editor"
+		},
+		{
+			"name": "vs/platform",
 			"project": "vscode-editor"
 		}
 	],
@@ -660,6 +660,10 @@
 		},
 		{
 			"name": "vs/workbench/services/request",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/contrib/primalStart",
 			"project": "vscode-workbench"
 		}
 	],
