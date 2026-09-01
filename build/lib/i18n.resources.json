@@ -163,7 +163,15 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/contrib/primalBoot",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/contrib/primalVibes",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/contrib/primalWallpaper",
 			"project": "vscode-workbench"
 		},
 		{

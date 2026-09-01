@@ -1,5 +1,6 @@
 {
 	"colors": [
+		"--primal-boot-ground",
 		"--primal-slab-border",
 		"--vscode-actionBar-toggledBackground",
 		"--vscode-activeSessionView-background",
@@ -976,12 +977,21 @@
 		"--vscode-window-inactiveBorder"
 	],
 	"others": [
+		"--primal-wallpaper-grain",
+		"--primal-wallpaper-grain-strength",
+		"--primal-wallpaper-image",
+		"--primal-wallpaper-opacity",
+		"--primal-wallpaper-slab-tint",
 		"--action-widget-close-start-opacity",
 		"--action-widget-close-start-transform",
 		"--activity-bar-action-height",
 		"--activity-bar-icon-size",
 		"--activity-bar-width",
 		"--agent-sessions-editor-tab-padding",
+		"--primal-boot-fade",
+		"--primal-boot-line-index",
+		"--primal-boot-reveal",
+		"--primal-boot-stagger",
 		"--editor-font-size",
 		"--background-dark",
 		"--background-light",
@@ -1219,6 +1229,7 @@
 		"--primal-tab-gap",
 		"--primal-tab-inset",
 		"--primal-tab-radius",
+		"--primal-wallpaper-size",
 		"--segmented-icon-toggle-cell-radius",
 		"--segmented-icon-toggle-cell-width",
 		"--segmented-icon-toggle-height",
