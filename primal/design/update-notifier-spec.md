@@ -38,8 +38,10 @@ cannot tell two builds apart; `product.commit` can, and the packaged app already
   JSON, timeout. Never a dialog, never an error toast, never a retry storm. Log at debug only.
 - Validate the parsed manifest before trusting it (commit is a hex string, downloads is an object of
   strings). It comes off the network — treat it as untrusted input.
-- Show a notification only when `manifest.commit !== product.commit` **and** that commit is not the
-  one the user chose to skip:
+- Show a notification when `manifest.commit !== product.commit`. The **background** check
+  additionally stays silent when that commit is the one the user chose to skip; the explicit command
+  always reports what it found, because answering "you are up to date" to a direct question while a
+  newer build exists would be a false statement:
   > Primal Code {version} is available — {name}
   - **Download** — opens the platform-appropriate URL from `downloads` via `IOpenerService`.
     If the current platform has no entry, omit the button rather than opening something wrong.
