@@ -1,0 +1,420 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * The Rig - the home console (primal/design/rig-spec.md).
+ *
+ * Rules of engagement for this file:
+ *
+ * - EVERY color is a workbench theme token, with zero literals anywhere, so all
+ *   six vibes and any user theme restyle this page for free. Unlike Primal
+ *   Start there is not even a swatch exception here: the Rig previews no theme
+ *   it is not already wearing.
+ *
+ * - Shape follows the "Slab" language shared with primalStart.css: quiet
+ *   surfaces with a hairline edge and a 10px radius, generous vertical rhythm,
+ *   no accent fills.
+ *
+ * - Meaning is never carried by hue. A session's status is a glyph plus a word
+ *   (primalRigEditor.ts, statusPresentation) and the chip itself is painted in
+ *   the same ink as the rest of the page.
+ *
+ * - High contrast opts out of the decorative half: the radii collapse, the
+ *   hairline becomes the theme's contrast border and the soft hover fills go
+ *   away. The page itself still renders - it is a landing surface, so hiding it
+ *   in high contrast would hide the product.
+ */
+
+.primal-rig-editor {
+	height: 100%;
+	overflow-y: auto;
+	user-select: text;
+
+	/* Shape constants. 10px matches the slab radius in primalChrome.css. */
+	--primal-rig-slab-radius: 10px;
+	--primal-rig-control-radius: var(--vscode-cornerRadius-medium, 6px);
+	--primal-rig-edge: 1px solid var(--vscode-widget-border, var(--vscode-editorGroup-border, transparent));
+}
+
+.primal-rig-editor .primal-rig-page {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 56px 32px 56px;
+}
+
+.primal-rig-editor.narrow .primal-rig-page {
+	padding: 32px 20px 40px;
+}
+
+/* ---------- Header: thin, not a dashboard poster ---------- */
+
+.primal-rig-editor .primal-rig-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	padding-bottom: 20px;
+	border-bottom: var(--primal-rig-edge);
+}
+
+.primal-rig-editor .primal-rig-wordmark {
+	/* "Public Sans" comes from the workbench font stack; 600 is the bundled semibold. */
+	flex: 1 1 auto;
+	min-width: 0;
+	font-weight: 600;
+	font-size: 26px;
+	line-height: 1.15;
+	letter-spacing: -0.02em;
+	margin: 0;
+	color: var(--vscode-foreground);
+}
+
+.primal-rig-editor.narrow .primal-rig-wordmark {
+	flex-basis: 100%;
+	font-size: 22px;
+}
+
+/*
+ * The cluster reflows rather than pinning its width: an editor pane can be
+ * dragged down to 220px, and a fixed cluster would push the page into a
+ * horizontal scrollbar. It wraps its own children, and shares the header's free
+ * space with the wordmark while staying right-aligned, so the wide layout is
+ * unchanged.
+ */
+.primal-rig-editor .primal-rig-header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Once the wordmark has taken the whole first line, the cluster sits under it
+	and reads with the rest of the page, not against the right edge. */
+.primal-rig-editor.narrow .primal-rig-header-actions {
+	justify-content: flex-start;
+}
+
+.primal-rig-editor button.primal-rig-vibe-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	border: var(--primal-rig-edge);
+	border-radius: var(--primal-rig-control-radius);
+	transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.primal-rig-editor button.primal-rig-vibe-chip:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+	border-color: var(--vscode-focusBorder);
+}
+
+.primal-rig-editor .primal-rig-vibe-icon {
+	flex: none;
+	font-size: 13px;
+}
+
+.primal-rig-editor .primal-rig-vibe-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 14ch;
+}
+
+.primal-rig-editor button.primal-rig-primary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 12px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background, transparent);
+	border: var(--primal-rig-edge);
+	border-radius: var(--primal-rig-control-radius);
+	transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.primal-rig-editor button.primal-rig-primary:hover {
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+	border-color: var(--vscode-focusBorder);
+}
+
+.primal-rig-editor .primal-rig-primary-icon {
+	flex: none;
+	font-size: 14px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-rig-editor button.primal-rig-primary:hover .primal-rig-primary-icon {
+	color: var(--vscode-foreground);
+}
+
+/* Same shrink contract as primalStart's action label: the label gives way
+	before the page does. */
+.primal-rig-editor .primal-rig-primary-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The narrow layout has no room for a hint the footer already gives. */
+.primal-rig-editor.narrow button.primal-rig-primary .primal-rig-kbd {
+	display: none;
+}
+
+/* ---------- Sections ---------- */
+
+.primal-rig-editor .primal-rig-section {
+	margin-top: 36px;
+}
+
+.primal-rig-editor .primal-rig-section-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--vscode-descriptionForeground);
+	margin: 0 0 12px;
+}
+
+.primal-rig-editor .primal-rig-list {
+	display: flex;
+	flex-direction: column;
+}
+
+/* An empty section states the fact; it never shows a placeholder row. */
+.primal-rig-editor .primal-rig-empty {
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+}
+
+.primal-rig-editor .primal-rig-section.empty .primal-rig-list,
+.primal-rig-editor .primal-rig-section:not(.empty) .primal-rig-empty {
+	display: none;
+}
+
+/* Nothing is claimed until the number has been read off recorded state. */
+.primal-rig-editor .primal-rig-section.pending {
+	display: none;
+}
+
+/* ---------- Rows shared by Projects and Agent activity ---------- */
+
+.primal-rig-editor button.primal-rig-row {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	width: 100%;
+	padding: 7px 8px;
+	margin-left: -8px;
+	text-align: left;
+	font-family: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	color: var(--vscode-foreground);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--primal-rig-control-radius);
+}
+
+.primal-rig-editor button.primal-rig-row:hover {
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+/* ---------- Projects ---------- */
+
+.primal-rig-editor .primal-rig-project-name {
+	flex: none;
+	max-width: 45%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.primal-rig-editor .primal-rig-project-path {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---------- Agent activity ---------- */
+
+.primal-rig-editor .primal-rig-session-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Glyph plus word, in the page's own ink: never a hue-only signal. */
+.primal-rig-editor .primal-rig-session-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	padding: 1px 7px;
+	font-size: 11px;
+	line-height: 16px;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-editorWidget-background, transparent);
+	border: var(--primal-rig-edge);
+	border-radius: var(--primal-rig-control-radius);
+}
+
+.primal-rig-editor .primal-rig-session-status-icon {
+	font-size: 11px;
+}
+
+.primal-rig-editor .primal-rig-session-time {
+	flex: none;
+	font-size: 12px;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-rig-editor.narrow .primal-rig-session-time {
+	display: none;
+}
+
+/* ---------- Today ---------- */
+
+.primal-rig-editor .primal-rig-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.primal-rig-editor .primal-rig-stat {
+	flex: 0 1 260px;
+	padding: 14px 16px;
+	background: var(--vscode-editorWidget-background, transparent);
+	border: var(--primal-rig-edge);
+	border-radius: var(--primal-rig-slab-radius);
+}
+
+.primal-rig-editor .primal-rig-stat-value {
+	font-size: 26px;
+	font-weight: 600;
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+	color: var(--vscode-foreground);
+}
+
+.primal-rig-editor .primal-rig-stat-caption {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---------- Keyboard chips ---------- */
+
+.primal-rig-editor .primal-rig-kbd {
+	flex: none;
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 16px;
+	padding: 1px 6px;
+	border-radius: var(--primal-rig-control-radius);
+	white-space: nowrap;
+	color: var(--vscode-keybindingLabel-foreground, var(--vscode-descriptionForeground));
+	background: var(--vscode-keybindingLabel-background, transparent);
+	border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-widget-border, transparent));
+	border-bottom-color: var(--vscode-keybindingLabel-bottomBorder, var(--vscode-widget-border, transparent));
+}
+
+/* ---------- Focus
+ *
+ * `:focus` and `:focus-visible` have identical specificity here, so the reset
+ * has to come first or it would cancel the keyboard ring.
+ * ---------- */
+
+.primal-rig-editor button.primal-rig-row:focus,
+.primal-rig-editor button.primal-rig-primary:focus,
+.primal-rig-editor button.primal-rig-vibe-chip:focus {
+	outline: none;
+}
+
+.primal-rig-editor button.primal-rig-row:focus-visible,
+.primal-rig-editor button.primal-rig-primary:focus-visible,
+.primal-rig-editor button.primal-rig-vibe-chip:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+/* ---------- Footer shortcut row ---------- */
+
+.primal-rig-editor .primal-rig-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 44px;
+	padding-top: 20px;
+	border-top: var(--primal-rig-edge);
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-rig-editor .primal-rig-footer-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.primal-rig-editor .primal-rig-footer-separator {
+	opacity: 0.5;
+}
+
+/* ---------- High contrast
+ *
+ * The page keeps rendering; only the decorative half opts out. `hc-black` and
+ * `hc-light` are this fork's high-contrast classes, applied by the workbench
+ * theme service to the workbench container, the same guard primalChrome.css and
+ * primalBoot.css use.
+ * ---------- */
+
+.monaco-workbench.hc-black .primal-rig-editor,
+.monaco-workbench.hc-light .primal-rig-editor {
+	--primal-rig-slab-radius: 0;
+	--primal-rig-control-radius: 0;
+	--primal-rig-edge: 1px solid var(--vscode-contrastBorder);
+}
+
+.monaco-workbench.hc-black .primal-rig-editor button.primal-rig-row:hover,
+.monaco-workbench.hc-light .primal-rig-editor button.primal-rig-row:hover,
+.monaco-workbench.hc-black .primal-rig-editor button.primal-rig-primary:hover,
+.monaco-workbench.hc-light .primal-rig-editor button.primal-rig-primary:hover,
+.monaco-workbench.hc-black .primal-rig-editor button.primal-rig-vibe-chip:hover,
+.monaco-workbench.hc-light .primal-rig-editor button.primal-rig-vibe-chip:hover {
+	background: transparent;
+	border-color: var(--vscode-contrastActiveBorder, var(--vscode-contrastBorder));
+}
+
+.monaco-workbench.hc-black .primal-rig-editor .primal-rig-stat,
+.monaco-workbench.hc-light .primal-rig-editor .primal-rig-stat,
+.monaco-workbench.hc-black .primal-rig-editor .primal-rig-session-status,
+.monaco-workbench.hc-light .primal-rig-editor .primal-rig-session-status {
+	background: transparent;
+}
