@@ -665,6 +665,10 @@
 		{
 			"name": "vs/workbench/contrib/primalStart",
 			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/contrib/primalRig",
+			"project": "vscode-workbench"
 		}
 	],
 	"sessions": [
