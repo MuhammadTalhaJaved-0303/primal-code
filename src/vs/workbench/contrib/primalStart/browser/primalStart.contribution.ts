@@ -24,6 +24,7 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
 import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
 import { ILifecycleService, LifecyclePhase, StartupKind } from '../../../services/lifecycle/common/lifecycle.js';
+import { PrimalRigInput } from '../../primalRig/browser/primalRigInput.js';
 import { PrimalStartEditor } from './primalStartEditor.js';
 import { PrimalStartInput } from './primalStartInput.js';
 
@@ -32,6 +33,16 @@ const PRIMAL_OPEN_START_COMMAND_ID = 'primalCode.openStart';
 
 /** Opt-out for the automatic startup page. */
 const PRIMAL_START_PAGE_ENABLED_SETTING_ID = 'primalCode.startPage.enabled';
+
+/** Which page a new/empty window lands on. */
+const PRIMAL_START_PAGE_SURFACE_SETTING_ID = 'primalCode.startPage.surface';
+
+/** The landing surfaces a window can open with. */
+type PrimalLandingSurface = 'start' | 'rig' | 'none';
+
+const PRIMAL_LANDING_SURFACES: readonly PrimalLandingSurface[] = ['start', 'rig', 'none'];
+
+const DEFAULT_PRIMAL_LANDING_SURFACE: PrimalLandingSurface = 'start';
 
 /** Upstream's startup editor, whose default this fork flips to 'none'. */
 const UPSTREAM_STARTUP_EDITOR_SETTING_ID = 'workbench.startupEditor';
@@ -74,6 +85,18 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).regis
 			scope: ConfigurationScope.APPLICATION,
 			description: localize('primalCode.startPage.enabled', "Open the Primal Start page in new windows that restore no editors. The Get Started walkthroughs stay available through the 'Help: Welcome' command."),
 		},
+		[PRIMAL_START_PAGE_SURFACE_SETTING_ID]: {
+			type: 'string',
+			enum: [...PRIMAL_LANDING_SURFACES],
+			default: DEFAULT_PRIMAL_LANDING_SURFACE,
+			scope: ConfigurationScope.APPLICATION,
+			enumDescriptions: [
+				localize('primalCode.startPage.surface.start', "Open the Primal Start page."),
+				localize('primalCode.startPage.surface.rig', "Open the Rig, the home console for projects, agent activity and today."),
+				localize('primalCode.startPage.surface.none', "Open nothing."),
+			],
+			description: localize('primalCode.startPage.surface', "Which page new windows that restore no editors land on. Both pages stay available on demand through the 'Primal Code: Primal Start' and 'Primal Code: The Rig' commands."),
+		},
 	},
 });
 
@@ -97,18 +120,26 @@ registerAction2(OpenPrimalStartAction);
 // --- startup ---------------------------------------------------------------
 
 /**
- * Opens Primal Start for new/empty windows.
+ * Opens the landing surface for new/empty windows.
+ *
+ * This is the ONLY startup runner for the Primal landing pages. The Rig
+ * (`primalRig/browser/primalRig.contribution.ts`) deliberately registers none of
+ * its own and is opened from here instead, chosen by
+ * `primalCode.startPage.surface`: two runners racing for the same window is the
+ * failure `primal/design/rig-spec.md` forbids.
  *
  * The guards mirror `StartupPageRunnerContribution` in
- * `welcomeGettingStarted/browser/startupPage.ts`, which is the surface this page
- * replaces: wait for `LifecyclePhase.Restored`, skip when `--skip-welcome` was
- * passed, skip reloaded windows, skip when the auxiliary bar is maximized, and
- * only open when the window restored no editors of its own.
+ * `welcomeGettingStarted/browser/startupPage.ts`, which is the surface these
+ * pages replace: wait for `LifecyclePhase.Restored`, skip when `--skip-welcome`
+ * was passed, skip reloaded windows, skip when the auxiliary bar is maximized,
+ * and only open when the window restored no editors of its own.
  *
- * The opt-out is `primalCode.startPage.enabled`. Upstream's `workbench.startupEditor`
- * still wins where a user set it explicitly, so the two runners never open two
- * startup pages into the same window; its default is flipped to `none` for this
- * fork precisely so Primal Start is what a fresh install gets.
+ * `primalCode.startPage.enabled` remains the master opt-out and
+ * `primalCode.startPage.surface` picks which page. Upstream's
+ * `workbench.startupEditor` still wins where a user set it explicitly, so the
+ * two runners never open two startup pages into the same window; its default is
+ * flipped to `none` for this fork precisely so a Primal page is what a fresh
+ * install gets.
  */
 class PrimalStartRunnerContribution extends Disposable implements IWorkbenchContribution {
 
@@ -132,14 +163,25 @@ class PrimalStartRunnerContribution extends Disposable implements IWorkbenchCont
 		// startup pressure (same reason as upstream).
 		await this.lifecycleService.when(LifecyclePhase.Restored);
 
-		if (!this.shouldOpenStartPage()) {
+		const surface = this.resolveSurface();
+		if (surface === 'none' || !this.shouldOpenStartPage()) {
 			return;
 		}
 
-		await this.editorService.openEditor(new PrimalStartInput(), {
+		await this.editorService.openEditor(surface === 'rig' ? new PrimalRigInput() : new PrimalStartInput(), {
 			pinned: false,
 			preserveFocus: this.shouldPreserveFocus()
 		});
+	}
+
+	/**
+	 * The configured landing surface. Settings are external data, so an
+	 * unrecognized value falls back to the default rather than being trusted.
+	 */
+	private resolveSurface(): PrimalLandingSurface {
+		const configured = this.configurationService.getValue<string>(PRIMAL_START_PAGE_SURFACE_SETTING_ID);
+
+		return PRIMAL_LANDING_SURFACES.find(surface => surface === configured) ?? DEFAULT_PRIMAL_LANDING_SURFACE;
 	}
 
 	private shouldOpenStartPage(): boolean {
@@ -177,8 +219,10 @@ class PrimalStartRunnerContribution extends Disposable implements IWorkbenchCont
 			return false;
 		}
 
-		if (this.editorService.editors.some(editor => editor.typeId === PrimalStartInput.ID)) {
-			return false; // never open it twice
+		// Never open a landing page on top of one that was already restored, in
+		// either direction: both are singleton inputs owning the same slot.
+		if (this.editorService.editors.some(editor => editor.typeId === PrimalStartInput.ID || editor.typeId === PrimalRigInput.ID)) {
+			return false;
 		}
 
 		return true;
