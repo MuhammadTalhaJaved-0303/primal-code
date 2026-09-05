@@ -1,7 +1,7 @@
 {
 	"name": "primal-code",
 	"displayName": "Primal Code",
-	"description": "Bring your own OpenAI or Anthropic key and use it as a first-class model everywhere VS Code asks for one: chat, agent mode, inline edits.",
+	"description": "Bring your own OpenAI or Anthropic key and use it as a first-class model everywhere Primal Code asks for one: chat, agent mode, inline edits.",
 	"version": "0.2.0",
 	"publisher": "primal-ai",
 	"license": "MIT",

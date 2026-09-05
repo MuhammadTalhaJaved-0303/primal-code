@@ -1099,12 +1099,12 @@ suite('SessionPluginBundler', () => {
 		const result = await bundler.bundle(directories);
 
 		assert.ok(result);
-		assert.strictEqual(result.ref.name, 'VS Code Synced Data');
+		assert.strictEqual(result.ref.name, 'Primal Code Synced Data');
 		assert.ok(result.ref.nonce);
 
 		const root = bundler.rootUri;
 		const manifest = await fileService.readFile(URI.joinPath(root, '.plugin', 'plugin.json'));
-		assert.match(manifest.value.toString(), /"name": "VS Code Synced Data"/);
+		assert.match(manifest.value.toString(), /"name": "Primal Code Synced Data"/);
 
 		const agent = await fileService.readFile(URI.joinPath(root, 'agents', 'foo.agent.md'));
 		assert.strictEqual(agent.value.toString(), 'agent body');

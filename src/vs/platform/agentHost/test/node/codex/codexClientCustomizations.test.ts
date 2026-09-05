@@ -257,7 +257,7 @@ suite('codexClientCustomizations', () => {
 				type: CustomizationType.Plugin,
 				id: 'synthetic-plugin',
 				uri: `${SYNCED_CUSTOMIZATION_SCHEME}:/agent-host-codex`,
-				name: 'VS Code Synced Data',
+				name: 'Primal Code Synced Data',
 			},
 			pluginDir: syncedPluginUri,
 		};
@@ -290,7 +290,7 @@ suite('codexClientCustomizations', () => {
 			},
 			{
 				synced: {
-					customization: { type: CustomizationType.Plugin, id: 'synthetic-plugin', uri: `${SYNCED_CUSTOMIZATION_SCHEME}:/agent-host-codex`, name: 'VS Code Synced Data', },
+					customization: { type: CustomizationType.Plugin, id: 'synthetic-plugin', uri: `${SYNCED_CUSTOMIZATION_SCHEME}:/agent-host-codex`, name: 'Primal Code Synced Data', },
 					pluginDir: syntheticPluginUri,
 				},
 				parsed: parsed({ agents: [agentDef(syntheticAgentUri, 'synthetic-reviewer')] }),

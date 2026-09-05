@@ -122,17 +122,17 @@ suite('customizationMigration', () => {
 		}, {
 			shortcut: 'User data, 1 customization needs migration',
 			agent: {
-				card: 'User data customizations are only used by VS Code. Found 1 agent that Copilot [Agent Host] ignores. Move it to keep it available.',
-				page: 'Found 1 agent in user data that local VS Code can still use, but Copilot [Agent Host] ignores. Move it to the harness agents folder to keep it available.',
+				card: 'User data customizations are only used by Primal Code. Found 1 agent that Copilot [Agent Host] ignores. Move it to keep it available.',
+				page: 'Found 1 agent in user data that local Primal Code can still use, but Copilot [Agent Host] ignores. Move it to the harness agents folder to keep it available.',
 				confirmation: 'This moves 1 agent out of user data.',
 			},
 			instruction: {
-				card: 'User data customizations are only used by VS Code. Found 1 instruction file that Copilot [Agent Host] ignores. Move it to keep it available.',
-				page: 'Found 1 instruction file in user data that local VS Code can still use, but Copilot [Agent Host] ignores. Move it to the harness instructions folder to keep it available.',
+				card: 'User data customizations are only used by Primal Code. Found 1 instruction file that Copilot [Agent Host] ignores. Move it to keep it available.',
+				page: 'Found 1 instruction file in user data that local Primal Code can still use, but Copilot [Agent Host] ignores. Move it to the harness instructions folder to keep it available.',
 				confirmation: 'This moves 1 instruction file out of user data.',
 			},
 			mixed: {
-				card: 'User data customizations are only used by VS Code. Found 2 customizations that Copilot [Agent Host] ignores. Move them to keep them available.',
+				card: 'User data customizations are only used by Primal Code. Found 2 customizations that Copilot [Agent Host] ignores. Move them to keep them available.',
 				confirmation: 'This moves 2 customizations out of user data.',
 			},
 			migrated: 'Migrated 1 user data customization.',
