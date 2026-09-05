@@ -39,6 +39,8 @@ import './services/dialogs/electron-browser/fileDialogService.js';
 import './services/workspaces/electron-browser/workspacesService.js';
 import './services/menubar/electron-browser/menubarService.js';
 import './services/update/electron-browser/updateService.js';
+import './services/primalTelemetry/electron-browser/primalTelemetryService.js';
+import './services/primalMedia/electron-browser/primalMediaService.js';
 import './services/url/electron-browser/urlService.js';
 import './services/lifecycle/electron-browser/lifecycleService.js';
 import './services/title/electron-browser/titleService.js';
