@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { $ } from '../../../../base/browser/dom.js';
-import { VSCODE_LOGO_PATH } from './vscodeLogoPath.js';
+import { PRIMAL_LOGO_PATH } from './primalLogoPath.js';
 
 /**
  * VS Code logo "fish" used by the Agents window aquarium. Each fish is a small
@@ -243,7 +243,7 @@ function createVSCodeLogoSymbol(): SVGSymbolElement {
 	symbol.setAttribute('overflow', 'visible');
 
 	const logoPath = $.SVG<SVGPathElement>('path');
-	logoPath.setAttribute('d', VSCODE_LOGO_PATH);
+	logoPath.setAttribute('d', PRIMAL_LOGO_PATH);
 	logoPath.setAttribute('fill', 'currentColor');
 	logoPath.setAttribute('fill-rule', 'evenodd');
 	symbol.appendChild(logoPath);
@@ -268,7 +268,7 @@ function buildFishSvg(targetDocument: Document): SVGSVGElement {
 	const svg = $.SVG<SVGSVGElement>('svg');
 	svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 	svg.setAttribute('focusable', 'false');
-	// viewBox 0..96 matches the original VS Code icon.
+	// viewBox 0..96 matches the mark's box in primalLogoPath.ts.
 	svg.setAttribute('viewBox', '0 0 96 96');
 	svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 	// Tell the rasterizer to optimize for visual quality, not speed: smoother

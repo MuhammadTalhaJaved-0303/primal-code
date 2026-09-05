@@ -27,34 +27,45 @@ trap 'rm -rf "$WORK"' EXIT
 # carry a Chrome download. Resolved relative to this repo rather than absolute,
 # so the path survives the workspace being moved or renamed.
 RENDERER="${PUPPETEER_PROJECT:-$ROOT/../primal-studio}"
-if [[ ! -d "$RENDERER/node_modules/puppeteer" ]]; then
-  echo "error: puppeteer not found under $RENDERER" >&2
-  echo "set PUPPETEER_PROJECT to a project that has puppeteer installed" >&2
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+# Rasterise at 1024px. Prefer a puppeteer project when one is around (pixel
+# identical to Chrome); otherwise fall back to macOS Quick Look, which renders
+# SVG through WebKit and needs nothing installed. Both produce the same PNG the
+# rest of this script consumes, so the icons are reproducible on any Mac.
+echo "rasterising $SVG at 1024px"
+if [[ -d "$RENDERER/node_modules/puppeteer" ]]; then
+  cat > "$RENDERER/.primal-render.tmp.mjs" <<'JS'
+import puppeteer from "puppeteer";
+import fs from "node:fs";
+const [svgPath, outPath, size] = process.argv.slice(2);
+const svg = fs.readFileSync(svgPath, "utf8");
+const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
+const page = await browser.newPage();
+await page.setViewport({ width: Number(size), height: Number(size), deviceScaleFactor: 1 });
+await page.setContent(`<html><body style="margin:0;background:transparent">${svg}</body></html>`);
+await page.evaluate(() => { const s = document.querySelector("svg"); s.setAttribute("width", "1024"); s.setAttribute("height", "1024"); });
+await page.screenshot({ path: outPath, omitBackground: true, clip: { x: 0, y: 0, width: Number(size), height: Number(size) } });
+await browser.close();
+JS
+  ( cd "$RENDERER" && node .primal-render.tmp.mjs "$SVG" "$WORK/icon_1024.png" 1024 )
+  rm -f "$RENDERER/.primal-render.tmp.mjs"
+else
+  echo "puppeteer not found under $RENDERER; rendering with Quick Look"
+  qlmanage -t -s 1024 -o "$WORK" "$SVG" >/dev/null 2>&1
+  mv "$WORK/$(basename "$SVG").png" "$WORK/icon_1024.png"
+fi
+W=$(sips -g pixelWidth "$WORK/icon_1024.png" | awk '/pixelWidth/{print $2}')
+H=$(sips -g pixelHeight "$WORK/icon_1024.png" | awk '/pixelHeight/{print $2}')
+if [[ "$W" != "1024" || "$H" != "1024" ]]; then
+  echo "error: rasteriser produced ${W}x${H}, expected 1024x1024" >&2
   exit 1
 fi
 
-echo "rasterising $SVG at 1024px"
-cat > "$WORK/render.mjs" <<'JS'
-import puppeteer from "puppeteer";
-import { readFileSync } from "node:fs";
-const [svgPath, out, size] = process.argv.slice(2);
-const svg = readFileSync(svgPath, "utf8");
-const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
-const page = await browser.newPage();
-await page.setViewport({ width: +size, height: +size, deviceScaleFactor: 1 });
-await page.setContent(
-  `<body style="margin:0">${svg.replace("<svg", `<svg width="${size}" height="${size}"`)}</body>`
-);
-await page.screenshot({ path: out, omitBackground: true });
-await browser.close();
-JS
-cp "$WORK/render.mjs" "$RENDERER/.primal-render.tmp.mjs"
-( cd "$RENDERER" && node .primal-render.tmp.mjs "$SVG" "$WORK/icon_1024.png" 1024 )
-rm -f "$RENDERER/.primal-render.tmp.mjs"
-
-# ---- macOS .icns -----------------------------------------------------------
-SET="$WORK/Primal.iconset"
+SET="$WORK/PrimalCode.iconset"
 mkdir -p "$SET"
+
 # iconutil requires these exact names; a missing size is silently dropped and
 # shows up later as a blurry dock icon.
 for spec in "16 icon_16x16" "32 icon_16x16@2x" "32 icon_32x32" "64 icon_32x32@2x" \
