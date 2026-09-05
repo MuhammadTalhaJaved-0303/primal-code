@@ -90,6 +90,10 @@ import { LinuxUpdateService } from '../../platform/update/electron-main/updateSe
 import { SnapUpdateService } from '../../platform/update/electron-main/updateService.snap.js';
 import { Win32UpdateService } from '../../platform/update/electron-main/updateService.win32.js';
 import { isInnoSetupInstall } from '../../platform/update/electron-main/win32UpdateType.js';
+import { IPrimalMediaService } from '../../platform/primalMedia/common/primalMedia.js';
+import { PrimalMediaMainService } from '../../platform/primalMedia/electron-main/primalMediaMainService.js';
+import { IPrimalTelemetryService } from '../../platform/primalTelemetry/common/primalTelemetry.js';
+import { PrimalTelemetryMainService } from '../../platform/primalTelemetry/electron-main/primalTelemetryMainService.js';
 import { IOpenURLOptions, IURLService } from '../../platform/url/common/url.js';
 import { URLHandlerChannelClient, URLHandlerRouter } from '../../platform/url/common/urlIpc.js';
 import { NativeURLService } from '../../platform/url/common/urlService.js';
@@ -1180,6 +1184,10 @@ export class CodeApplication extends Disposable {
 				break;
 		}
 
+		// Primal Deck (machine telemetry and now playing, sampled only while the renderer holds a lease)
+		services.set(IPrimalTelemetryService, new SyncDescriptor(PrimalTelemetryMainService, undefined, false /* proxied to other processes */));
+		services.set(IPrimalMediaService, new SyncDescriptor(PrimalMediaMainService, undefined, false /* proxied to other processes */));
+
 		// Windows
 		services.set(IWindowsMainService, new SyncDescriptor(WindowsMainService, [machineId, sqmId, devDeviceId, this.userEnv], false));
 		services.set(IAuxiliaryWindowsMainService, new SyncDescriptor(AuxiliaryWindowsMainService, undefined, false));
@@ -1355,6 +1363,16 @@ export class CodeApplication extends Disposable {
 
 		// Show a native "no updates available" dialog from the main process only in windowless macOS case.
 		this._register(new NotAvailableUpdateDialog(updateService, accessor.get(IDialogMainService), accessor.get(IWindowsMainService)));
+
+		// Primal Deck
+		const primalTelemetryChannel = ProxyChannel.fromService(accessor.get(IPrimalTelemetryService), disposables, {
+			// A sample is only true for the second it was taken: never replay one that was buffered before a renderer listened.
+			unbufferedEvents: ['onDidSample']
+		});
+		mainProcessElectronServer.registerChannel('primalTelemetry', primalTelemetryChannel);
+
+		const primalMediaChannel = ProxyChannel.fromService(accessor.get(IPrimalMediaService), disposables);
+		mainProcessElectronServer.registerChannel('primalMedia', primalMediaChannel);
 
 		// Metered Connection
 		const meteredConnectionChannel = new MeteredConnectionChannel(accessor.get(IMeteredConnectionService) as MeteredConnectionMainService);

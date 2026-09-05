@@ -1,0 +1,755 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * The Deck - the full-window console (primal/design/deck-spec.md).
+ *
+ * Rules of engagement for this file:
+ *
+ * - EVERY color is a workbench theme token, with zero literals, so all six
+ *   vibes and any user theme restyle the console for free.
+ *
+ * - Meaning is never carried by hue. A status is a glyph plus a word, a bar
+ *   is a length, and the whole page is painted in the theme's own ink.
+ *
+ * - Shape follows the "Slab" language shared with The Rig: quiet surfaces, a
+ *   hairline edge, a small control radius, no accent fills.
+ *
+ * - High contrast opts out of the decorative half: radii collapse, the
+ *   hairline becomes the contrast border and hover fills go away. The console
+ *   itself keeps rendering.
+ *
+ * - No animation of its own except two short transitions, both switched off
+ *   under reduced motion. The spectrum's motion is real data, drawn by
+ *   primalDeckSpectrum.ts, and is gated there.
+ */
+
+.primal-deck-editor {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+	user-select: text;
+	color: var(--vscode-foreground);
+
+	/* Shape constants, shared with The Rig's control tier. */
+	--primal-deck-control-radius: var(--vscode-cornerRadius-medium, 6px);
+	--primal-deck-edge: 1px solid var(--vscode-widget-border, var(--vscode-editorGroup-border, transparent));
+}
+
+/* ---------- Header: thin ---------- */
+
+.primal-deck-editor .primal-deck-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex: none;
+	min-height: 38px;
+	padding: 6px 14px;
+	border-bottom: var(--primal-deck-edge);
+}
+
+.primal-deck-editor .primal-deck-brand {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex: none;
+	min-width: 0;
+}
+
+.primal-deck-editor .primal-deck-wordmark {
+	font-weight: 600;
+	font-size: 14px;
+	letter-spacing: -0.01em;
+	white-space: nowrap;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-clock {
+	flex: none;
+	font-family: var(--monaco-monospace-font);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-session {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: center;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---------- Controls: vibe chip, exit, jump ---------- */
+
+.primal-deck-editor button.primal-deck-control {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	padding: 4px 10px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	border: var(--primal-deck-edge);
+	border-radius: var(--primal-deck-control-radius);
+	transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.primal-deck-editor button.primal-deck-control:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+	border-color: var(--vscode-focusBorder);
+}
+
+.primal-deck-editor .primal-deck-control-icon {
+	flex: none;
+	font-size: 13px;
+}
+
+.primal-deck-editor .primal-deck-vibe-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 14ch;
+}
+
+.primal-deck-editor button.primal-deck-exit {
+	color: var(--vscode-foreground);
+}
+
+/* ---------- Body: three columns ---------- */
+
+.primal-deck-editor .primal-deck-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: grid;
+	grid-template-columns: 26fr 48fr 26fr;
+}
+
+.primal-deck-editor .primal-deck-column {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.primal-deck-editor .primal-deck-left {
+	border-right: var(--primal-deck-edge);
+}
+
+.primal-deck-editor .primal-deck-right {
+	border-left: var(--primal-deck-edge);
+}
+
+/* Below ~900px: stream and telemetry only. */
+.primal-deck-editor.narrow .primal-deck-body {
+	grid-template-columns: 64fr 36fr;
+}
+
+.primal-deck-editor.narrow .primal-deck-left {
+	display: none;
+}
+
+/* Below ~640px: the stream alone. */
+.primal-deck-editor.compact .primal-deck-body {
+	grid-template-columns: 1fr;
+}
+
+.primal-deck-editor.compact .primal-deck-right {
+	display: none;
+}
+
+/* ---------- Panels ---------- */
+
+.primal-deck-editor .primal-deck-panel {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 10px 12px;
+}
+
+.primal-deck-editor .primal-deck-panel + .primal-deck-panel {
+	border-top: var(--primal-deck-edge);
+}
+
+.primal-deck-editor .primal-deck-panel-label {
+	flex: none;
+	margin: 0 0 8px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* An honest empty or waiting line; never a placeholder row. */
+.primal-deck-editor .primal-deck-panel-status {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-panel-status:empty {
+	display: none;
+}
+
+.primal-deck-editor .primal-deck-panel-caption {
+	flex: none;
+	margin-top: 6px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-panel-caption:empty {
+	display: none;
+}
+
+.primal-deck-editor .primal-deck-now-playing,
+.primal-deck-editor .primal-deck-telemetry {
+	flex: none;
+}
+
+.primal-deck-editor .primal-deck-sessions,
+.primal-deck-editor .primal-deck-stream,
+.primal-deck-editor .primal-deck-spectrum {
+	flex: 1 1 auto;
+}
+
+/* ---------- The Stream ---------- */
+
+.primal-deck-editor .primal-deck-log-host {
+	position: relative;
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.primal-deck-editor .primal-deck-log {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	outline: none;
+	font-size: 12px;
+	line-height: 18px;
+}
+
+/* Only the log lines are monospace; the empty state below keeps the UI font. */
+.primal-deck-editor .primal-deck-log-lines {
+	font-family: var(--monaco-monospace-font);
+	font-variant-numeric: tabular-nums;
+}
+
+.primal-deck-editor .primal-deck-line {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 1px 0;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.primal-deck-editor .primal-deck-line-time {
+	flex: none;
+	min-width: 8ch;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-line-glyph {
+	flex: none;
+	width: 1.5ch;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-line-label {
+	flex: none;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-line-detail {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-line.kind-tool .primal-deck-line-label,
+.primal-deck-editor .primal-deck-line.kind-status .primal-deck-line-label {
+	font-weight: 600;
+}
+
+.primal-deck-editor .primal-deck-line.kind-tool .primal-deck-line-detail,
+.primal-deck-editor .primal-deck-line.kind-edit .primal-deck-line-detail,
+.primal-deck-editor .primal-deck-line.kind-status .primal-deck-line-detail,
+.primal-deck-editor .primal-deck-line.kind-session .primal-deck-line-detail {
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-line.kind-edit .primal-deck-line-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+	flex: 0 1 auto;
+}
+
+.primal-deck-editor .primal-deck-line.kind-thinking {
+	font-style: italic;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-line.kind-thinking .primal-deck-line-label,
+.primal-deck-editor .primal-deck-line.kind-thinking .primal-deck-line-detail {
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-line.kind-session {
+	color: var(--vscode-descriptionForeground);
+}
+
+/* A subagent's tool call sits one step in. */
+.primal-deck-editor .primal-deck-line.nested {
+	padding-left: 2ch;
+}
+
+/* Restored lines streamed before the Deck was watching and carry no arrival time. */
+.primal-deck-editor .primal-deck-line.restored {
+	opacity: 0.7;
+}
+
+.primal-deck-editor .primal-deck-log-empty {
+	display: none;
+	padding: 6px 0;
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-log-empty.active {
+	display: block;
+}
+
+.primal-deck-editor button.primal-deck-jump {
+	position: absolute;
+	right: 12px;
+	bottom: 8px;
+	display: none;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background, transparent);
+	border: var(--primal-deck-edge);
+	border-radius: var(--primal-deck-control-radius);
+	box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
+}
+
+.primal-deck-editor button.primal-deck-jump.active {
+	display: inline-flex;
+}
+
+.primal-deck-editor button.primal-deck-jump:hover {
+	border-color: var(--vscode-focusBorder);
+}
+
+/* ---------- Telemetry ---------- */
+
+.primal-deck-editor .primal-deck-readouts {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	font-family: var(--monaco-monospace-font);
+	font-size: 12px;
+}
+
+/* Nothing is claimed until the first sample has been read. */
+.primal-deck-editor .primal-deck-readouts.pending {
+	display: none;
+}
+
+/* No sample is arriving any more: the last real numbers stay readable but stop
+	presenting themselves as live, under the panel's "unavailable" line. */
+.primal-deck-editor .primal-deck-readouts.stale {
+	opacity: 0.6;
+}
+
+.primal-deck-editor .primal-deck-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.primal-deck-editor .primal-deck-row.hidden {
+	display: none;
+}
+
+.primal-deck-editor .primal-deck-row-key {
+	flex: none;
+	width: 4ch;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-meter {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 8px;
+	overflow: hidden;
+	background: transparent;
+	border: var(--primal-deck-edge);
+	border-radius: var(--primal-deck-control-radius);
+}
+
+.primal-deck-editor .primal-deck-meter-fill {
+	height: 100%;
+	width: 0;
+	background: var(--vscode-foreground);
+	opacity: 0.55;
+	transition: width 0.4s linear;
+}
+
+.primal-deck-editor .primal-deck-row-value {
+	flex: none;
+	min-width: 5ch;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-row-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.primal-deck-editor .primal-deck-cores {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 2px 10px;
+}
+
+.primal-deck-editor .primal-deck-cores .primal-deck-row {
+	gap: 6px;
+}
+
+.primal-deck-editor .primal-deck-cores .primal-deck-row-key {
+	width: 3ch;
+	font-size: 11px;
+}
+
+.primal-deck-editor .primal-deck-cores .primal-deck-meter {
+	height: 5px;
+}
+
+.primal-deck-editor .primal-deck-cores .primal-deck-row-value {
+	min-width: 4ch;
+	font-size: 11px;
+}
+
+/* ---------- Spectrum ---------- */
+
+.primal-deck-editor .primal-deck-spectrum-host {
+	flex: 1 1 auto;
+	min-height: 80px;
+	min-width: 0;
+}
+
+.primal-deck-editor .primal-deck-spectrum-canvas {
+	display: block;
+	font: 11px var(--monaco-monospace-font);
+}
+
+/* Canvas pixels are not in the accessibility tree: this carries the numbers the
+	canvas draws. Off screen, never hidden from assistive technology. */
+.primal-deck-editor .primal-deck-spectrum-readout {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* ---------- Now Playing ---------- */
+
+.primal-deck-editor .primal-deck-track {
+	display: none;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.primal-deck-editor .primal-deck-track.active {
+	display: flex;
+}
+
+/* Artwork only ever from a URL the player handed over; hidden otherwise. */
+.primal-deck-editor .primal-deck-art {
+	display: none;
+	flex: none;
+	width: 48px;
+	height: 48px;
+	object-fit: cover;
+	border: var(--primal-deck-edge);
+	border-radius: var(--primal-deck-control-radius);
+}
+
+.primal-deck-editor .primal-deck-art.active {
+	display: block;
+}
+
+.primal-deck-editor .primal-deck-track-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.primal-deck-editor .primal-deck-track-title {
+	font-size: 13px;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-foreground);
+}
+
+.primal-deck-editor .primal-deck-track-artist {
+	font-size: 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-transport {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-family: var(--monaco-monospace-font);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-transport-app {
+	margin-left: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ---------- Agent sessions ---------- */
+
+/* A scroll container clips at its padding box on both axes, and the rows below
+	bleed 6px past its left edge with a focus ring 3px further out again. The
+	padding makes room for that bleed inside the box; the matching negative
+	margin keeps every row exactly where it was drawn before. */
+.primal-deck-editor .primal-deck-session-list {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 4px 0 4px 10px;
+	margin: -4px 0 -4px -10px;
+}
+
+.primal-deck-editor .primal-deck-sessions.empty .primal-deck-session-list,
+.primal-deck-editor .primal-deck-sessions:not(.empty) .primal-deck-panel-status {
+	display: none;
+}
+
+.primal-deck-editor button.primal-deck-session-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	width: 100%;
+	padding: 5px 6px;
+	margin-left: -6px;
+	text-align: left;
+	font-family: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	color: var(--vscode-foreground);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--primal-deck-control-radius);
+}
+
+.primal-deck-editor button.primal-deck-session-row:hover {
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+.primal-deck-editor .primal-deck-session-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Glyph plus word, in the page's own ink: never a hue-only signal. */
+.primal-deck-editor .primal-deck-session-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	min-width: 9ch;
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-session-status-icon {
+	font-size: 11px;
+}
+
+.primal-deck-editor .primal-deck-session-time {
+	flex: none;
+	font-size: 11px;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---------- Keyboard chips ---------- */
+
+.primal-deck-editor .primal-deck-kbd {
+	flex: none;
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 16px;
+	padding: 0 6px;
+	border-radius: var(--primal-deck-control-radius);
+	white-space: nowrap;
+	color: var(--vscode-keybindingLabel-foreground, var(--vscode-descriptionForeground));
+	background: var(--vscode-keybindingLabel-background, transparent);
+	border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-widget-border, transparent));
+	border-bottom-color: var(--vscode-keybindingLabel-bottomBorder, var(--vscode-widget-border, transparent));
+}
+
+/* ---------- Footer shortcut row ---------- */
+
+.primal-deck-editor .primal-deck-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+	padding: 6px 14px;
+	border-top: var(--primal-deck-edge);
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-deck-editor .primal-deck-footer-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.primal-deck-editor .primal-deck-footer-separator {
+	opacity: 0.5;
+}
+
+/* ---------- Focus
+ *
+ * `:focus` and `:focus-visible` have identical specificity here, so the reset
+ * has to come first or it would cancel the keyboard ring.
+ * ---------- */
+
+.primal-deck-editor button.primal-deck-control:focus,
+.primal-deck-editor button.primal-deck-jump:focus,
+.primal-deck-editor button.primal-deck-session-row:focus,
+.primal-deck-editor .primal-deck-log:focus {
+	outline: none;
+}
+
+.primal-deck-editor button.primal-deck-control:focus-visible,
+.primal-deck-editor button.primal-deck-jump:focus-visible,
+.primal-deck-editor button.primal-deck-session-row:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.primal-deck-editor .primal-deck-log:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+/* ---------- Reduced motion: the two transitions go away; the spectrum is gated in code. ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+	.primal-deck-editor button.primal-deck-control,
+	.primal-deck-editor .primal-deck-meter-fill {
+		transition: none;
+	}
+}
+
+/* ---------- High contrast
+ *
+ * The console keeps rendering; only the decorative half opts out. `hc-black`
+ * and `hc-light` are this fork's high-contrast classes, applied by the
+ * workbench theme service to the workbench container - the same guard
+ * primalRig.css, primalChrome.css and primalBoot.css use.
+ * ---------- */
+
+.monaco-workbench.hc-black .primal-deck-editor,
+.monaco-workbench.hc-light .primal-deck-editor {
+	--primal-deck-control-radius: 0;
+	--primal-deck-edge: 1px solid var(--vscode-contrastBorder);
+}
+
+.monaco-workbench.hc-black .primal-deck-editor button.primal-deck-control:hover,
+.monaco-workbench.hc-light .primal-deck-editor button.primal-deck-control:hover,
+.monaco-workbench.hc-black .primal-deck-editor button.primal-deck-session-row:hover,
+.monaco-workbench.hc-light .primal-deck-editor button.primal-deck-session-row:hover,
+.monaco-workbench.hc-black .primal-deck-editor button.primal-deck-jump:hover,
+.monaco-workbench.hc-light .primal-deck-editor button.primal-deck-jump:hover {
+	background: transparent;
+	border-color: var(--vscode-contrastActiveBorder, var(--vscode-contrastBorder));
+}
+
+.monaco-workbench.hc-black .primal-deck-editor .primal-deck-meter-fill,
+.monaco-workbench.hc-light .primal-deck-editor .primal-deck-meter-fill {
+	opacity: 1;
+}
+
+.monaco-workbench.hc-black .primal-deck-editor .primal-deck-line.restored,
+.monaco-workbench.hc-light .primal-deck-editor .primal-deck-line.restored,
+.monaco-workbench.hc-black .primal-deck-editor .primal-deck-readouts.stale,
+.monaco-workbench.hc-light .primal-deck-editor .primal-deck-readouts.stale {
+	opacity: 1;
+}
+
+.monaco-workbench.hc-black .primal-deck-editor button.primal-deck-jump,
+.monaco-workbench.hc-light .primal-deck-editor button.primal-deck-jump {
+	background: transparent;
+	box-shadow: none;
+}

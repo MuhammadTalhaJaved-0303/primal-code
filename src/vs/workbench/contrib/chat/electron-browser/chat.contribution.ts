@@ -35,6 +35,7 @@ import './codexCustomizationSettings.contribution.js';
 import '../browser/primalSettings/primalSettings.contribution.js';
 import '../../primalStart/browser/primalStart.contribution.js';
 import '../../primalRig/browser/primalRig.contribution.js';
+import '../../primalDeck/browser/primalDeck.contribution.js';
 import '../../primalVibes/browser/primalVibes.contribution.js';
 import '../../primalBoot/browser/primalBoot.contribution.js';
 import '../../primalWallpaper/browser/primalWallpaper.contribution.js';

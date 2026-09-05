@@ -977,6 +977,7 @@
 		"--vscode-window-inactiveBorder"
 	],
 	"sizes": [
+		"--primal-deck-control-radius",
 		"--primal-rig-control-radius",
 		"--primal-rig-slab-radius",
 		"--primal-slab-radius",
@@ -1148,6 +1149,7 @@
 		"--primal-boot-line-index",
 		"--primal-boot-reveal",
 		"--primal-boot-stagger",
+		"--primal-deck-edge",
 		"--primal-rig-edge",
 		"--primal-start-edge",
 		"--primal-wallpaper-grain",
