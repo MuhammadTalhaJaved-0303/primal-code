@@ -106,7 +106,7 @@ export class SessionsPolicyBlockedOverlay extends Disposable {
 		}));
 
 		const button = this._register(new Button(card, { ...defaultButtonStyles, secondary: true }));
-		button.label = localize('policyBlocked.openVSCode', "Open VS Code");
+		button.label = localize('policyBlocked.openVSCode', "Open Primal Code");
 		this._register(button.onDidClick(() => this._openVSCode()));
 	}
 

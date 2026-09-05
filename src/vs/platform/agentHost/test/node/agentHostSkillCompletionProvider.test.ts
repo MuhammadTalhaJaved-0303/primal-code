@@ -182,7 +182,7 @@ suite('AgentHostSkillCompletionProvider', () => {
 	test('de-duplicates the same skill discovered via the synced bundle and the on-disk scan', async () => {
 		const agent = new MockAgent('mock');
 		agent.getSessionCustomizations = async () => [
-			syncedPlugin('VS Code Synced Data', [skillAt('flaky-smoke-tests', 'vscode-synced-customization:/plugins/bundle/skills/flaky-smoke-tests/SKILL.md', 'Diagnose flaky tests')]),
+			syncedPlugin('Primal Code Synced Data', [skillAt('flaky-smoke-tests', 'vscode-synced-customization:/plugins/bundle/skills/flaky-smoke-tests/SKILL.md', 'Diagnose flaky tests')]),
 			directory('.github', 'file:///ws/.github/skills', [skillAt('flaky-smoke-tests', 'file:///ws/.github/skills/flaky-smoke-tests/SKILL.md', 'Diagnose flaky tests')]),
 		];
 		const provider = createProvider(agent);

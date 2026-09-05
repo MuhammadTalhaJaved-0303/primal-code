@@ -127,20 +127,20 @@ const promptFilesMigrationCategory: ICustomizationMigrationCategory = {
 		if (workspaceCount > 0 && userCount > 0) {
 			return localize(
 				'promptMigrationCardDescriptionWorkspaceAndUser',
-				"Prompt files are deprecated for this harness. Found {0} prompt files ({1} workspace, {2} global) that local VS Code can still run, but {3} ignores. Convert them to skills to keep them available.",
+				"Prompt files are deprecated for this harness. Found {0} prompt files ({1} workspace, {2} global) that local Primal Code can still run, but {3} ignores. Convert them to skills to keep them available.",
 				totalCount, workspaceCount, userCount, harnessLabel,
 			);
 		}
 		if (workspaceCount > 0) {
 			return localize(
 				'promptMigrationCardDescriptionWorkspace',
-				"Prompt files are deprecated for this harness. Found {0} workspace prompt files that local VS Code can still run, but {1} ignores. Convert them to skills to keep them available.",
+				"Prompt files are deprecated for this harness. Found {0} workspace prompt files that local Primal Code can still run, but {1} ignores. Convert them to skills to keep them available.",
 				workspaceCount, harnessLabel,
 			);
 		}
 		return localize(
 			'promptMigrationCardDescriptionUser',
-			"Prompt files are deprecated for this harness. Found {0} global prompt files that local VS Code can still run, but {1} ignores. Convert them to skills to keep them available.",
+			"Prompt files are deprecated for this harness. Found {0} global prompt files that local Primal Code can still run, but {1} ignores. Convert them to skills to keep them available.",
 			userCount, harnessLabel,
 		);
 	},
@@ -153,20 +153,20 @@ const promptFilesMigrationCategory: ICustomizationMigrationCategory = {
 		if (workspaceCount > 0 && userCount > 0) {
 			return localize(
 				'promptMigrationPageDescriptionWorkspaceAndUser',
-				"Prompt files are not supported for this harness. Found {0} prompt files ({1} workspace, {2} user) that local VS Code can still run, but {3} ignores. Convert them to skills to keep them available.",
+				"Prompt files are not supported for this harness. Found {0} prompt files ({1} workspace, {2} user) that local Primal Code can still run, but {3} ignores. Convert them to skills to keep them available.",
 				totalCount, workspaceCount, userCount, harnessLabel,
 			);
 		}
 		if (workspaceCount > 0) {
 			return localize(
 				'promptMigrationPageDescriptionWorkspace',
-				"Prompt files are not supported for this harness. Found {0} workspace prompt files that local VS Code can still run, but {1} ignores. Convert them to skills to keep them available.",
+				"Prompt files are not supported for this harness. Found {0} workspace prompt files that local Primal Code can still run, but {1} ignores. Convert them to skills to keep them available.",
 				workspaceCount, harnessLabel,
 			);
 		}
 		return localize(
 			'promptMigrationPageDescriptionUser',
-			"Prompt files are not supported for this harness. Found {0} user prompt files that local VS Code can still run, but {1} ignores. Convert them to skills to keep them available.",
+			"Prompt files are not supported for this harness. Found {0} user prompt files that local Primal Code can still run, but {1} ignores. Convert them to skills to keep them available.",
 			userCount, harnessLabel,
 		);
 	},
@@ -260,7 +260,7 @@ const userDataMigrationCategory: ICustomizationMigrationCategory = {
 		if (agentCount > 0 && instructionsCount > 0) {
 			return localize(
 				'userDataMigrationCardDescriptionMixed',
-				"User data customizations are only used by VS Code. Found {0} customizations that {1} ignores. Move them to keep them available.",
+				"User data customizations are only used by Primal Code. Found {0} customizations that {1} ignores. Move them to keep them available.",
 				totalCount, harnessLabel,
 			);
 		}
@@ -268,24 +268,24 @@ const userDataMigrationCategory: ICustomizationMigrationCategory = {
 			return agentCount === 1
 				? localize(
 					'userDataMigrationCardDescriptionAgent',
-					"User data customizations are only used by VS Code. Found 1 agent that {0} ignores. Move it to keep it available.",
+					"User data customizations are only used by Primal Code. Found 1 agent that {0} ignores. Move it to keep it available.",
 					harnessLabel,
 				)
 				: localize(
 					'userDataMigrationCardDescriptionAgents',
-					"User data customizations are only used by VS Code. Found {0} agents that {1} ignores. Move them to keep them available.",
+					"User data customizations are only used by Primal Code. Found {0} agents that {1} ignores. Move them to keep them available.",
 					agentCount, harnessLabel,
 				);
 		}
 		return instructionsCount === 1
 			? localize(
 				'userDataMigrationCardDescriptionInstruction',
-				"User data customizations are only used by VS Code. Found 1 instruction file that {0} ignores. Move it to keep it available.",
+				"User data customizations are only used by Primal Code. Found 1 instruction file that {0} ignores. Move it to keep it available.",
 				harnessLabel,
 			)
 			: localize(
 				'userDataMigrationCardDescriptionInstructions',
-				"User data customizations are only used by VS Code. Found {0} instruction files that {1} ignores. Move them to keep them available.",
+				"User data customizations are only used by Primal Code. Found {0} instruction files that {1} ignores. Move them to keep them available.",
 				instructionsCount, harnessLabel,
 			);
 	},
@@ -301,7 +301,7 @@ const userDataMigrationCategory: ICustomizationMigrationCategory = {
 			// message explains the move rather than repeating the counts.
 			message: localize(
 				'userDataMigrationBannerMessage',
-				"They are stored in user data, which only VS Code reads. Migrating moves them into the folders {0} reads, keeping their name, type, and content, so you can keep using them.",
+				"They are stored in user data, which only Primal Code reads. Migrating moves them into the folders {0} reads, keeping their name, type, and content, so you can keep using them.",
 				harnessLabel,
 			),
 			consequence: localize(
@@ -319,7 +319,7 @@ const userDataMigrationCategory: ICustomizationMigrationCategory = {
 		if (agentCount > 0 && instructionsCount > 0) {
 			return localize(
 				'userDataMigrationPageDescriptionAgentsAndInstructions',
-				"Found {0} customizations in user data that local VS Code can still use, but {1} ignores. Move them to the harness folders to keep their type and content.",
+				"Found {0} customizations in user data that local Primal Code can still use, but {1} ignores. Move them to the harness folders to keep their type and content.",
 				totalCount, harnessLabel,
 			);
 		}
@@ -327,24 +327,24 @@ const userDataMigrationCategory: ICustomizationMigrationCategory = {
 			return agentCount === 1
 				? localize(
 					'userDataMigrationPageDescriptionAgent',
-					"Found 1 agent in user data that local VS Code can still use, but {0} ignores. Move it to the harness agents folder to keep it available.",
+					"Found 1 agent in user data that local Primal Code can still use, but {0} ignores. Move it to the harness agents folder to keep it available.",
 					harnessLabel,
 				)
 				: localize(
 					'userDataMigrationPageDescriptionAgents',
-					"Found {0} agents in user data that local VS Code can still use, but {1} ignores. Move them to the harness agents folder to keep them available.",
+					"Found {0} agents in user data that local Primal Code can still use, but {1} ignores. Move them to the harness agents folder to keep them available.",
 					agentCount, harnessLabel,
 				);
 		}
 		return instructionsCount === 1
 			? localize(
 				'userDataMigrationPageDescriptionInstruction',
-				"Found 1 instruction file in user data that local VS Code can still use, but {0} ignores. Move it to the harness instructions folder to keep it available.",
+				"Found 1 instruction file in user data that local Primal Code can still use, but {0} ignores. Move it to the harness instructions folder to keep it available.",
 				harnessLabel,
 			)
 			: localize(
 				'userDataMigrationPageDescriptionInstructions',
-				"Found {0} instruction files in user data that local VS Code can still use, but {1} ignores. Move them to the harness instructions folder to keep them available.",
+				"Found {0} instruction files in user data that local Primal Code can still use, but {1} ignores. Move them to the harness instructions folder to keep them available.",
 				instructionsCount, harnessLabel,
 			);
 	},

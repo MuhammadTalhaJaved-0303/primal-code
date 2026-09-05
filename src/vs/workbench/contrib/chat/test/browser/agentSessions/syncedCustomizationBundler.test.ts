@@ -83,7 +83,7 @@ suite('SyncedCustomizationBundler', () => {
 		const result = await bundler.bundle([{ uri, type: PromptsType.instructions }]);
 		assert.ok(result, 'should return a result');
 		assert.ok(result.ref.uri, 'should have a URI');
-		assert.strictEqual(result.ref.name, 'VS Code Synced Data');
+		assert.strictEqual(result.ref.name, 'Primal Code Synced Data');
 		assert.ok(result.ref.nonce, 'should have a nonce');
 
 		// Verify the file was written to the in-memory FS
@@ -155,7 +155,7 @@ suite('SyncedCustomizationBundler', () => {
 		const manifestUri = URI.from({ scheme: SYNCED_CUSTOMIZATION_SCHEME, path: '/test-agent/.plugin/plugin.json' });
 		const manifest = await fileService.readFile(manifestUri);
 		const parsed = JSON.parse(manifest.value.toString());
-		assert.strictEqual(parsed.name, 'VS Code Synced Data');
+		assert.strictEqual(parsed.name, 'Primal Code Synced Data');
 	});
 
 	test('nonce is stable for same content', async () => {

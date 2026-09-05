@@ -1,8 +1,8 @@
 {
   "name": "grunt",
   "publisher": "vscode",
-  "description": "Extension to add Grunt capabilities to VS Code.",
-  "displayName": "Grunt support for VS Code",
+  "description": "Extension to add Grunt capabilities to Primal Code.",
+  "displayName": "Grunt support for Primal Code",
   "version": "10.0.0",
   "private": true,
   "icon": "images/grunt.png",
