@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-/* "Open in VS Code" titlebar widget — icon-only at rest, expands on hover/focus. */
+/* "Open in Primal Code" titlebar widget — icon-only at rest, expands on hover/focus. */
 .monaco-workbench .open-in-vscode-titlebar-widget {
 	display: inline-flex;
 	align-items: center;
