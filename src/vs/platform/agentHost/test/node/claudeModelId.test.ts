@@ -5,7 +5,7 @@
 
 import assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
-import { parseClaudeModelId, toSdkModelId, tryParseClaudeModelId } from '../../node/claude/claudeModelId.js';
+import { distinguishClaudeModelName, parseClaudeModelId, toSdkModelId, tryParseClaudeModelId } from '../../node/claude/claudeModelId.js';
 
 suite('parseClaudeModelId', () => {
 
@@ -266,5 +266,24 @@ suite('parseClaudeModelId', () => {
 				['claude-haiku-4-5', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4', 'gpt-4o'],
 			);
 		});
+	});
+});
+
+suite('distinguishClaudeModelName', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('appends the generation from the id when the display name carries none, keeps qualifiers, passes the rest through', () => {
+		const cases: [string, string][] = [
+			['Fable', 'claude-fable-5-1'],
+			['Fable', 'claude-fable-5'],
+			['Opus (1M context)', 'claude-opus-5-1m'],
+			['Sonnet 5', 'claude-sonnet-5'],
+			['Haiku', 'haiku'],
+			['', 'claude-fable-5'],
+		];
+		assert.deepStrictEqual(
+			cases.map(([displayName, id]) => distinguishClaudeModelName(displayName, id)),
+			['Fable 5.1', 'Fable 5', 'Opus 5 (1M context)', 'Sonnet 5', 'Haiku', ''],
+		);
 	});
 });

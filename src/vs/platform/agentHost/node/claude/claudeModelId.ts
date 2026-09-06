@@ -196,3 +196,33 @@ function extractValidSuffix(name: string, modifiers: string): string {
 	}
 	return '';
 }
+
+/**
+ * A picker label that tells two generations of one family apart.
+ *
+ * The SDK's `displayName` is the bare family name ("Fable", "Opus") — the same
+ * string for Fable 5 and Fable 5.1 — so a picker built from it shows identical
+ * rows. The generation is in the model id, so when the display name carries no
+ * digit we append the parsed version, keeping any trailing qualifier such as
+ * "(1M context)" after it: "Opus (1M context)" → "Opus 5 (1M context)".
+ * Names that already state a version, or ids that do not parse, pass through.
+ */
+export function distinguishClaudeModelName(displayName: string, modelId: string): string {
+	const trimmed = displayName.trim();
+	if (!trimmed) {
+		return trimmed;
+	}
+	// Split off a trailing qualifier such as "(1M context)" first: its digits are
+	// not a version, and the version must be inserted before it.
+	const qualifier = /^(?<base>.*?)\s*(?<tail>\(.*\))$/.exec(trimmed);
+	const base = qualifier?.groups?.base ?? trimmed;
+	const tail = qualifier?.groups?.tail;
+	if (/\d/.test(base)) {
+		return trimmed;
+	}
+	const parsed = tryParseClaudeModelId(modelId);
+	if (!parsed?.version) {
+		return trimmed;
+	}
+	return tail ? `${base} ${parsed.version} ${tail}` : `${base} ${parsed.version}`;
+}
