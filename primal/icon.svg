@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Primal Code app icon: the P mark in paper on a basalt tile. Source of truth for primal/make-icons.sh. -->
+  <rect width="1024" height="1024" rx="225" fill="#131211"/>
+  <g transform="translate(110 118) scale(8.2)">
+    <path fill="#FAF9F6" fill-rule="evenodd" d="M22 22Q22 14 30 14L52 14A24 24 0 0 1 52 62L38 62L38 74Q38 82 30 82Q22 82 22 74ZM44 48L64 38L44 28Z"/>
+  </g>
+</svg>
