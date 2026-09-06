@@ -738,10 +738,12 @@ class SessionItemRenderer implements ITreeRenderer<SessionListItem, FuzzyScore, 
 				descriptionDisposable.clear();
 			}
 
-			// Timestamp — visible when not hiding details
+			// Timestamp — visible when not hiding details. The separator before it is
+			// marked so the stylesheet can drop it: the timestamp is right-aligned
+			// (`.session-time` in sessionsList.css), which would leave the dot mid-row.
 			if (!hideDetails && timeDate) {
 				if (parts.length > 0) {
-					DOM.append(template.detailsRow, $('span.session-separator.has-separator'));
+					DOM.append(template.detailsRow, $('span.session-separator.has-separator.session-separator-before-time'));
 				}
 				const timeEl = DOM.append(template.detailsRow, $('span.session-time'));
 				const definiteTimeDate = timeDate;
@@ -1060,6 +1062,9 @@ export class SessionSectionRenderer implements ITreeRenderer<SessionListItem, Fu
 		if (element.id === AUTOMATIONS_SECTION_ID) {
 			template.container.classList.add('session-section-shortcut');
 		}
+		// Workspace headers carry a user's folder name, so the stylesheet keeps
+		// them out of the uppercase eyebrow reserved for system sections.
+		template.container.classList.toggle('session-section-workspace', element.id.startsWith('workspace:'));
 
 		const sectionIcon = getSessionSectionIcon(element.id);
 		template.icon.className = sectionIcon ? `session-section-icon ${ThemeIcon.asClassName(sectionIcon)}` : 'session-section-icon';

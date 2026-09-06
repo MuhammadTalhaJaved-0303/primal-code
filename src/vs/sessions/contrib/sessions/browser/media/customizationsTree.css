@@ -1,0 +1,235 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/* Expandable customizations tree in the sessions sidebar. Category rows use
+ * the same quiet row treatment as the sessions list; an expanded category
+ * reads as a tree through its rotated chevron and an indent guide. Every
+ * colour is a theme token; state is never carried by hue alone. */
+
+.customizations-tree {
+	display: flex;
+	flex-direction: column;
+	gap: var(--vscode-spacing-size20, 2px);
+	padding: 0 10px 2px;
+	font-size: var(--vscode-agents-fontSize-label1, 12px);
+}
+
+.customizations-node {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* The tree item owns focus, but the ring is drawn on its own row only so it
+ * never wraps the expanded children. The workbench's generic tabindex focus
+ * rule is suppressed on the node itself. */
+.monaco-workbench .customizations-tree .customizations-node:focus {
+	outline: none;
+}
+
+.customizations-node:focus-visible > .customizations-row {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+.customizations-row {
+	display: flex;
+	align-items: center;
+	gap: var(--vscode-spacing-size60, 6px);
+	min-height: 26px;
+	padding: 0 var(--vscode-spacing-size40, 4px) 0 var(--vscode-spacing-size60, 6px);
+	box-sizing: border-box;
+	border-radius: var(--vscode-cornerRadius-small);
+	color: var(--vscode-agentsPanel-foreground, var(--vscode-foreground));
+	cursor: pointer;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.customizations-row:hover {
+	background-color: var(--vscode-list-hoverBackground);
+}
+
+.customizations-row-icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	color: var(--vscode-icon-foreground);
+}
+
+.customizations-row-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Count: mono caption, right-aligned, tabular so it lines up across rows. */
+.customizations-row-count {
+	flex-shrink: 0;
+	min-width: 2ch;
+	text-align: right;
+	font-family: var(--monaco-monospace-font, monospace);
+	font-size: var(--vscode-agents-fontSize-label2, 11px);
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+}
+
+.customizations-row-count:empty {
+	display: none;
+}
+
+/* Chevron: a real button for pointer users, toggling with a click; it sits
+ * outside the Tab order because the treeitem's Right/Left arrows do the same
+ * job and the tree is a single Tab stop. It rotates instead of swapping
+ * glyphs. */
+.customizations-chevron {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	margin: 0;
+	border: none;
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	border-radius: var(--vscode-cornerRadius-small);
+	cursor: pointer;
+}
+
+.customizations-chevron > .codicon {
+	font-size: var(--vscode-codiconFontSize-compact, 12px);
+	transition: transform 120ms ease-out;
+}
+
+.customizations-chevron.expanded > .codicon {
+	transform: rotate(90deg);
+}
+
+.customizations-chevron:hover {
+	background-color: var(--vscode-toolbar-hoverBackground);
+	color: var(--vscode-foreground);
+}
+
+.monaco-workbench .customizations-tree .customizations-chevron:focus {
+	outline: none;
+}
+
+.customizations-chevron:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+/* Children sit indented under their category with a guide line, so the
+ * expanded state reads as a tree rather than a longer flat list. */
+.customizations-children {
+	display: flex;
+	flex-direction: column;
+	margin: 1px 0 var(--vscode-spacing-size40, 4px) 13px;
+	padding-left: var(--vscode-spacing-size40, 4px);
+	border-left: 1px solid var(--vscode-tree-indentGuidesStroke);
+}
+
+.customizations-children[hidden] {
+	display: none;
+}
+
+.customizations-row.leaf {
+	align-items: flex-start;
+	min-height: 0;
+	padding-top: var(--vscode-spacing-size20, 2px);
+	padding-bottom: var(--vscode-spacing-size20, 2px);
+}
+
+.customizations-row.leaf .customizations-row-icon {
+	height: 16px;
+}
+
+.customizations-leaf-text {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.customizations-leaf-name {
+	line-height: 16px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.customizations-leaf-detail {
+	display: flex;
+	min-width: 0;
+	line-height: 14px;
+	font-size: var(--vscode-agents-fontSize-label2, 11px);
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.customizations-leaf-detail-part {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.customizations-leaf-detail-part + .customizations-leaf-detail-part::before {
+	content: '\00B7';
+	padding: 0 var(--vscode-spacing-size40, 4px);
+}
+
+/* Disabled rows dim the name and icon; the detail line also says "Disabled"
+ * in words, so the state never rests on colour alone. */
+.customizations-node.disabled > .customizations-row .customizations-row-icon,
+.customizations-node.disabled > .customizations-row .customizations-leaf-name {
+	opacity: 0.6;
+}
+
+/* "Show all N" row: link colour plus an arrow glyph and an underline on hover. */
+.customizations-row.show-all {
+	align-items: center;
+	color: var(--vscode-textLink-foreground);
+}
+
+.customizations-row.show-all .customizations-row-icon {
+	color: inherit;
+}
+
+.customizations-row.show-all:hover .customizations-row-label {
+	text-decoration: underline;
+}
+
+.customizations-message {
+	padding: 3px var(--vscode-spacing-size60, 6px);
+	line-height: 16px;
+	font-size: var(--vscode-agents-fontSize-label2, 11px);
+	color: var(--vscode-descriptionForeground);
+}
+
+/* High contrast: the decorative guide takes the contrast border, and
+ * dimming is dropped in favour of the explicit "Disabled" text. */
+.hc-black .customizations-children,
+.hc-light .customizations-children {
+	border-left-color: var(--vscode-contrastBorder);
+}
+
+.hc-black .customizations-node.disabled > .customizations-row .customizations-row-icon,
+.hc-black .customizations-node.disabled > .customizations-row .customizations-leaf-name,
+.hc-light .customizations-node.disabled > .customizations-row .customizations-row-icon,
+.hc-light .customizations-node.disabled > .customizations-row .customizations-leaf-name {
+	opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.customizations-chevron > .codicon {
+		transition: none;
+	}
+}

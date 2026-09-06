@@ -25,7 +25,7 @@ import { agentIcon, instructionsIcon, mcpServerIcon, pluginIcon, skillIcon, hook
 import { ActionViewItem, IBaseActionViewItemOptions } from '../../../../base/browser/ui/actionbar/actionViewItems.js';
 import { IAction } from '../../../../base/common/actions.js';
 import { $, append } from '../../../../base/browser/dom.js';
-import { autorun } from '../../../../base/common/observable.js';
+import { autorun, IReader } from '../../../../base/common/observable.js';
 import { Button } from '../../../../base/browser/ui/button/button.js';
 import { defaultButtonStyles } from '../../../../platform/theme/browser/defaultStyles.js';
 import { IEditorService } from '../../../../workbench/services/editor/common/editorService.js';
@@ -35,6 +35,8 @@ import { ICustomizationHarnessService } from '../../../../workbench/contrib/chat
 import { ISession } from '../../../services/sessions/common/session.js';
 import { ISessionsService } from '../../../services/sessions/browser/sessionsService.js';
 import { SessionType } from '../../../../workbench/contrib/chat/common/chatSessionsService.js';
+import { IAgentPlugin } from '../../../../workbench/contrib/chat/common/plugins/agentPluginService.js';
+import { AgentPluginItemKind } from '../../../../workbench/contrib/chat/browser/agentPluginEditor/agentPluginItems.js';
 
 export interface ICustomizationItemConfig {
 	readonly id: string;
@@ -60,7 +62,7 @@ function customizationSectionVisibleKey(section: string): string {
 	return `sessionsCustomizationSectionVisible.${section}`;
 }
 
-const CUSTOMIZATION_OVERVIEW_ITEM: ICustomizationItemConfig = {
+export const CUSTOMIZATION_OVERVIEW_ITEM: ICustomizationItemConfig = {
 	id: 'sessions.customization.overview',
 	label: localize('overview', "Overview"),
 	icon: Codicon.home,
@@ -137,7 +139,7 @@ export async function openCustomizationOverviewPage(editorService: IEditorServic
 	}
 }
 
-async function openCustomizationSectionPage(editorService: IEditorService, harnessService: ICustomizationHarnessService, sessionsService: ISessionsService, section: typeof AICustomizationManagementSection[keyof typeof AICustomizationManagementSection]): Promise<void> {
+export async function openCustomizationSectionPage(editorService: IEditorService, harnessService: ICustomizationHarnessService, sessionsService: ISessionsService, section: typeof AICustomizationManagementSection[keyof typeof AICustomizationManagementSection]): Promise<void> {
 	const sessionResource = sessionsService.activeSession.get()?.resource;
 	if (sessionResource) {
 		harnessService.setActiveSession(sessionResource);
@@ -151,10 +153,84 @@ async function openCustomizationSectionPage(editorService: IEditorService, harne
 }
 
 /**
- * Custom ActionViewItem for each customization link in the toolbar.
+ * Opens the customizations editor on the Plugins section and shows the
+ * detail page for an installed plugin: the same path the MCP list widget's
+ * "Show Plugin" action takes (`AICustomizationManagementEditor.showPluginDetail`).
+ */
+export async function openCustomizationPluginDetail(editorService: IEditorService, harnessService: ICustomizationHarnessService, sessionsService: ISessionsService, plugin: IAgentPlugin): Promise<void> {
+	const sessionResource = sessionsService.activeSession.get()?.resource;
+	if (sessionResource) {
+		harnessService.setActiveSession(sessionResource);
+	}
+
+	const input = AICustomizationManagementEditorInput.getOrCreate();
+	const pane = await editorService.openEditor(input, { pinned: true });
+	if (pane instanceof AICustomizationManagementEditor) {
+		pane.selectSectionById(AICustomizationManagementSection.Plugins);
+		await pane.showPluginDetail({
+			kind: AgentPluginItemKind.Installed,
+			name: plugin.label,
+			description: plugin.fromMarketplace?.description ?? '',
+			marketplace: plugin.fromMarketplace?.marketplace,
+			plugin,
+		});
+	}
+}
+
+/**
+ * Looks up the sidebar row configuration for a `Menus.SidebarCustomizations`
+ * action id, covering both the Overview row and the per-section rows.
+ */
+export function findCustomizationItemConfig(actionId: string): ICustomizationItemConfig | undefined {
+	if (actionId === CUSTOMIZATION_OVERVIEW_ITEM.id) {
+		return CUSTOMIZATION_OVERVIEW_ITEM;
+	}
+	return CUSTOMIZATION_ITEMS.find(config => config.id === actionId);
+}
+
+/**
+ * Services needed to read a customization row's count. Bundled so the
+ * sidebar tree and the toolbar view item read the exact same observables.
+ */
+export interface ICustomizationCountServices {
+	readonly itemsModel: IAICustomizationItemsModel;
+	readonly mcpService: IMcpService;
+	readonly toolsService: ILanguageModelToolsService;
+	readonly toolEnablementService: IAgentHostToolSetEnablementService;
+}
+
+/**
+ * Reads the live count for a customization row inside an observable
+ * reader. Counts come from the same observables that feed the
+ * customizations editor, so the sidebar always matches it exactly.
+ */
+export function readCustomizationItemCount(config: ICustomizationItemConfig, reader: IReader, services: ICustomizationCountServices): number {
+	if (config.modelSection) {
+		return services.itemsModel.getCount(config.modelSection).read(reader);
+	}
+	if (config.isMcp) {
+		return services.mcpService.servers.read(reader).length;
+	}
+	if (config.isPlugins) {
+		return services.itemsModel.getPluginCount().read(reader);
+	}
+	if (config.isTools) {
+		const state = services.toolEnablementService.observe(AGENT_HOST_COPILOT_CLI_SESSION_TYPE).read(reader);
+		const toolSets = services.toolsService.toolSets.read(reader);
+		return countEnabledCustomizationTools(toolSets, state, reader);
+	}
+	return 0;
+}
+
+/**
+ * Custom ActionViewItem for each customization link when the
+ * `Menus.SidebarCustomizations` menu is rendered as a toolbar.
  * Renders icon + label + a single count badge driven by the same
  * observables that feed the customizations editor — so the badge always
  * matches the editor's count exactly.
+ *
+ * The sessions sidebar itself renders the menu as an expandable tree
+ * (see `customizationsTree.ts`), which reads the same menu and counts.
  */
 export class CustomizationLinkViewItem extends ActionViewItem {
 
@@ -213,22 +289,13 @@ export class CustomizationLinkViewItem extends ActionViewItem {
 		}));
 	}
 
-	private _readCount(reader: Parameters<Parameters<typeof autorun>[0]>[0]): number {
-		if (this._config.modelSection) {
-			return this._itemsModel.getCount(this._config.modelSection).read(reader);
-		}
-		if (this._config.isMcp) {
-			return this._mcpService.servers.read(reader).length;
-		}
-		if (this._config.isPlugins) {
-			return this._itemsModel.getPluginCount().read(reader);
-		}
-		if (this._config.isTools) {
-			const state = this._toolEnablementService.observe(AGENT_HOST_COPILOT_CLI_SESSION_TYPE).read(reader);
-			const toolSets = this._toolsService.toolSets.read(reader);
-			return countEnabledCustomizationTools(toolSets, state, reader);
-		}
-		return 0;
+	private _readCount(reader: IReader): number {
+		return readCustomizationItemCount(this._config, reader, {
+			itemsModel: this._itemsModel,
+			mcpService: this._mcpService,
+			toolsService: this._toolsService,
+			toolEnablementService: this._toolEnablementService,
+		});
 	}
 
 	private _renderTotalCount(container: HTMLElement, count: number): void {
