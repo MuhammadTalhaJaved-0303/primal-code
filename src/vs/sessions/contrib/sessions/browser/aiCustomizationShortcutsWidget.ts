@@ -13,7 +13,6 @@ import { autorun, derived } from '../../../../base/common/observable.js';
 import { ScrollbarVisibility } from '../../../../base/common/scrollable.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { localize } from '../../../../nls.js';
-import { HiddenItemStrategy, MenuWorkbenchToolBar } from '../../../../platform/actions/browser/toolbar.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
 import { DomScrollableElement } from '../../../../base/browser/ui/scrollbar/scrollableElement.js';
@@ -21,7 +20,7 @@ import { IMcpService } from '../../../../workbench/contrib/mcp/common/mcpTypes.j
 import { IAICustomizationItemsModel } from '../../../../workbench/contrib/chat/browser/aiCustomization/aiCustomizationItemsModel.js';
 import { ICustomizationHarnessService } from '../../../../workbench/contrib/chat/common/customizationHarnessService.js';
 import { CUSTOMIZATION_ITEMS } from './customizationsToolbar.contribution.js';
-import { Menus } from '../../../browser/menus.js';
+import { CustomizationsTree } from './customizationsTree.js';
 const $ = DOM.$;
 const CUSTOMIZATIONS_VERTICAL_PADDING = 6;
 const CUSTOMIZATIONS_COLLAPSED_STORAGE_KEY = 'agentSessions.customizationsShortcuts.collapsed';
@@ -30,17 +29,23 @@ export interface IAICustomizationShortcutsWidgetOptions {
 	readonly onDidChangeLayout?: () => void;
 }
 
+/**
+ * The "Customizations" block at the bottom of the sessions sidebar: a
+ * collapsible header above an expandable tree of customization categories
+ * (see `CustomizationsTree`). The header collapse is owned here; the pane
+ * height by the sessions view; per-category expansion by the tree.
+ */
 export class AICustomizationShortcutsWidget extends Disposable {
 
 	private _renderDisposables = this._register(new DisposableStore());
 	private _wrapper: HTMLElement | undefined;
 	private _options: IAICustomizationShortcutsWidgetOptions | undefined;
 	private _scrollableElement: DomScrollableElement | undefined;
-	private _toolbar: MenuWorkbenchToolBar | undefined;
+	private _tree: CustomizationsTree | undefined;
 	private _headerElement: HTMLElement | undefined;
 	private _headerTotalCountElement: HTMLElement | undefined;
 	private _chevronElement: HTMLElement | undefined;
-	private _toolbarContentElement: HTMLElement | undefined;
+	private _contentElement: HTMLElement | undefined;
 	private _scrollableDomNode: HTMLElement | undefined;
 	private _rootVerticalPadding = 0;
 	private _headerTotalCount = 0;
@@ -90,11 +95,11 @@ export class AICustomizationShortcutsWidget extends Disposable {
 		}
 		this._renderDisposables.clear();
 		this._scrollableElement = undefined;
-		this._toolbar = undefined;
+		this._tree = undefined;
 		this._headerElement = undefined;
 		this._headerTotalCountElement = undefined;
 		this._chevronElement = undefined;
-		this._toolbarContentElement = undefined;
+		this._contentElement = undefined;
 		this._scrollableDomNode = undefined;
 		this._rootVerticalPadding = 0;
 		this._headerTotalCount = 0;
@@ -129,7 +134,33 @@ export class AICustomizationShortcutsWidget extends Disposable {
 		const container = DOM.append(parent, $('.ai-customization-toolbar'));
 		this._setRootPadding(container, CUSTOMIZATIONS_VERTICAL_PADDING, CUSTOMIZATIONS_VERTICAL_PADDING);
 
-		// Header
+		this._renderHeader(container);
+
+		// Tree, wrapped in a scrollable so the pane can be shorter than its content.
+		const scrollContent = $('.ai-customization-toolbar-content-scrollable');
+		const content = DOM.append(scrollContent, $('.ai-customization-toolbar-content'));
+		this._contentElement = content;
+		const scrollableElement = this._renderDisposables.add(new DomScrollableElement(scrollContent, {
+			horizontal: ScrollbarVisibility.Hidden,
+			vertical: ScrollbarVisibility.Auto,
+			useShadows: false,
+		}));
+		this._scrollableElement = scrollableElement;
+		this._scrollableDomNode = DOM.append(container, scrollableElement.getDomNode());
+
+		const tree = this._renderDisposables.add(this.instantiationService.createInstance(CustomizationsTree, content));
+		this._tree = tree;
+
+		// Re-layout when the tree's content changes (a category expanded or
+		// collapsed, its items arrived, or a menu row appeared after activation).
+		this._renderDisposables.add(tree.onDidChangeContentHeight(() => {
+			this._scrollableElement?.scanDomNode();
+			this._onDidChangeHeight.fire();
+			options?.onDidChangeLayout?.();
+		}));
+	}
+
+	private _renderHeader(container: HTMLElement): void {
 		const header = DOM.append(container, $('.ai-customization-header'));
 		this._headerElement = header;
 		header.setAttribute('role', 'button');
@@ -141,6 +172,7 @@ export class AICustomizationShortcutsWidget extends Disposable {
 		this._headerTotalCountElement = DOM.append(header, $('span.ai-customization-header-total-count.hidden'));
 
 		this._chevronElement = DOM.append(header, $('span.ai-customization-chevron'));
+		this._chevronElement.classList.add(...ThemeIcon.asClassNameArray(Codicon.chevronRight));
 		this._chevronElement.setAttribute('aria-hidden', 'true');
 		this._updateChevron();
 
@@ -157,36 +189,10 @@ export class AICustomizationShortcutsWidget extends Disposable {
 				this._toggleCollapsed();
 			}
 		}));
-
-		// Toolbar container
-		const scrollContent = $('.ai-customization-toolbar-content-scrollable');
-		const toolbarContainer = DOM.append(scrollContent, $('.ai-customization-toolbar-content.sidebar-action-list'));
-		this._toolbarContentElement = toolbarContainer;
-		const scrollableElement = this._renderDisposables.add(new DomScrollableElement(scrollContent, {
-			horizontal: ScrollbarVisibility.Hidden,
-			vertical: ScrollbarVisibility.Auto,
-			useShadows: false,
-		}));
-		this._scrollableElement = scrollableElement;
-		this._scrollableDomNode = DOM.append(container, scrollableElement.getDomNode());
-
-		const toolbar = this._renderDisposables.add(this.instantiationService.createInstance(MenuWorkbenchToolBar, toolbarContainer, Menus.SidebarCustomizations, {
-			hiddenItemStrategy: HiddenItemStrategy.NoHide,
-			toolbarOptions: { primaryGroup: () => true },
-			telemetrySource: 'sidebarCustomizations',
-		}));
-		this._toolbar = toolbar;
-
-		// Re-layout when toolbar items change (e.g., Plugins item appearing after extension activation)
-		this._renderDisposables.add(toolbar.onDidChangeMenuItems(() => {
-			this._scrollableElement?.scanDomNode();
-			this._onDidChangeHeight.fire();
-			options?.onDidChangeLayout?.();
-		}));
 	}
 
 	get desiredHeight(): number {
-		const content = this._toolbarContentElement;
+		const content = this._contentElement;
 		if (!content) {
 			return 0;
 		}
@@ -226,11 +232,8 @@ export class AICustomizationShortcutsWidget extends Disposable {
 	}
 
 	private _updateChevron(): void {
-		if (!this._chevronElement) {
-			return;
-		}
-		this._chevronElement.className = 'ai-customization-chevron';
-		this._chevronElement.classList.add(...ThemeIcon.asClassNameArray(this._collapsed ? Codicon.chevronRight : Codicon.chevronDown));
+		// One glyph that rotates (see customizationsToolbar.css) instead of swapping icons.
+		this._chevronElement?.classList.toggle('expanded', !this._collapsed);
 	}
 
 	private _renderHeaderTotalCount(): void {
@@ -253,6 +256,6 @@ export class AICustomizationShortcutsWidget extends Disposable {
 			this._headerElement?.focus();
 			return;
 		}
-		this._toolbar?.focus();
+		this._tree?.focus();
 	}
 }

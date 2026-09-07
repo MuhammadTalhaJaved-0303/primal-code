@@ -5,13 +5,15 @@
 
 import '../media/sessionsViewPane.css';
 import * as DOM from '../../../../../base/browser/dom.js';
+import { RunOnceScheduler } from '../../../../../base/common/async.js';
 import { onUnexpectedError } from '../../../../../base/common/errors.js';
 import { Emitter, Event } from '../../../../../base/common/event.js';
 import { DisposableStore } from '../../../../../base/common/lifecycle.js';
+import { clamp } from '../../../../../base/common/numbers.js';
 import { autorun } from '../../../../../base/common/observable.js';
 import { isWeb } from '../../../../../base/common/platform.js';
 import { Orientation } from '../../../../../base/browser/ui/sash/sash.js';
-import { IView, Sizing, SplitView } from '../../../../../base/browser/ui/splitview/splitview.js';
+import { IView, LayoutPriority, Sizing, SplitView } from '../../../../../base/browser/ui/splitview/splitview.js';
 import { Color } from '../../../../../base/common/color.js';
 import { ContextKeyExpr, IContextKey, IContextKeyService, RawContextKey } from '../../../../../platform/contextkey/common/contextkey.js';
 import { IsAuxiliaryWindowContext, IsSessionsWindowContext } from '../../../../../workbench/common/contextkeys.js';
@@ -52,6 +54,12 @@ const GROUPING_STORAGE_KEY = 'sessionsViewPane.grouping';
 const SORTING_STORAGE_KEY = 'sessionsViewPane.sorting';
 const CUSTOMIZATIONS_MIN_HEIGHT = 129;
 const SESSIONS_SECTION_MIN_HEIGHT = 120;
+/** Divider position the user dragged the customizations pane to, in pixels. */
+const CUSTOMIZATIONS_PANE_HEIGHT_STORAGE_KEY = 'agentSessions.customizationsPane.height';
+/** Upper bound for the expanded customizations pane as a share of the sidebar body. */
+const CUSTOMIZATIONS_MAX_BODY_FRACTION = 0.75;
+/** Coalesces storage writes while the divider is being dragged. */
+const CUSTOMIZATIONS_HEIGHT_STORE_DELAY = 300;
 
 /**
  * Place the given session in the sessions grid to the right of the last
@@ -96,6 +104,9 @@ export class SessionsView extends ViewPane {
 	private currentBodyHeight = 0;
 	private currentBodyWidth = 0;
 	private didInitializePaneSizes = false;
+	private sidebarSplitViewHeight = 0;
+	/** Height the user dragged the customizations pane to; undefined means content-fit. */
+	private userCustomizationsPaneHeight: number | undefined;
 
 	constructor(
 		options: IViewPaneOptions,
@@ -126,6 +137,12 @@ export class SessionsView extends ViewPane {
 		const storedSorting = this.storageService.get(SORTING_STORAGE_KEY, StorageScope.PROFILE);
 		if (storedSorting && Object.values(SessionsSorting).includes(storedSorting as SessionsSorting)) {
 			this.currentSorting = storedSorting as SessionsSorting;
+		}
+
+		// Restore the customizations pane height the user chose with the divider
+		const storedPaneHeight = this.storageService.getNumber(CUSTOMIZATIONS_PANE_HEIGHT_STORAGE_KEY, StorageScope.PROFILE);
+		if (typeof storedPaneHeight === 'number' && Number.isFinite(storedPaneHeight) && storedPaneHeight > 0) {
+			this.userCustomizationsPaneHeight = storedPaneHeight;
 		}
 
 		// Ensure context keys reflect restored state immediately
@@ -324,10 +341,14 @@ export class SessionsView extends ViewPane {
 			},
 		};
 
+		const getCustomizationsPaneMaxHeight = () => this.getCustomizationsPaneMaxHeight();
 		const customizationsPane: IView = {
 			element: customizationsSection,
+			// Low priority: container resizes flow to the sessions list first, so a
+			// divider position the user chose survives until the list hits its minimum.
+			priority: LayoutPriority.Low,
 			get minimumSize() { return customizationsWidget.collapsed ? customizationsWidget.collapsedHeight : CUSTOMIZATIONS_MIN_HEIGHT; },
-			get maximumSize() { return customizationsWidget.collapsed ? customizationsWidget.collapsedHeight : Math.max(CUSTOMIZATIONS_MIN_HEIGHT, customizationsWidget.desiredHeight); },
+			get maximumSize() { return customizationsWidget.collapsed ? customizationsWidget.collapsedHeight : getCustomizationsPaneMaxHeight(); },
 			onDidChange: Event.map(Event.any(customizationsWidget.onDidChangeHeight, customizationsSizeChange.event), () => this.getCustomizationsPaneHeight()),
 			layout: height => {
 				customizationsSection.style.height = `${height}px`;
@@ -338,21 +359,30 @@ export class SessionsView extends ViewPane {
 		this.sidebarSplitView.addView(sessionsPane, Sizing.Distribute, 0, true);
 		this.sidebarSplitView.addView(customizationsPane, this.getCustomizationsPaneHeight(), 1, true);
 
-		let savedCustomizationsPaneHeight = this.getCustomizationsPaneHeight();
 		this._register(customizationsWidget.onDidToggleCollapsed(collapsed => {
 			if (!this.sidebarSplitView) {
 				return;
 			}
-			if (collapsed) {
-				const currentSize = this.sidebarSplitView.getViewSize(1);
-				if (currentSize > customizationsWidget.collapsedHeight) {
-					savedCustomizationsPaneHeight = currentSize;
-				}
-				this.sidebarSplitView.resizeView(1, customizationsWidget.collapsedHeight);
-			} else {
-				this.sidebarSplitView.resizeView(1, savedCustomizationsPaneHeight);
-			}
+			// Expanding restores the persisted divider position, or the content-fit
+			// height when the user never dragged the divider.
+			this.sidebarSplitView.resizeView(1, collapsed ? customizationsWidget.collapsedHeight : this.getCustomizationsPaneHeight());
 			this.layoutSidebarSplitView();
+		}));
+
+		// Persist the divider position the user drags to. Double-clicking the
+		// divider returns the pane to its content-fit height and forgets it.
+		const storePaneHeight = this._register(new RunOnceScheduler(() => this.storeCustomizationsPaneHeight(), CUSTOMIZATIONS_HEIGHT_STORE_DELAY));
+		this._register(this.sidebarSplitView.onDidSashChange(() => {
+			if (!this.sidebarSplitView || customizationsWidget.collapsed) {
+				return;
+			}
+			this.userCustomizationsPaneHeight = this.sidebarSplitView.getViewSize(1);
+			storePaneHeight.schedule();
+		}));
+		this._register(this.sidebarSplitView.onDidSashReset(() => {
+			this.userCustomizationsPaneHeight = undefined;
+			this.storageService.remove(CUSTOMIZATIONS_PANE_HEIGHT_STORAGE_KEY, StorageScope.PROFILE);
+			this.sidebarSplitView?.resizeView(1, this.getCustomizationsPaneHeight());
 		}));
 
 		const updateSplitViewStyles = () => {
@@ -584,6 +614,7 @@ export class SessionsView extends ViewPane {
 		if (this.sidebarSplitViewContainer.offsetHeight === 0) {
 			this.sidebarSplitViewContainer.style.height = `${height}px`;
 		}
+		this.sidebarSplitViewHeight = height;
 		this.sidebarSplitView.layout(height);
 		if (!this.didInitializePaneSizes) {
 			this.didInitializePaneSizes = true;
@@ -591,12 +622,36 @@ export class SessionsView extends ViewPane {
 		}
 	}
 
+	/**
+	 * Upper bound for the expanded customizations pane: a share of the sidebar
+	 * body, never leaving the sessions list less than its minimum height.
+	 */
+	private getCustomizationsPaneMaxHeight(): number {
+		const bodyHeight = this.sidebarSplitViewHeight;
+		const byFraction = Math.floor(bodyHeight * CUSTOMIZATIONS_MAX_BODY_FRACTION);
+		const leavingSessionsRoom = bodyHeight - SESSIONS_SECTION_MIN_HEIGHT;
+		return Math.max(CUSTOMIZATIONS_MIN_HEIGHT, Math.min(byFraction, leavingSessionsRoom));
+	}
+
+	/**
+	 * Preferred height for the customizations pane: the header alone while
+	 * collapsed; otherwise the divider position the user dragged to (persisted
+	 * across restarts) or, when none was chosen, the widget's content-fit
+	 * height. Always clamped to the pane's minimum and its body-fraction maximum.
+	 */
 	private getCustomizationsPaneHeight(): number {
 		if (this._customizationsWidget?.collapsed) {
 			return this._customizationsWidget.collapsedHeight;
 		}
 		const desiredHeight = this._customizationsWidget?.desiredHeight ?? 0;
-		return Math.max(CUSTOMIZATIONS_MIN_HEIGHT, Number.isFinite(desiredHeight) ? desiredHeight : 0);
+		const preferred = this.userCustomizationsPaneHeight ?? (Number.isFinite(desiredHeight) ? desiredHeight : 0);
+		return clamp(preferred, CUSTOMIZATIONS_MIN_HEIGHT, this.getCustomizationsPaneMaxHeight());
+	}
+
+	private storeCustomizationsPaneHeight(): void {
+		if (typeof this.userCustomizationsPaneHeight === 'number') {
+			this.storageService.store(CUSTOMIZATIONS_PANE_HEIGHT_STORAGE_KEY, Math.round(this.userCustomizationsPaneHeight), StorageScope.PROFILE, StorageTarget.USER);
+		}
 	}
 
 	override focus(): void {

@@ -119,7 +119,11 @@ export class AgentHostDiscoveredConfigNotificationContribution extends Disposabl
 			.map(type => type.sessionType);
 		const claude = claudeTypes.find(type => type.authRequirement === SessionTypeAuthRequirement.None) ?? claudeTypes[0];
 
-		const show = shouldShowDiscoveredConfigNudge({
+		// Primal Code: this nudge exists to steer a signed-out user towards a
+		// Copilot subscription. There is no Copilot in this product — agents run
+		// on the user's own keys — so an existing native configuration is simply
+		// the normal case, not something to apologise for. Never show it.
+		const show = false && shouldShowDiscoveredConfigNudge({
 			signedIn: authState === ConditionalAuthState.SignedIn,
 			allowSignedOutWhenUsable: isAllowSignedOutWhenUsableEnabled(this._configurationService),
 			usableWithoutGitHub: claude?.authRequirement === SessionTypeAuthRequirement.None,

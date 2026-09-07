@@ -56,7 +56,7 @@ import { handleCanUseTool } from './claudeCanUseTool.js';
 import { handleElicitation } from './claudeElicitationBridge.js';
 import type { IAgentServerToolHost } from '../../common/agentServerTools.js';
 import { createPricingMetaFromBilling, normalizeCAPIBilling } from '../../common/agentModelPricing.js';
-import { tryParseClaudeModelId } from './claudeModelId.js';
+import { distinguishClaudeModelName, tryParseClaudeModelId } from './claudeModelId.js';
 import { resolvePromptToContentBlocks } from './claudePromptResolver.js';
 import { IClaudeProxyHandle, IClaudeProxyService, type ClaudeTransport } from './claudeProxyService.js';
 import { readClaudePermissionMode } from './claudeSessionPermissionMode.js';
@@ -169,7 +169,9 @@ export function fromSdkModelInfo(m: ModelInfo, provider: AgentProvider): IAgentM
 		// SDK-canonical id (`m.value`, e.g. `claude-sonnet-4-5-20250929`). Native
 		// ids are SDK format end to end; `toSdkModelId` is identity at this seam.
 		id: m.value,
-		name: m.displayName,
+		// The SDK repeats the bare family name across generations ('Fable' for
+		// both 5 and 5.1); the version lives only in the id, so derive it there.
+		name: distinguishClaudeModelName(m.displayName, m.value),
 		supportsVision: false,
 		...(configSchema ? { configSchema } : {}),
 	};

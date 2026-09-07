@@ -12,6 +12,33 @@
 		border-radius: var(--vscode-cornerRadius-medium);
 		margin: 0 10px;
 		width: calc(100% - 20px);
+		/* Card seam. Rows are absolutely positioned with a JS-set height, so a
+		 * vertical margin cannot separate them; a transparent 1px top/bottom
+		 * border plus padding-box clipping keeps every hover/selection/pulse
+		 * fill 1px inside the row so neighbouring cards never touch. The row
+		 * is border-box (list.css), so the outer height is unchanged. */
+		border-top: var(--vscode-strokeThickness) solid transparent;
+		border-bottom: var(--vscode-strokeThickness) solid transparent;
+		background-clip: padding-box;
+		transition: box-shadow 100ms ease-out;
+	}
+
+	/* Hover lift: a 1px token hairline drawn inside the card. Box-shadow is used
+	 * so `outline` stays reserved for focus/selection. */
+	.monaco-list:not(.drop-target):not(.dragging) .monaco-list-row.session-list-inset-row:hover:not(.selected) {
+		box-shadow: inset 0 0 0 1px var(--vscode-widget-border, var(--vscode-contrastBorder));
+	}
+
+	/* Selected row while the list itself is not focused (the usual state while
+	 * the chat has focus). Upstream only tints it and emits
+	 * `.monaco-list.<id> .monaco-list-row.focused.selected { outline: 1px dotted <list.inactiveFocusOutline> }`
+	 * from the list's own style element (listWidget.ts DefaultStyleController)
+	 * at specificity (0,5,0); that colour is unset in most themes so no outline
+	 * shows. This selector is (0,6,0) on purpose so it wins without !important,
+	 * and it defers to the same token chain in themes that define one. */
+	.monaco-list:not(:focus) .monaco-list-row.session-list-inset-row.selected {
+		outline: var(--vscode-strokeThickness) solid var(--vscode-list-inactiveFocusOutline, var(--vscode-contrastActiveBorder, color-mix(in srgb, var(--vscode-focusBorder) 45%, transparent)));
+		outline-offset: -1px;
 	}
 
 	/* Suppressed while selected so the selection highlight is not overpainted. */
@@ -216,13 +243,19 @@
 		align-items: center;
 	}
 
+	/* Rhythm inside the 52px content box (54px row minus the two seam borders):
+	 * 8 + 17 title + 4 + 15 caption + 8 = 52. The approval/CI row heights in
+	 * SessionItemRenderer assume exactly this, so keep these metrics fixed. */
 	.session-title-row {
 		line-height: 17px;
 		padding-bottom: 4px;
 	}
 
+	/* Caption row in the UI font: the description is prose (status text or
+	 * rendered markdown). Only the numeric parts (diff pill, timestamp) are
+	 * monospace, see below. */
 	.session-details-row {
-		gap: 4px;
+		gap: 6px;
 		font-size: var(--vscode-agents-fontSize-label2, 11px);
 		line-height: 15px;
 		max-height: 15px;
@@ -238,11 +271,24 @@
 			}
 		}
 
+		/* Diff stats as a compact pill. Added always precedes removed and each
+		 * count carries its own sign in the text, so the pair stays readable
+		 * without the (theme) added/removed hues below. Monospace with tabular
+		 * numerals so the counts keep a stable width as they change. */
 		.session-diff {
+			display: inline-flex;
+			align-items: center;
+			flex-shrink: 0;
+			gap: 6px;
+			font-family: var(--monaco-monospace-font, monospace);
 			font-variant-numeric: tabular-nums;
+			/* 13px line + two 1px strokes = the row's 15px line. */
+			line-height: 13px;
+			padding: 0 6px;
+			white-space: nowrap;
 			overflow: hidden;
-			display: flex;
-			gap: 2px;
+			border: var(--vscode-strokeThickness) solid color-mix(in srgb, currentColor 22%, transparent);
+			border-radius: var(--vscode-cornerRadius-small);
 
 			.session-diff-added {
 				color: var(--vscode-chat-linesAddedForeground);
@@ -264,10 +310,17 @@
 
 			&.has-separator {
 				display: inline;
+				opacity: 0.7;
 
 				&::before {
 					content: '\00B7';
 				}
+			}
+
+			/* The timestamp is right-aligned (below), so its leading dot would
+			 * float mid-row. The renderer marks that one separator. */
+			&.session-separator-before-time {
+				display: none;
 			}
 		}
 	}
@@ -294,24 +347,34 @@
 
 	.session-title {
 		font-size: var(--vscode-agents-fontSize-body1, 13px);
-	}
-
-	.session-title {
+		font-weight: var(--vscode-agents-fontWeight-regular, 400);
 		color: var(--vscode-foreground);
 	}
 
-	/* Strong foreground is reserved for sessions that need attention: */
-	/* unread, input required, or selected. All others use foreground. */
+	/* Sessions that need attention (unread, input required) step up in both
+	 * colour and weight so the difference survives without colour vision. */
 	&.unread .session-title,
 	&.needs-input .session-title {
 		color: var(--vscode-strongForeground);
+		font-weight: var(--vscode-agents-fontWeight-semiBold, 600);
 	}
 
+	/* Relative time sits flush right, Linear-style; the flex:1 description
+	 * (when present) already pushes it there, `margin-left: auto` covers the
+	 * badge/diff-only case. Monospace with tabular numerals so it does not
+	 * jitter as it ticks over. The row's 6px gap already separates it, and
+	 * at narrow widths it ellipsizes rather than being hard-clipped by the
+	 * row, once the description has given up its space. */
 	.session-time {
-		display: flex;
-		align-items: center;
+		display: block;
+		flex-shrink: 1;
+		min-width: 0;
+		margin-left: auto;
+		font-family: var(--monaco-monospace-font, monospace);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.session-approval-row {
@@ -415,7 +478,10 @@
 	justify-content: center;
 	align-items: center;
 	padding: 0 10px;
-	font-size: var(--vscode-agents-fontSize-label2, 11px);
+	font-family: var(--monaco-monospace-font, monospace);
+	font-size: var(--vscode-agents-fontSize-label3, 10px);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	color: var(--vscode-descriptionForeground);
 	min-height: 26px;
 	cursor: pointer;
@@ -462,7 +528,8 @@
 	}
 }
 
-/* Folders show-more/show-less: align with workspace section headers. */
+/* Folders show-more/show-less: left-aligned like the workspace headers it
+ * follows. It is system text, so it keeps the show-more eyebrow type. */
 .session-show-more.session-show-more-folders {
 	justify-content: flex-start;
 	font-weight: var(--vscode-agents-fontWeight-semiBold, 600);
@@ -478,15 +545,40 @@
 	}
 }
 
-/* Section Header */
+/* Section Header — a small semibold caption over a hairline. System sections
+ * (Pinned, Today, Automations, ...) render as a monospace uppercase eyebrow;
+ * headers that carry a user's own words (session group names, workspace
+ * folder names) keep the UI font and their original casing, so "myApp" and
+ * "MyApp" stay distinguishable and long names do not gain tracking. */
 
 .session-section {
+	position: relative;
 	display: flex;
 	align-items: center;
 	font-size: var(--vscode-agents-fontSize-label2, 11px);
 	font-weight: var(--vscode-agents-fontWeight-semiBold, 600);
 	color: var(--vscode-descriptionForeground);
 	padding: 0 10px;
+
+	&:not(.session-group):not(.session-section-workspace) {
+		font-family: var(--monaco-monospace-font, monospace);
+		font-size: var(--vscode-agents-fontSize-label3, 10px);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	/* Hairline aligned to the card insets. Decorative: opted out in high contrast. */
+	&:not(.session-section-shortcut)::after {
+		content: '';
+		position: absolute;
+		left: 10px;
+		right: 10px;
+		bottom: 0;
+		height: 1px;
+		background: var(--vscode-widget-border, var(--vscode-contrastBorder));
+		opacity: 0.6;
+		pointer-events: none;
+	}
 
 	.session-section-label {
 		flex: 1 1 auto;
@@ -722,6 +814,48 @@
 	50%,
 	100% {
 		background-position: -120% 0;
+	}
+}
+
+/* ---- Status shapes ----
+ * Meaning is carried by glyph shape, never by hue alone. The SessionStatusIcon
+ * widget renders: running = animated dot grid (reduced motion:
+ * codicon-session-in-progress); waiting on you = animated ring (reduced motion:
+ * codicon-circle-filled, container gets `session-icon-pulse`); failed =
+ * codicon-error; unread = codicon-circle-filled; read = codicon-circle-small-filled
+ * or the PR icon; archived = codicon-pass-filled. The one collision is under
+ * reduced motion, where "waiting on you" and "unread" both become a filled dot
+ * that differs only by colour, so the waiting-on-you dot is given a ring. The
+ * `session-icon-pulse` marker is set by the widget for NeedsInput in every host
+ * (row icon and the Automations section indicator alike). */
+.session-item .session-icon.session-icon-pulse > .codicon-circle-filled,
+.session-section .session-section-status-indicator.session-icon-pulse > .codicon-circle-filled {
+	border-radius: 50%;
+	outline: var(--vscode-strokeThickness) solid currentColor;
+	outline-offset: -1px;
+}
+
+/* High contrast: drop decorative hairlines (the theme's own outlines carry state)
+ * and give the diff pill a real contrast border instead of a mixed one. */
+.hc-black .session-section:not(.session-section-shortcut)::after,
+.hc-light .session-section:not(.session-section-shortcut)::after {
+	display: none;
+}
+
+/* Same selector as the hover rule above, prefixed by the theme class, so it outranks it. */
+.hc-black .sessions-list-control .monaco-list:not(.drop-target):not(.dragging) .monaco-list-row.session-list-inset-row:hover:not(.selected),
+.hc-light .sessions-list-control .monaco-list:not(.drop-target):not(.dragging) .monaco-list-row.session-list-inset-row:hover:not(.selected) {
+	box-shadow: none;
+}
+
+.hc-black .session-item .session-details-row .session-diff,
+.hc-light .session-item .session-details-row .session-diff {
+	border-color: var(--vscode-contrastBorder);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sessions-list-control .monaco-list-row.session-list-inset-row {
+		transition: none;
 	}
 }
 
