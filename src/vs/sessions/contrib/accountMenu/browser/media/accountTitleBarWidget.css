@@ -20,9 +20,18 @@
 	overflow: hidden;
 }
 
+/* Only the two-account state needs a gap; the single-icon state stays centred. */
 .agent-sessions-workbench .sessions-account-titlebar-widget.has-chatgpt-account {
-	width: 28px;
-	min-width: 28px;
+	gap: 4px;
+	justify-content: center;
+}
+
+.agent-sessions-workbench .sessions-account-titlebar-widget.has-chatgpt-account {
+	/* Two 18px discs plus a 4px gap. The pair used to be crammed into 28px with
+	 * both discs absolutely positioned, which overlapped them by ~8px and read
+	 * as one icon colliding with another rather than as two accounts. */
+	width: 40px;
+	min-width: 40px;
 	overflow: visible;
 }
 
@@ -69,9 +78,8 @@
 
 .agent-sessions-workbench .sessions-account-titlebar-widget.has-chatgpt-account .sessions-account-titlebar-widget-avatar,
 .agent-sessions-workbench .sessions-account-titlebar-widget.has-chatgpt-account .sessions-account-titlebar-widget-icon {
-	position: absolute;
-	left: 1px;
-	z-index: 2;
+	position: static;
+	flex: 0 0 auto;
 }
 
 .agent-sessions-workbench .sessions-account-titlebar-widget-codex-icon:not(.visible) {
@@ -96,9 +104,8 @@
 }
 
 .agent-sessions-workbench .sessions-account-titlebar-widget.has-chatgpt-account .sessions-account-titlebar-widget-codex-icon {
-	position: absolute;
-	right: 0;
-	z-index: 1;
+	position: static;
+	flex: 0 0 auto;
 }
 
 .monaco-workbench .part.titlebar.inactive .sessions-account-titlebar-widget-avatar {
