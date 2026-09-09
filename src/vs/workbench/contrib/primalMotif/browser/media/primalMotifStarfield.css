@@ -1,0 +1,99 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * Primal Code - the `galaxy` motif's nebula.
+ *
+ * WHY THIS IS CSS AND NOT CANVAS. The stars move; the nebula they sit in does
+ * not. Painting a static picture on the canvas would have cost two full 640x360
+ * gradient blends on every one of thirty frames a second, for an image that is
+ * identical every time - against a 0.5ms main-thread budget for the whole frame.
+ * As a `background-image` on the canvas element it is composited by the browser,
+ * costs exactly nothing per frame, and follows a theme change live without the
+ * renderer being rebuilt. The canvas is created with an alpha channel and
+ * cleared every frame, so this shows through everywhere a star is not.
+ *
+ * WHERE THE COMPOSITION COMES FROM. The four slabs - editor, side bar, auxiliary
+ * bar, panel - are opaque and cover the middle of the workbench, so the only
+ * ground anyone ever sees is the strip above them and the strip below them (plus
+ * the slabs' rounded corner notches). primalWallpaperPaint.ts reasons the same
+ * way about its own wash: the pools are placed so that each of those two strips
+ * cuts across a real gradient rather than a flat tone. Two pools sit near the top
+ * and bottom edges for exactly that reason, and a third, smaller one keeps the
+ * top strip from reading as a single even glow.
+ *
+ * NO COLOR LITERALS. Every stop is `color-mix` over a workbench token, and every
+ * token has a token fallback, so a theme missing one of them degrades to a
+ * quieter sky instead of dropping the whole declaration. `focusBorder` is the one
+ * accent the workbench guarantees and `descriptionForeground` is secondary ink;
+ * both contrast the theme's background by construction, so the same three pools
+ * lift a dark ground and deepen a light one with no light/dark branch here.
+ *
+ * THE `transparent` END STOPS ARE SAFE. A gradient that fades to `transparent`
+ * is the classic way to accidentally fade through black, because `transparent`
+ * is `rgba(0, 0, 0, 0)`. CSS gradients interpolate with premultiplied alpha, so
+ * a zero-alpha stop contributes no color at all and the ramp stays on the
+ * token's own hue the whole way out. (This is the one place the CSS differs from
+ * primalWallpaperPaint.ts, which composes its stops as strings and therefore has
+ * to spell the zero-alpha color out itself. Writing
+ * `color-mix(in srgb, X 0%, transparent)` here would not reproduce that: with a
+ * zero result alpha it computes to `rgba(0, 0, 0, 0)` regardless of X.)
+ *
+ * FULL-STRENGTH STOPS, ON PURPOSE. The wallpaper layer this element lives inside
+ * carries the user's clamped intensity as its own `opacity` (0.12 by default), so
+ * everything here is already scaled down by roughly eight before it reaches the
+ * screen. Scaling the stops down as well would multiply the two together and
+ * leave the nebula invisible - the same trap primalWallpaperPaint.ts documents
+ * for the ambient wash.
+ *
+ * NOTHING HERE ANIMATES. There is no transition, no animation and no timer in
+ * this file: the cross-fade the surface gets on appearance belongs to
+ * primalMotif.css, and the motion belongs to the canvas. There is consequently
+ * nothing for `prefers-reduced-motion` to degrade, which is why this file
+ * declares no reduced-motion block rather than declaring an empty one.
+ *
+ * The guard is the one primalMotif.css uses, for the same reasons.
+ */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+
+	/*
+	 * One class more than the rule in primalMotif.css that lays the surface out,
+	 * so this wins on specificity rather than on stylesheet order - which is not
+	 * something a bundler guarantees.
+	 *
+	 * The stars themselves are drawn into the canvas at 640x360 and upscaled by
+	 * the browser's default smoothing, which is what turns a one-pixel square
+	 * into a soft round dot. `image-rendering` is deliberately left alone:
+	 * `pixelated` would give hard square stars and cost the illusion for nothing.
+	 */
+	&.primal-motif-on .primal-wallpaper > .primal-motif-surface.primal-motif-starfield {
+		background-image:
+			/* The near pool, in the accent. Its core sits inside the box at the top
+			 * left so the title bar strip cuts across the bright part of it. */
+			radial-gradient(115% 100% at 18% 4%,
+				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 88%, transparent) 0%,
+				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 34%, transparent) 34%,
+				transparent 72%),
+
+			/* A second, smaller accent pool further along the top strip, so that
+			 * strip is a gradient across its width and not one even glow. */
+			radial-gradient(64% 52% at 63% 10%,
+				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 30%, transparent) 0%,
+				transparent 62%),
+
+			/* The counter pool, in secondary ink, for the status bar strip. */
+			radial-gradient(102% 92% at 85% 96%,
+				color-mix(in srgb, var(--vscode-descriptionForeground, var(--vscode-foreground)) 66%, transparent) 0%,
+				transparent 62%);
+
+		/* Gradients have no intrinsic size, so `auto` already resolves to the
+		 * element's box; both are stated because the surface is a replaced element
+		 * and a canvas's own default background behaviour is easy to misread. */
+		background-repeat: no-repeat;
+		background-size: 100% 100%;
+		background-position: center center;
+	}
+}

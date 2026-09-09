@@ -1150,6 +1150,8 @@
 		"--primal-boot-reveal",
 		"--primal-boot-stagger",
 		"--primal-deck-edge",
+		"--primal-motif-fade",
+		"--primal-motif-fade-duration",
 		"--primal-rig-edge",
 		"--primal-start-edge",
 		"--primal-wallpaper-grain",
