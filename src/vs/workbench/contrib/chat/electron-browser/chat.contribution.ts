@@ -37,6 +37,7 @@ import '../../primalStart/browser/primalStart.contribution.js';
 import '../../primalRig/browser/primalRig.contribution.js';
 import '../../primalDeck/browser/primalDeck.contribution.js';
 import '../../primalVibes/browser/primalVibes.contribution.js';
+import '../../primalThemeGallery/browser/primalThemeGallery.contribution.js';
 import '../../primalBoot/browser/primalBoot.contribution.js';
 import '../../primalWallpaper/browser/primalWallpaper.contribution.js';
 import '../../primalMotif/browser/primalMotif.contribution.js';

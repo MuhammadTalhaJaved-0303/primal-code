@@ -32,11 +32,24 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).regis
 	properties: {
 		[PRIMAL_VIBE_SETTING_ID]: {
 			type: 'string',
-			enum: PRIMAL_VIBES.map(vibe => vibe.id),
-			enumDescriptions: PRIMAL_VIBES.map(vibe => vibe.label),
-			default: undefined,
+			// '' is a real member of the enum, not a hole in it: a profile that has
+			// never applied a vibe has no id to record, and an `enum` whose declared
+			// default is not one of its own members advertises a value the setting
+			// can never legally hold.
+			enum: ['', ...PRIMAL_VIBES.map(vibe => vibe.id)],
+			// The mode belongs in the TEXT. The dropdown showed labels only, so
+			// 'Primal Ink' and 'Primal Basalt' were indistinguishable until you
+			// applied one — and for a colour-blind reader, applying one is not a
+			// reliable way to find out either.
+			enumDescriptions: [
+				localize('primalCode.vibe.none', "No vibe recorded yet."),
+				...PRIMAL_VIBES.map(vibe => vibe.mode === 'dark'
+					? localize('primalCode.vibe.dark', "{0} — a dark vibe.", vibe.label)
+					: localize('primalCode.vibe.light', "{0} — a light vibe.", vibe.label))
+			],
+			default: '',
 			scope: ConfigurationScope.APPLICATION,
-			description: localize('primalCode.vibe', "The last applied vibe. A vibe bundles the color theme, product icon theme and file icon theme. Use 'Vibes: Choose Vibe...' to switch."),
+			description: localize('primalCode.vibe', "The last applied vibe. A vibe bundles the color theme, product icon theme and file icon theme. Use 'Vibes: Choose Vibe...' to switch, or 'Primal Code: Browse Themes' for the full gallery."),
 		},
 	},
 });
