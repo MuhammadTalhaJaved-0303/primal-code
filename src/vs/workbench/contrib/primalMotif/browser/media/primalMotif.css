@@ -1,0 +1,146 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/*
+ * Primal Code - the motif layer.
+ *
+ * WHERE THE SURFACE SITS. It does not get a layer of its own. The scheduler
+ * appends its one element per window *inside* the wallpaper's `.primal-wallpaper`
+ * element (primalWallpaper/browser/media/primalWallpaper.css), which already
+ * carries `z-index: -1`, the user's clamped opacity ceiling, and a `::after`
+ * grain pseudo-element that paints above its in-flow children. The motif
+ * inherits all three at once: it is capped by the same intensity setting, the
+ * grain sits over the motion rather than under it, and the four opaque slabs -
+ * editor, side bar, auxiliary bar, panel - still sit above the whole stratum.
+ * Art can never end up behind code, and that is structural rather than tuned.
+ *
+ * ONE SURFACE PER WINDOW. There is exactly one element matched by these rules in
+ * any window, because there is exactly one loop per window and the scheduler has
+ * no API that could make a second. That is the performance argument: a no-op
+ * passthrough shader at 120fps took an M3 Pro from ~2% to 95% GPU and each extra
+ * surface added ~25%. The cost is the loop, so the loop count is what is
+ * defended.
+ *
+ * FIXED BUFFER, UPSCALED. The canvas backing store is 640x360 and is set in
+ * TypeScript, never here; CSS only stretches it to the ground. A 5K panel
+ * therefore costs exactly what a laptop panel costs.
+ *
+ * NO COLOR LITERALS. There is not one in this file. Every pixel the motif paints
+ * comes from the canvas, and everything the scheduler puts on that canvas is
+ * derived from active-theme tokens (see `readPalette` in primalMotifScheduler.ts).
+ *
+ * The guard is the one primalWallpaper.css and primalChrome.css use, for the
+ * same reasons: high contrast opts out entirely, and `agent-sessions-workbench`
+ * / `modern-ui` are the other two chrome designs that ship here.
+ */
+
+/*
+ * Inert unless the guard below matches, exactly like the wallpaper layer: an
+ * element the scheduler left behind in a high-contrast window paints nothing.
+ */
+.primal-motif-surface {
+	display: none;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+
+	/* How long the surface takes to cross-fade in over the wallpaper's own wash.
+	 * Short enough that a theme switch does not read as a page load, long enough
+	 * that the motif does not pop. Zeroed under reduced motion below. */
+	--primal-motif-fade-duration: 240ms;
+
+	/* =====================================================================
+	 * 1. The surface
+	 * ================================================================== */
+
+	&.primal-motif-on .primal-wallpaper > .primal-motif-surface {
+		display: block;
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 0;
+		pointer-events: none;
+
+		/* The scheduler writes this to 1 once the surface has something to show,
+		 * so the first painted frame arrives as a fade rather than a flash. */
+		opacity: var(--primal-motif-fade, 0);
+		transition: opacity var(--primal-motif-fade-duration) ease-out;
+	}
+
+	/* ---------------------------------------------------------------------
+	 * The seam: the wallpaper cedes its `background-image` and keeps the rest.
+	 *
+	 * While a motif actually holds the ground - `.primal-motif-on` is written
+	 * only when a surface exists and has been created successfully - the wash
+	 * underneath it is dropped, so the motif is not compositing over a second
+	 * gradient it knows nothing about. Everything else the wallpaper does is
+	 * untouched: the `z-index: -1` stratum, the clamped `opacity` ceiling, the
+	 * grain `::after` above the motion, and the opaque slabs above all of it.
+	 *
+	 * The moment the motif is `static`, parked into non-existence, or has failed,
+	 * the scheduler removes the class and the wash is back with no second code
+	 * path and nothing to restore. `primalWallpaperService.ts` is not modified
+	 * and does not know this rule exists; the seam is one selector wide.
+	 *
+	 * It carries one class more than the rule it overrides, so it wins on
+	 * specificity rather than on stylesheet order.
+	 * ------------------------------------------------------------------ */
+
+	&.primal-wallpaper-on.primal-motif-on > .primal-wallpaper {
+		background-image: none;
+	}
+
+	/* =====================================================================
+	 * 2. Legibility: a live motif forces `tintSlabs` off
+	 *
+	 * `primalCode.wallpaper.tintSlabs` lets a hint of the ground bleed through
+	 * the side bar, auxiliary bar and panel. That is checkable against a static
+	 * wash - the contrast is one number. Behind something that moves it becomes
+	 * per-pixel and per-frame, and is no longer checkable at all.
+	 *
+	 * So the tint is revoked while a non-static motif holds the ground. This is
+	 * done here, in CSS, rather than by writing the user's setting: the setting
+	 * keeps whatever value they chose and comes back the moment the motif is
+	 * `static` again, and there is no window in which a stale settings write
+	 * could leave the slabs translucent over a moving surface.
+	 *
+	 * These selectors carry one more class than the wallpaper's tint rules
+	 * (`.primal-wallpaper-on.primal-wallpaper-tint` plus `.primal-motif-on`), so
+	 * they win on specificity and not on file order - which is not something a
+	 * bundler guarantees.
+	 * ================================================================== */
+
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.sidebar,
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.auxiliarybar {
+		background-color: var(--vscode-sideBar-background) !important;
+	}
+
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.panel {
+		background-color: var(--vscode-panel-background) !important;
+	}
+
+	/* =====================================================================
+	 * 3. Reduced motion
+	 *
+	 * The scheduler has already decided there will be no loop; rule 2 of the
+	 * ladder resolves to a single painted resting frame. All that is left for
+	 * CSS is the cross-fade, which is itself motion. `.primal-motif-instant` is
+	 * written by the scheduler from `IAccessibilityService.isMotionReduced()`,
+	 * which folds the `workbench.reduceMotion` setting together with the media
+	 * query; the media query is honoured on its own as well, for a window whose
+	 * setting says `auto` before the service has been consulted.
+	 * ================================================================== */
+
+	&.primal-motif-instant {
+		--primal-motif-fade-duration: 0ms;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.monaco-workbench {
+		--primal-motif-fade-duration: 0ms;
+	}
+}

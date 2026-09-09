@@ -39,6 +39,7 @@ import '../../primalDeck/browser/primalDeck.contribution.js';
 import '../../primalVibes/browser/primalVibes.contribution.js';
 import '../../primalBoot/browser/primalBoot.contribution.js';
 import '../../primalWallpaper/browser/primalWallpaper.contribution.js';
+import '../../primalMotif/browser/primalMotif.contribution.js';
 import '../../primalUpdate/browser/primalUpdate.contribution.js';
 import { AgentSessionProviders, getAgentSessionProviderName } from '../browser/agentSessions/agentSessions.js';
 import { IAgentSessionsService } from '../browser/agentSessions/agentSessionsService.js';
