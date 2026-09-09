@@ -1,10 +1,25 @@
 {
 	"displayName": "Primal Vibes Themes",
-	"description": "The six Primal Code vibe color themes",
+	"description": "The 6 hand-authored Primal Code vibes and 15 generated corpus themes",
 	"inkThemeLabel": "Primal Ink",
 	"basaltThemeLabel": "Primal Basalt",
 	"tideThemeLabel": "Primal Tide",
 	"duskThemeLabel": "Primal Dusk",
 	"fernThemeLabel": "Primal Fern",
-	"ridgeThemeLabel": "Primal Ridge"
+	"ridgeThemeLabel": "Primal Ridge",
+	"umberSoftThemeLabel": "Primal Umber Soft",
+	"umberThemeLabel": "Primal Umber",
+	"umberHardThemeLabel": "Primal Umber Hard",
+	"pewterSoftThemeLabel": "Primal Pewter Soft",
+	"pewterThemeLabel": "Primal Pewter",
+	"pewterHardThemeLabel": "Primal Pewter Hard",
+	"cinderSoftThemeLabel": "Primal Cinder Soft",
+	"cinderThemeLabel": "Primal Cinder",
+	"cinderHardThemeLabel": "Primal Cinder Hard",
+	"trenchSoftThemeLabel": "Primal Trench Soft",
+	"trenchThemeLabel": "Primal Trench",
+	"trenchHardThemeLabel": "Primal Trench Hard",
+	"nightshadeSoftThemeLabel": "Primal Nightshade Soft",
+	"nightshadeThemeLabel": "Primal Nightshade",
+	"nightshadeHardThemeLabel": "Primal Nightshade Hard"
 }
