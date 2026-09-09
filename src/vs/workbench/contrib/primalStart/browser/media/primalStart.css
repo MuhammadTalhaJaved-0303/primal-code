@@ -331,3 +331,112 @@
 .primal-start-editor .primal-start-footer-separator {
 	opacity: 0.5;
 }
+
+/* ==========================================================================
+ * The motif stage
+ *
+ * See primalMotif/browser/media/primalMotif.css. The motif layer runs exactly
+ * one surface per window; while this page is the visible pane it offers itself
+ * as that surface's host, so the globe is drawn here instead of into the ~35px
+ * of title strip that is all the ground a workbench with four flush opaque
+ * slabs actually shows.
+ *
+ * THE STACKING CONTEXT IS LOAD-BEARING. `.editor-instance` gets nothing but
+ * `height: 100%` from editorgroupview.css, `.editor-container` and
+ * `.editor-group-container` are statically positioned, and the nearest
+ * positioned ancestor above them is `.split-view-view`. An `inset: 0` layer
+ * without the `position: relative` below would therefore size itself to the
+ * whole editor-group box - tab strip included - and escape this pane's clip.
+ * `isolation: isolate` is what makes the 0/1 pair a guarantee rather than an
+ * accident: the editor part's own `::before`/`::after` sit at z-index 10, the
+ * drop overlay at 12 and the sashes at 35, and none of them are in this
+ * context.
+ *
+ * THE GUARD. The same four classes primalMotif.css and primalWallpaper.css
+ * carry: high contrast opts out of the ground entirely, and
+ * `agent-sessions-workbench` / `modern-ui` are the other two chrome designs
+ * that ship in this fork and own their own ground selectors.
+ * ========================================================================== */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane {
+	position: relative;
+	isolation: isolate;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane > .primal-motif-stage {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane > .primal-start-editor {
+	position: relative;
+	z-index: 1;
+
+	/* The scrim below is inset NEGATIVELY on both sides so its feather lands
+	 * outside the text column, and it is absolutely positioned against the page,
+	 * which is inside this scroll container - so its border box counts towards
+	 * this container's scrollable overflow. `overflow-y: auto` alone is not
+	 * enough to stop that: an unspecified `overflow-x` computes to `auto` and not
+	 * to `visible` whenever the other axis is not visible, so the page grew a
+	 * second scroll axis and up to 48px of dead sideways pan at any pane
+	 * narrower than the column plus its feather. Panning it dragged the text off
+	 * the plate that the scrim comment calls mandatory, over a stage that does
+	 * not pan with it.
+	 *
+	 * Clipping here is the intended picture anyway: the plate is meant to fade
+	 * out at the pane edge, which is where the stage is clipped by its own
+	 * `overflow: hidden`, so no seam appears. Nothing legitimate needs to scroll
+	 * sideways - every long string on this page is already ellipsised. Stated as
+	 * two values so the vertical axis is unmistakably still `auto`. */
+	overflow: hidden auto;
+}
+
+/* --------------------------------------------------------------------------
+ * The scrim. MANDATORY, not belt-and-braces.
+ *
+ * Every word of body text on this page sits directly on bare ground with no
+ * plate behind it: the tagline, all three section labels, the recent paths and
+ * the whole footer are `--vscode-descriptionForeground`, the LOW contrast token
+ * in every vibe (roughly 3:1 in Ink). primalMotif.css already revokes the
+ * wallpaper's `tintSlabs` while a motif runs, and says exactly why: contrast
+ * against something that moves is per-pixel and per-frame and is therefore not
+ * checkable at all. Putting a moving ground behind unplated body text
+ * re-creates that unmeasurable case one layer closer to the reader, so the text
+ * column gets a plate of its own. At 0.9 over a ceiling of 0.14 what survives
+ * behind the words is under 1.5% ink - below the point where the question of
+ * per-frame contrast arises at all.
+ *
+ * WHY A BLURRED RECTANGLE AND NOT A GRADIENT. The plate is painted in
+ * `--vscode-editor-background`, the ground's own colour, so it has no shape of
+ * its own: what it reads as is the globe fading out behind the words. That only
+ * works if it has no edge, and it has to be feathered on all four sides at once
+ * while staying bounded to the text's own height - a full-height band would
+ * take the whole right gutter and the space below the footer with it, which is
+ * exactly where the composition lives. One blurred rectangle does all four
+ * sides; it is static, rasterised once, and never animates.
+ *
+ * The top inset carries the plate off the top of the scroll area so its feather
+ * is never on screen; the bottom one stops short of the footer's own margin so
+ * the arc rises into a clean band below it.
+ *
+ * It sits at `z-index: -1` inside `.primal-start-editor`, which establishes its
+ * own stacking context above, so the scrim can never fall behind the stage.
+ * ------------------------------------------------------------------------ */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane .primal-start-page {
+	position: relative;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane .primal-start-page::before {
+	content: '';
+	position: absolute;
+	inset: -96px -48px -32px;
+	z-index: -1;
+	pointer-events: none;
+	background: var(--vscode-editor-background);
+	opacity: 0.9;
+	filter: blur(24px);
+}

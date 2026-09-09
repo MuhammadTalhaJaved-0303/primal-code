@@ -12,7 +12,7 @@ import { Codicon } from '../../../../base/common/codicons.js';
 import { fromNow } from '../../../../base/common/date.js';
 import { onUnexpectedError } from '../../../../base/common/errors.js';
 import { splitRecentLabel } from '../../../../base/common/labels.js';
-import { DisposableMap, DisposableStore } from '../../../../base/common/lifecycle.js';
+import { DisposableMap, DisposableStore, IDisposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { localize } from '../../../../nls.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
@@ -30,6 +30,7 @@ import { EditorPane } from '../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { IHostService } from '../../../services/host/browser/host.js';
+import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { ACTION_ID_NEW_CHAT, CHAT_OPEN_ACTION_ID } from '../../chat/browser/actions/chatActions.js';
 import { IAgentSessionsModel } from '../../chat/browser/agentSessions/agentSessionsModel.js';
 import { openSession } from '../../chat/browser/agentSessions/agentSessionsOpener.js';
@@ -42,6 +43,7 @@ import { IAgentSessionsService } from '../../chat/browser/agentSessions/agentSes
 import { ChatViewPaneTarget, IChatWidgetService } from '../../chat/browser/chat.js';
 import { ChatSessionStatus } from '../../chat/common/chatSessionsService.js';
 import { IChatDetail, IChatService } from '../../chat/common/chatService/chatService.js';
+import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../primalMotif/browser/primalMotif.js';
 import { IPrimalVibe, IPrimalVibeService, PRIMAL_VIBE_CYCLE_COMMAND_ID, PRIMAL_VIBE_PICK_COMMAND_ID } from '../../primalVibes/browser/primalVibes.js';
 import { PrimalRigInput } from './primalRigInput.js';
 import { IRigSessionRow, agentSessionRows, countSessionsToday, liveSessionRows, mergeSessionRows } from './primalRigSessions.js';
@@ -100,6 +102,27 @@ export class PrimalRigEditor extends EditorPane {
 
 	private scrollContainer: HTMLElement | undefined;
 	private primaryActionButton: HTMLButtonElement | undefined;
+
+	//#region Motif stage
+
+	/**
+	 * The mechanism is the Start page's, verbatim - see the same region in
+	 * `primalStart/browser/primalStartEditor.ts` for why each piece is here.
+	 *
+	 * It is duplicated rather than shared because `primalCode.startPage.surface`
+	 * is `'start' | 'rig' | 'none'`: whichever page got the stage alone, the
+	 * feature would be invisible for the half of users who chose the other. Only
+	 * one of the two is ever the visible pane, so the one-surface-per-window
+	 * budget is unaffected.
+	 */
+	private stage: HTMLElement | undefined;
+	private workbenchContainer: HTMLElement | undefined;
+	private targetWindow: Window | undefined;
+	private readonly stageRegistration = this._register(new MutableDisposable<IDisposable>());
+	private stageWidth = 0;
+	private stageHeight = 0;
+
+	//#endregion
 	private vibeChip: HTMLButtonElement | undefined;
 	private vibeChipLabel: HTMLElement | undefined;
 
@@ -156,6 +179,8 @@ export class PrimalRigEditor extends EditorPane {
 		@IChatService private readonly chatService: IChatService,
 		@IAgentSessionsService private readonly agentSessionsService: IAgentSessionsService,
 		@IChatWidgetService private readonly chatWidgetService: IChatWidgetService,
+		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+		@IPrimalMotifService private readonly motifService: IPrimalMotifService,
 	) {
 		super(PrimalRigEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -163,6 +188,24 @@ export class PrimalRigEditor extends EditorPane {
 	protected override createEditor(parent: HTMLElement): void {
 		this.editorDisposables.clear();
 		this.sessionsSignature = undefined; // the list DOM below is new; nothing is rendered yet
+
+		// The offer names an element, so it cannot outlive the element it named.
+		this.stageRegistration.clear();
+
+		// The pane is the stacking context the stage and the page are ordered
+		// inside. `.editor-instance` is given nothing but `height: 100%` by
+		// editorgroupview.css, so without this an `inset: 0` layer would size
+		// itself to the whole editor-group box - tab strip included - and escape
+		// this pane's clip. See primalRig.css.
+		parent.classList.add('primal-rig-pane');
+
+		this.targetWindow = DOM.getWindow(parent);
+		this.workbenchContainer = this.layoutService.getContainer(this.targetWindow);
+
+		// Before the scroll container and as its sibling: `.primal-rig-editor` is
+		// `overflow-y: auto`, so a stage inside it would scroll away.
+		this.stage = DOM.append(parent, $('.' + PRIMAL_MOTIF_STAGE_CLASS, { 'aria-hidden': 'true' }));
+		this.editorDisposables.add(DOM.addDisposableListener(this.targetWindow.document, 'visibilitychange', () => this.updateStage()));
 
 		this.scrollContainer = DOM.append(parent, $('.primal-rig-editor'));
 		const page = DOM.append(this.scrollContainer, $('.primal-rig-page'));
@@ -174,6 +217,10 @@ export class PrimalRigEditor extends EditorPane {
 		this.renderFooter(page);
 
 		this.scheduleDeferredLoad(parent);
+
+		// A no-op unless this pane is already the visible one, which is the case
+		// `setInput` would otherwise be the first to notice.
+		this.updateStage();
 	}
 
 	//#region Header
@@ -626,13 +673,51 @@ export class PrimalRigEditor extends EditorPane {
 		return this.keybindingService.lookupKeybinding(commandId)?.getLabel() ?? undefined;
 	}
 
+	//#region Motif stage
+
+	/**
+	 * The single decision: this pane offers itself as the motif's host exactly
+	 * while it is the visible pane in a visible document. `setEditorVisible` and
+	 * not `Composite.setVisible`, for the reasons set out on the Start page's
+	 * copy of this method.
+	 */
+	private updateStage(): void {
+		const stage = this.stage;
+		const container = this.workbenchContainer;
+		const shouldHost = !!stage && !!container && this.isVisible() && this.targetWindow?.document.visibilityState === 'visible';
+
+		if (shouldHost === !!this.stageRegistration.value) {
+			return;
+		}
+
+		if (!shouldHost) {
+			this.stageRegistration.clear();
+			return;
+		}
+
+		this.stageRegistration.value = this.motifService.registerStage(container, stage);
+	}
+
+	//#endregion
+
 	override async setInput(input: PrimalRigInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
+		this.updateStage();
 
 		// State may have moved on while the page sat in the background.
 		this.attachLiveModelListeners();
 		this.updateAgentActivity();
 		await Promise.all([this.updateProjects(), this.updateToday()]);
+	}
+
+	override clearInput(): void {
+		super.clearInput();
+		this.updateStage();
+	}
+
+	protected override setEditorVisible(visible: boolean): void {
+		super.setEditorVisible(visible);
+		this.updateStage();
 	}
 
 	override focus(): void {
@@ -642,5 +727,22 @@ export class PrimalRigEditor extends EditorPane {
 
 	override layout(dimension: Dimension): void {
 		this.scrollContainer?.classList.toggle('narrow', dimension.width < NARROW_WIDTH_THRESHOLD);
+
+		// The motif's `onDidLayoutContainer` hook fires on *container* layout, and
+		// an editor resize is not one, so the surface has to be told. Only a size
+		// that actually changed: a sash drag is a great many layouts.
+		if (dimension.width === this.stageWidth && dimension.height === this.stageHeight) {
+			return;
+		}
+
+		this.stageWidth = dimension.width;
+		this.stageHeight = dimension.height;
+
+		// `relayout` and not `trigger`, for the reasons set out on the Start
+		// page's copy of this method: a trigger re-arms the frame chain and would
+		// defeat the plan's frame-rate ceiling for the whole of a sash drag.
+		if (this.stageRegistration.value && this.workbenchContainer) {
+			this.motifService.relayout(this.workbenchContainer);
+		}
 	}
 }
