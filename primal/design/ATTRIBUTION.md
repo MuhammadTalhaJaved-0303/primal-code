@@ -25,7 +25,7 @@ generated file must be able to state where every line came from.
 | Primal family | Variants | Source scheme | Author | Licence |
 | --- | --- | --- | --- | --- |
 | Primal Umber | Umber Soft, Umber, Umber Hard | Mezcal (`base16/mezcal.yaml`) | Teshre | MIT |
-| Primal Pewter | Pewter Soft, Pewter, Pewter Hard | Espresso (`base16/espresso.yaml`) | Unknown. Maintained by Alex Mirrington (https://github.com/alexmirrington) | MIT |
+| Primal Pewter | Pewter Soft, Pewter, Pewter Hard | Tomorrow Night Eighties (`base16/tomorrow-night-eighties.yaml`) | Chris Kempson (http://chriskempson.com) | MIT |
 | Primal Cinder | Cinder Soft, Cinder, Cinder Hard | Brasa (`base16/brasa.yaml`) | Teshre | MIT |
 | Primal Trench | Trench Soft, Trench, Trench Hard | Equilibrium Dark (`base16/equilibrium-dark.yaml`) | Carlo Abelli | MIT |
 | Primal Nightshade | Nightshade Soft, Nightshade, Nightshade Hard | Precious Dark Eleven (`base16/precious-dark-eleven.yaml`) | 4lex4 <4lex49@zoho.com> | MIT |

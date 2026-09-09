@@ -98,7 +98,23 @@ export type SurfaceSlotId =
 	| "brightAccent"
 	| "linkActiveFg";
 
-/** Slots the generator synthesises, so lightness separation is provable. */
+/**
+ * Slots the generator synthesises, so lightness separation is provable.
+ *
+ * Two independent ladders and one wash family, because those are the three
+ * kinds of thing a user has to tell apart and they are never mixed in one
+ * widget:
+ *
+ *   severity  error / warning / info      - squiggles, problem icons, badges
+ *   diff      added / untracked / conflict / modified / deleted
+ *                                         - gutter bars, ruler marks, SCM
+ *   wash      the six semi-transparent diff backgrounds, which are measured
+ *             AFTER compositing and so cannot be a rung of the diff ladder
+ *
+ * `untracked` used to be an alias of `added`, which made two states the
+ * explorer shows side by side byte-identical - 0.00 dE00 to a trichromat, let
+ * alone a dichromat. It is its own role now, with its own hue.
+ */
 export type SemanticSlotId =
 	| "error"
 	| "warning"
@@ -106,7 +122,14 @@ export type SemanticSlotId =
 	| "added"
 	| "deleted"
 	| "modified"
-	| "conflict";
+	| "conflict"
+	| "untracked"
+	| "addedLineWash"
+	| "deletedLineWash"
+	| "addedInlineWash"
+	| "deletedInlineWash"
+	| "addedTextWash"
+	| "deletedTextWash";
 
 /** Slots that are an exact per-mode pick of another slot. */
 export type ModeSlotId =
@@ -180,6 +203,28 @@ export const SEMANTIC_SLOT_IDS: readonly SemanticSlotId[] = [
 	"deleted",
 	"modified",
 	"conflict",
+	"untracked",
+	"addedLineWash",
+	"deletedLineWash",
+	"addedInlineWash",
+	"deletedInlineWash",
+	"addedTextWash",
+	"deletedTextWash",
+];
+
+/**
+ * The semantic slots whose value already carries its own alpha. A token rule
+ * that names one of these must not restate an alpha: the generator chose the
+ * alpha as part of proving the composited pair apart, and overriding it would
+ * silently undo that proof.
+ */
+export const SEMANTIC_WASH_SLOT_IDS: readonly SemanticSlotId[] = [
+	"addedLineWash",
+	"deletedLineWash",
+	"addedInlineWash",
+	"deletedInlineWash",
+	"addedTextWash",
+	"deletedTextWash",
 ];
 
 /** Resolved by MODE_SLOT_RULES, not supplied by anyone. */
@@ -533,10 +578,10 @@ export const WORKBENCH_TOKENS: readonly WorkbenchToken[] = [
 	{ token: "editorGutter.addedBackground", from: "added" },
 	{ token: "editorGutter.deletedBackground", from: "deleted" },
 	{ token: "editorGutter.modifiedBackground", from: "modified" },
-	{ token: "diffEditor.insertedTextBackground", from: "added", alpha: "33" },
-	{ token: "diffEditor.insertedLineBackground", from: "added", alpha: "1A" },
-	{ token: "diffEditor.removedTextBackground", from: "deleted", alpha: "33" },
-	{ token: "diffEditor.removedLineBackground", from: "deleted", alpha: "1A" },
+	{ token: "diffEditor.insertedTextBackground", from: "addedTextWash" },
+	{ token: "diffEditor.insertedLineBackground", from: "addedLineWash" },
+	{ token: "diffEditor.removedTextBackground", from: "deletedTextWash" },
+	{ token: "diffEditor.removedLineBackground", from: "deletedLineWash" },
 	{ token: "diffEditor.unchangedRegionBackground", from: "sideBg" },
 	{ token: "diffEditor.diagonalFill", from: "border", alpha: "99" },
 	{
@@ -652,13 +697,13 @@ export const WORKBENCH_TOKENS: readonly WorkbenchToken[] = [
 	{ token: "terminal.ansiBrightCyan", from: "ansiBrightCyan" },
 	{ token: "terminal.ansiBrightWhite", from: "ansiBrightWhite" },
 	{ token: "gitDecoration.addedResourceForeground", from: "added" },
-	{ token: "gitDecoration.modifiedResourceForeground", from: "warning" },
+	{ token: "gitDecoration.modifiedResourceForeground", from: "modified" },
 	{ token: "gitDecoration.deletedResourceForeground", from: "deleted" },
 	{ token: "gitDecoration.renamedResourceForeground", from: "added" },
-	{ token: "gitDecoration.untrackedResourceForeground", from: "added" },
+	{ token: "gitDecoration.untrackedResourceForeground", from: "untracked" },
 	{ token: "gitDecoration.ignoredResourceForeground", from: "subtleFg" },
 	{ token: "gitDecoration.conflictingResourceForeground", from: "conflict" },
-	{ token: "gitDecoration.stageModifiedResourceForeground", from: "warning" },
+	{ token: "gitDecoration.stageModifiedResourceForeground", from: "modified" },
 	{ token: "gitDecoration.stageDeletedResourceForeground", from: "deleted" },
 	{ token: "gitDecoration.submoduleResourceForeground", from: "info" },
 	{ token: "notificationCenter.border", from: "border" },
@@ -682,13 +727,11 @@ export const WORKBENCH_TOKENS: readonly WorkbenchToken[] = [
 	{ token: "pickerGroup.foreground", from: "mutedFg" },
 	{ token: "quickInput.background", from: "elevatedBg" },
 	{ token: "quickInput.foreground", from: "editorFg" },
-	{ token: "quickInput.border", from: "border" },
 	{ token: "quickInputTitle.background", from: "elevatedBg" },
 	{ token: "quickInputList.focusBackground", from: "selectionBg" },
 	{ token: "quickInputList.focusForeground", from: "editorFg" },
 	{ token: "quickInputList.focusIconForeground", from: "editorFg" },
 	{ token: "quickInputList.focusHighlightForeground", from: "brightAccent" },
-	{ token: "quickInputList.hoverBackground", from: "hoverBg" },
 	{ token: "keybindingLabel.background", from: "hoverBg" },
 	{ token: "keybindingLabel.foreground", from: "editorFg" },
 	{ token: "keybindingLabel.border", from: "controlBorder" },
@@ -750,13 +793,6 @@ export const WORKBENCH_TOKENS: readonly WorkbenchToken[] = [
 	{ token: "charts.orange", from: "conflict" },
 	{ token: "charts.green", from: "ansiGreen" },
 	{ token: "charts.purple", from: "ansiMagenta" },
-	{ token: "gauge.foreground", from: "info" },
-	{ token: "gauge.background", from: "info", alpha: "4D" },
-	{ token: "gauge.border", from: "border" },
-	{ token: "gauge.warningForeground", from: "warning" },
-	{ token: "gauge.warningBackground", from: "warning", alpha: "4D" },
-	{ token: "gauge.errorForeground", from: "error" },
-	{ token: "gauge.errorBackground", from: "error", alpha: "4D" },
 	{ token: "editorCommentsWidget.rangeBackground", from: "accent", alpha: "1A" },
 	{ token: "editorCommentsWidget.rangeActiveBackground", from: "accent", alpha: "2E" },
 	{ token: "chat.requestBubbleBackground", from: "accent", alpha: "14" },
@@ -785,8 +821,8 @@ export const WORKBENCH_TOKENS: readonly WorkbenchToken[] = [
 	{ token: "inlineChatInput.border", from: "controlBorder" },
 	{ token: "inlineChatInput.focusBorder", from: "accent", alpha: { light: null, dark: "B3" } },
 	{ token: "inlineChatInput.placeholderForeground", from: "mutedFg" },
-	{ token: "inlineChatDiff.inserted", from: "added", alpha: "26" },
-	{ token: "inlineChatDiff.removed", from: "deleted", alpha: "26" },
+	{ token: "inlineChatDiff.inserted", from: "addedInlineWash" },
+	{ token: "inlineChatDiff.removed", from: "deletedInlineWash" },
 	{ token: "interactive.activeCodeBorder", from: "comment" },
 	{ token: "interactive.inactiveCodeBorder", from: "border" },
 	{ token: "agents.background", from: "editorBg" },
@@ -956,7 +992,7 @@ export const TOKEN_COLOR_RULES: readonly TokenColorRule[] = [
 	},
 	{
 		scope: ["markup.changed", "punctuation.definition.changed"],
-		from: "conflict"
+		from: "modified"
 	},
 	{
 		scope: ["meta.diff.range", "meta.diff.header", "meta.separator"],
@@ -986,6 +1022,31 @@ export const TOKEN_COLOR_RULES: readonly TokenColorRule[] = [
 	},
 ];
 
+/**
+ * Tokens whose SLOT changed when the semantic ladders landed, so the map no
+ * longer reproduces the six hand-authored themes at them even with the old
+ * semantics pinned.
+ *
+ * There are three, and all three are the same defect: a diff role was painted
+ * with a severity colour. `gitDecoration.modifiedResourceForeground` and its
+ * staged twin read `warning`, so a modified file in the explorer was amber
+ * while the same file's `editorGutter.modifiedBackground` was blue - two
+ * answers to one question - and, worse, it put a severity colour inside
+ * validateTheme's "source control decorations" group, which is what made that
+ * group impossible to separate: the severity and diff ladders would have had to
+ * be mutually separated as well, and no plane has that much room.
+ * `markup.changed` read `conflict` for the same reason, in the syntax path.
+ *
+ * They are declared rather than absorbed because both self-checks assert
+ * byte-identity against the fixture, and a change of this kind has to be
+ * visible in the diff of this file rather than hidden in a regenerated blob.
+ */
+export const REROUTED_TOKENS: readonly { readonly token: string; readonly wasFrom: SlotId; readonly why: string }[] = [
+	{ token: "gitDecoration.modifiedResourceForeground", wasFrom: "warning", why: "a modified file is a diff state, not a warning; it now matches editorGutter.modifiedBackground" },
+	{ token: "gitDecoration.stageModifiedResourceForeground", wasFrom: "warning", why: "same role, staged" },
+	{ token: "markup.changed", wasFrom: "conflict", why: "a changed line in a diff is `modified`; `conflict` is the merge state" }
+];
+
 /** A fully resolved palette: every slot the token map can name. */
 export type Palette = Readonly<Record<SlotId, string>>;
 
@@ -994,6 +1055,8 @@ function withAlpha(hex: string, alpha: Alpha | undefined, mode: ThemeMode): stri
 	const suffix = typeof alpha === "string" ? alpha : alpha[mode];
 	return suffix === null ? hex : hex + suffix;
 }
+
+const WASH_SLOT_SET: ReadonlySet<string> = new Set(SEMANTIC_WASH_SLOT_IDS);
 
 /** Applies WORKBENCH_TOKENS to a resolved palette. Key order is preserved. */
 export function buildColors(palette: Palette, mode: ThemeMode): Record<string, string> {
@@ -1005,6 +1068,11 @@ export function buildColors(palette: Palette, mode: ThemeMode): Record<string, s
 		}
 		const hex = palette[entry.from];
 		if (hex === undefined) throw new Error(`tokenMap: palette has no slot "${entry.from}" (for ${entry.token})`);
+		// A wash slot carries the alpha the generator proved the pair apart at.
+		// Restating one here would replace a measured value with a guess.
+		if (WASH_SLOT_SET.has(entry.from) && entry.alpha !== undefined) {
+			throw new Error(`tokenMap: ${entry.token} names wash slot "${entry.from}" and also states an alpha; the wash slot owns its alpha`);
+		}
 		colors[entry.token] = withAlpha(hex, entry.alpha, mode);
 	}
 	return colors;
@@ -1056,37 +1124,83 @@ interface Fixture {
 	}[];
 }
 
+/** Which slot a workbench token hangs off, for partitioning a diff. */
+function slotOfToken(token: string): string {
+	const entry = WORKBENCH_TOKENS.find(t => t.token === token);
+	if (entry === undefined) return "?";
+	return "literal" in entry ? "literal" : entry.from;
+}
+
+const SEMANTIC_SLOT_SET: ReadonlySet<string> = new Set<string>(SEMANTIC_SLOT_IDS);
+const REROUTED_TOKEN_SET: ReadonlySet<string> = new Set(REROUTED_TOKENS.map(entry => entry.token));
+
+/** Tokens the shipping themes are ALLOWED to differ from the fixture at. */
+function isExpectedToMove(token: string): boolean {
+	return REROUTED_TOKEN_SET.has(token) || SEMANTIC_SLOT_SET.has(slotOfToken(token));
+}
+
 function selfCheck(): number {
 	const here = dirname(fileURLToPath(import.meta.url));
 	const fixture = JSON.parse(readFileSync(join(here, "tokenMap.test-fixture.json"), "utf8")) as Fixture;
 	let failures = 0;
 
 	for (const vibe of fixture.vibes) {
-		// 1. The map applied to the fixture palette must equal the fixture output.
+		// 1. The map applied to the fixture palette must equal the fixture output,
+		//    except at the tokens REROUTED_TOKENS declares. The fixture records the
+		//    six hand-authored themes; the exceptions are printed, never absorbed.
 		const colors = buildColors(vibe.palette, vibe.mode);
 		const tokenColors = buildTokenColors(vibe.palette, vibe.syntaxEmphasis);
-		failures += diff(`${vibe.id}: map -> fixture colors`, colors, vibe.colors);
-		failures += diffJson(`${vibe.id}: map -> fixture tokenColors`, tokenColors, vibe.tokenColors);
+		failures += diff(`${vibe.id}: map -> fixture colors`, colors, vibe.colors, false, REROUTED_TOKEN_SET);
+		failures += diffJson(`${vibe.id}: map -> fixture tokenColors`, tokenColors, vibe.tokenColors, false, REROUTED_TOKEN_SET);
 
-		// 2. The fixture must still equal the shipping theme, or it has rotted.
+		// 2. The fixture must still equal the shipping theme at every token that is
+		//    NOT semantic-derived. The semantic-derived ones deliberately moved when
+		//    the ladders landed - the fixture is the before, the theme file is the
+		//    after - and buildThemes.ts --check is what proves the after is generated
+		//    rather than hand-edited. This half is what still catches a hand-edit of
+		//    any of the ~400 colours the ladders do not touch.
 		const shipped = JSON.parse(readFileSync(join(here, "..", "..", vibe.themeFile), "utf8")) as {
 			colors: Record<string, string>;
 			tokenColors: readonly TokenColorEntry[];
 		};
-		failures += diff(`${vibe.id}: fixture -> ${vibe.themeFile}`, vibe.colors, shipped.colors, true);
-		failures += diffJson(`${vibe.id}: fixture tokenColors -> ${vibe.themeFile}`, vibe.tokenColors, shipped.tokenColors, true);
+		const structural: Record<string, string> = {};
+		const shippedStructural: Record<string, string> = {};
+		let moved = 0;
+		for (const key of Object.keys(vibe.colors)) {
+			if (isExpectedToMove(key)) { if (vibe.colors[key].toUpperCase() !== (shipped.colors[key] ?? "").toUpperCase()) moved++; continue; }
+			structural[key] = vibe.colors[key];
+			shippedStructural[key] = shipped.colors[key];
+		}
+		failures += diff(`${vibe.id}: fixture -> ${vibe.themeFile} (non-semantic)`, structural, shippedStructural, true);
+		console.log(`  ${vibe.id.padEnd(7)} ${Object.keys(structural).length} non-semantic colours identical, ${moved} semantic-derived colours re-lit by the ladder`);
 	}
 
 	if (failures > 0) {
 		console.error(`\ntokenMap: ${failures} mismatch(es)`);
 		return 1;
 	}
-	console.log(`tokenMap: ${fixture.vibes.length} vibes reproduce their shipping theme exactly ` +
-		`(${WORKBENCH_TOKENS.length} workbench colours, ${TOKEN_COLOR_RULES.length} tokenColors each)`);
+	console.log(`tokenMap: ${fixture.vibes.length} vibes reproduce their hand-authored fixture exactly ` +
+		`(${WORKBENCH_TOKENS.length} workbench colours, ${TOKEN_COLOR_RULES.length} tokenColors each), ` +
+		`with ${REROUTED_TOKENS.length} declared re-routes`);
 	return 0;
 }
 
-function diff(what: string, got: Record<string, string>, want: Record<string, string>, caseInsensitive = false): number {
+/**
+ * Compares two colour maps key by key.
+ *
+ * `declared` names keys that are ALLOWED to differ - the re-routes above. A
+ * declared difference is printed as an expectation, not counted as a failure;
+ * anything else is a failure. A declared key that turns out to MATCH is also a
+ * failure, because a declaration nobody needs any more is a stale claim in a
+ * file whose whole job is to be true.
+ */
+function diff(
+	what: string,
+	got: Record<string, string>,
+	want: Record<string, string>,
+	caseInsensitive = false,
+	declared: ReadonlySet<string> = new Set()
+): number {
 	const norm = (v: string): string => (caseInsensitive ? v.toUpperCase() : v);
 	const gotKeys = Object.keys(got);
 	const wantKeys = Object.keys(want);
@@ -1096,7 +1210,17 @@ function diff(what: string, got: Record<string, string>, want: Record<string, st
 		bad++;
 	}
 	for (const key of wantKeys) {
-		if (norm(got[key] ?? "") !== norm(want[key])) {
+		const same = norm(got[key] ?? "") === norm(want[key]);
+		if (declared.has(key)) {
+			if (same) {
+				console.error(`  ${what}: ${key} is declared in REROUTED_TOKENS but no longer differs; remove the declaration`);
+				bad++;
+			} else {
+				console.log(`  ${what}: ${key} ${want[key]} -> ${got[key]} (declared re-route)`);
+			}
+			continue;
+		}
+		if (!same) {
 			console.error(`  ${what}: ${key} = ${got[key]}, expected ${want[key]}`);
 			bad++;
 		}
@@ -1104,14 +1228,44 @@ function diff(what: string, got: Record<string, string>, want: Record<string, st
 	return bad;
 }
 
-function diffJson(what: string, got: unknown, want: unknown, caseInsensitive = false): number {
+/**
+ * Compares two tokenColors arrays rule by rule. `declared` names scopes whose
+ * rule is allowed to differ, with the same both-ways strictness as `diff`.
+ */
+function diffJson(
+	what: string,
+	got: readonly TokenColorEntry[],
+	want: readonly TokenColorEntry[],
+	caseInsensitive = false,
+	declared: ReadonlySet<string> = new Set()
+): number {
 	const norm = (v: unknown): string => {
 		const text = JSON.stringify(v);
 		return caseInsensitive ? text.toUpperCase() : text;
 	};
-	if (norm(got) === norm(want)) return 0;
-	console.error(`  ${what}: differs`);
-	return 1;
+	if (got.length !== want.length) {
+		console.error(`  ${what}: ${got.length} rules, expected ${want.length}`);
+		return 1;
+	}
+	let bad = 0;
+	for (let i = 0; i < want.length; i++) {
+		const same = norm(got[i]) === norm(want[i]);
+		const isDeclared = want[i].scope.some(scope => declared.has(scope));
+		if (isDeclared) {
+			if (same) {
+				console.error(`  ${what}: rule ${i} (${want[i].scope[0]}) is declared in REROUTED_TOKENS but no longer differs; remove the declaration`);
+				bad++;
+			} else {
+				console.log(`  ${what}: ${want[i].scope[0]} ${want[i].settings.foreground} -> ${got[i].settings.foreground} (declared re-route)`);
+			}
+			continue;
+		}
+		if (!same) {
+			console.error(`  ${what}: rule ${i} (${want[i].scope[0]}) differs`);
+			bad++;
+		}
+	}
+	return bad;
 }
 
 const entry = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

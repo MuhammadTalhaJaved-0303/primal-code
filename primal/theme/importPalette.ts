@@ -63,7 +63,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { contrastDirection, effectiveContrast, hexToOklch, lightness, mixHex, oklchToHex, raiseContrast } from "./color.ts";
+import { contrastDirection, effectiveContrast, hexToOklch, lightness, mixHex, oklchToHex, raiseContrast, type LightnessDirection } from "./color.ts";
+import { perceptualDistanceOfHex } from "./validateTheme.ts";
 import { SEED_SLOT_IDS, type SeedSlotId, type ThemeMode } from "./tokenMap.ts";
 import type { Seed } from "./generateTheme.ts";
 
@@ -495,13 +496,48 @@ export const DEPTH_OVERSHOOT_LIMIT = 2.5;
  * `liftedAnsiSlots` reports exactly which slots were touched so it is never
  * silent.
  *
- * ANSI BLACK IS EXEMPT. Its entire convention is "the dark one"; lifting it to
- * 3:1 on a dark plane makes it a mid grey, which is not black in any useful
- * sense. All four shipping dark vibes leave it dark and fail this same check
- * (Basalt 1.21:1, Dusk 1.29:1, Fern 1.37:1, Tide 1.37:1), so Primal already
- * treats it as an accepted deviation rather than a defect.
+ * ANSI BLACK IS NOT EXEMPT, and this is a reversal. The exemption used to read
+ * "its entire convention is the dark one; lifting it to 3:1 on a dark plane
+ * makes it a mid grey", and cited the four shipping dark vibes failing the same
+ * check as proof that Primal accepted the deviation. That was circular - the
+ * vibes were excused by the corpus rule and the corpus rule by the vibes - and
+ * it is wrong on the merits: SGR 30 is a foreground code like the other fifteen,
+ * and a program that prints with it on the default plane produced text no user
+ * could read. `validateTheme.ts` calls that an error, and it is right to.
+ *
+ * Black is still the darkest slot in the ramp after the lift, because the lift
+ * stops the instant a colour clears the floor and black starts furthest from
+ * it: on every dark plane in the corpus black lands at 3.0:1 and every other
+ * slot sits at or above that. The convention that survives is the ORDER - black
+ * darkest, bright black next - which is the part a program can rely on; the
+ * part that does not survive is "indistinguishable from the background", which
+ * was never a feature.
  */
 export const ANSI_MIN_CONTRAST = 3.0;
+
+/**
+ * How far apart two ANSI slots must sit for a TRICHROMAT, in dE00.
+ *
+ * The same number as `validateTheme.ts`'s MIN_ANSI_DELTA_E, and it is here for
+ * one specific consequence of the lift: the lift stops the moment a colour
+ * clears the floor, so two slots that were far apart because one of them was
+ * dark can both land ON the floor and arrive at nearly the same colour. Black
+ * and bright black are the pair this bites - black is now always lifted on a
+ * dark plane, and bright black is the comment grey, which is usually below the
+ * floor too - and a repair that only caught byte-identical results let the
+ * near-misses through.
+ *
+ * So the bright sibling is pushed further from the plane until a trichromat can
+ * tell the pair apart. Under the normal observer only: a dichromat cannot
+ * separate all sixteen whatever this file does (see buildThemes.ts), and
+ * pretending otherwise here would push every bright slot to the top of the
+ * plane for nothing.
+ */
+export const ANSI_MIN_SEPARATION = 10;
+
+/** OKLab L per push, and the most pushes allowed, when separating a bright sibling. */
+const SEPARATION_STEP = 0.005;
+const SEPARATION_LIMIT = 200;
 
 /**
  * Normal/bright ANSI siblings, which must never end up as the same colour.
@@ -531,8 +567,8 @@ const ANSI_SLOTS: readonly SeedSlotId[] = [
 	"ansiBrightBlue", "ansiBrightMagenta", "ansiBrightCyan", "ansiBrightWhite"
 ];
 
-/** ANSI seed slots the legibility lift applies to - every one but black. */
-const LIFTED_ANSI_SLOTS: readonly SeedSlotId[] = ANSI_SLOTS.filter(slot => slot !== "ansiBlack");
+/** ANSI seed slots the legibility lift applies to: all sixteen. See ANSI_MIN_CONTRAST. */
+const LIFTED_ANSI_SLOTS: readonly SeedSlotId[] = ANSI_SLOTS;
 
 /** True when `depth` is expressible on this scheme's background. See DEPTH_OVERSHOOT_LIMIT. */
 export function depthIsExpressible(scheme: Scheme, depth: Depth): boolean {
@@ -594,6 +630,29 @@ export function realisedDepth(editorBgHex: string, chromeBgHex: string): number 
 function brighten(hex: string, step: number, mode: ThemeMode): string {
 	const lch = hexToOklch(hex);
 	return oklchToHex({ L: Math.min(1, Math.max(0, lch.L + step * inkDirection(mode))), C: lch.C, h: lch.h });
+}
+
+/**
+ * Moves `bright` away from its plane, in fixed OKLab L steps holding hue and
+ * chroma, until a trichromat can tell it from `normal`. Returns it unchanged
+ * when it already can - the common case, and the reason this is a repair rather
+ * than a derivation.
+ *
+ * Bounded and deterministic: at most SEPARATION_LIMIT steps, and if the slot
+ * runs out of plane before it clears, the last candidate is returned and the
+ * validator reports the shortfall rather than this function looping.
+ */
+function separateFrom(bright: string, normal: string, away: LightnessDirection): string {
+	let candidate = bright;
+	for (let step = 0; step < SEPARATION_LIMIT; step++) {
+		if (perceptualDistanceOfHex(candidate, normal) >= ANSI_MIN_SEPARATION) return candidate;
+		const lch = hexToOklch(candidate);
+		const L = Math.min(1, Math.max(0, lch.L + (away === "lighter" ? SEPARATION_STEP : -SEPARATION_STEP)));
+		const next = oklchToHex({ L, C: lch.C, h: lch.h });
+		if (next === candidate) return candidate;
+		candidate = next;
+	}
+	return candidate;
 }
 
 /** What a caller has to decide that the scheme cannot say. */
@@ -694,21 +753,84 @@ function mapSeed(scheme: Scheme, options: ImportOptions = {}): Seed {
  * distinct terminal colours is simply not a palette this product uses. Loud,
  * and cheap.
  *
- * The lift runs first, so this catches a collision the lift itself created as
- * well as one the scheme arrived with.
+ * Called TWICE, and the two calls are not the same check:
+ *
+ *   - `assertNoCrossSlotCollision` runs on the mapped seed, before any repair,
+ *     and is the rejection this comment argues for. Judging it on what the
+ *     scheme STATED is what keeps it a rejection: the legibility lift and the
+ *     bright-sibling push both move colours, and either can pull two stated
+ *     duplicates apart by accident, readmitting exactly the palette whose
+ *     yellow is a blue.
+ *   - This one runs last, over all sixteen, and catches a collision the repairs
+ *     themselves created.
  */
-function assertDistinctAnsi(seed: Readonly<Record<SeedSlotId, string>>, scheme: Scheme): void {
+/**
+ * The eight normal/bright sibling pairs, as a lookup, so a stated duplicate
+ * BETWEEN siblings can be told from one across roles.
+ */
+const BRIGHT_PAIR_KEYS: ReadonlySet<string> = new Set(BRIGHT_PAIRS.map(([normal, bright]) => `${normal}|${bright}`));
+
+/**
+ * Rejects a scheme that states one hex for two DIFFERENT ANSI roles.
+ *
+ * A sibling collision is not in this set, and that is the whole distinction:
+ * "bright red is the lighter red" is what the convention says a bright slot IS,
+ * so pushing the bright one away from the plane restates the scheme's own
+ * intent rather than inventing a colour - it is the same derivation base16
+ * schemes, which state no brights at all, already get. A collision across roles
+ * has no such rule: nothing in the palette says which of the two roles the hex
+ * belonged to.
+ */
+function assertNoCrossSlotCollision(seed: Readonly<Record<SeedSlotId, string>>, scheme: Scheme): void {
 	const byColour = new Map<string, SeedSlotId>();
 	for (const slot of ANSI_SLOTS) {
 		const colour = seed[slot].toUpperCase();
 		const first = byColour.get(colour);
-		if (first !== undefined) {
+		if (first !== undefined && !BRIGHT_PAIR_KEYS.has(`${first}|${slot}`)) {
 			throw new AnsiCollisionError(
 				scheme.source,
 				`ANSI slots ${first} and ${slot} are both ${seed[slot]} - the sixteen terminal colours must be distinct`
 			);
 		}
-		byColour.set(colour, slot);
+		if (first === undefined) byColour.set(colour, slot);
+	}
+}
+
+/**
+ * The last gate: sixteen slots a trichromat can actually tell apart.
+ *
+ * MEASURED, NOT COMPARED FOR EQUALITY, and that is a real widening. Equality
+ * only ever caught the case where two slots held the identical byte string,
+ * which is the loudest possible collision and the rarest one to survive the
+ * repairs above. `ANSI_MIN_SEPARATION` has been declared in this file all along
+ * as "the same number as validateTheme.ts's MIN_ANSI_DELTA_E" - the exact-hex
+ * test was simply weaker than the constant it shipped with, so espresso's
+ * derived `ansiBrightCyan` (#E8F1FF, 7.26 dE00 off its stated `ansiBrightWhite`
+ * #FFFFFF) walked through it and shipped a ramp with fifteen usable colours in
+ * sixteen slots.
+ *
+ * STILL A REJECTION, NOT A REPAIR, and espresso is why the distinction survives
+ * contact with a real palette. Its `base0C` is #BED6FF, a pale blue one step
+ * below white, and `base07` is #FFFFFF: 17.55 dE00 apart in total. A bright cyan
+ * needs 10 from each, so it needs 20 of room in a gap that holds 17.55. No
+ * lightness step exists, in either direction, and any repair would have to
+ * invent a hue the palette never states. The palette cannot express sixteen
+ * distinct terminal colours; it is not a palette this product uses.
+ */
+function assertDistinctAnsi(seed: Readonly<Record<SeedSlotId, string>>, scheme: Scheme): void {
+	for (let i = 0; i < ANSI_SLOTS.length; i++) {
+		for (let j = i + 1; j < ANSI_SLOTS.length; j++) {
+			const first = ANSI_SLOTS[i];
+			const second = ANSI_SLOTS[j];
+			const distance = perceptualDistanceOfHex(seed[first], seed[second]);
+			if (distance < ANSI_MIN_SEPARATION) {
+				throw new AnsiCollisionError(
+					scheme.source,
+					`ANSI slots ${first} ${seed[first]} and ${second} ${seed[second]} are ${distance.toFixed(2)} dE00 apart, ` +
+					`under the ${ANSI_MIN_SEPARATION} a trichromat needs - the sixteen terminal colours must be distinct`
+				);
+			}
+		}
 	}
 }
 
@@ -725,6 +847,9 @@ function assertDistinctAnsi(seed: Readonly<Record<SeedSlotId, string>>, scheme: 
  */
 export function toSeed(scheme: Scheme, options: ImportOptions = {}): Seed {
 	const seed = mapSeed(scheme, options);
+	// Judged on what the scheme STATES, before any repair: see
+	// assertNoCrossSlotCollision for why the sibling case is repaired instead.
+	assertNoCrossSlotCollision(seed, scheme);
 	// terminal.background is the panel plane, so that is the plane an ANSI
 	// colour has to be readable on. See ANSI_MIN_CONTRAST.
 	const away = contrastDirection(seed.panelBg);
@@ -733,13 +858,11 @@ export function toSeed(scheme: Scheme, options: ImportOptions = {}): Seed {
 		lifted[slot] = raiseContrast(seed[slot], seed.panelBg, ANSI_MIN_CONTRAST, away);
 	}
 	// The lift stops the moment a colour clears the floor, so a normal slot and
-	// its bright sibling that were both below it can arrive at the same place.
-	// Push the bright one clear again - a pair of identical ANSI slots is a
-	// collision whichever way it was arrived at.
+	// its bright sibling that were both below it can arrive at the same place -
+	// or a hair apart, which is the same defect measured properly. Push the
+	// bright one clear again; see ANSI_MIN_SEPARATION.
 	for (const [normal, brightSlot] of BRIGHT_PAIRS) {
-		if (lifted[brightSlot] === lifted[normal]) {
-			lifted[brightSlot] = brighten(lifted[normal], BRIGHT_LIGHTNESS_STEP, scheme.mode);
-		}
+		lifted[brightSlot] = separateFrom(lifted[brightSlot], lifted[normal], away);
 	}
 	assertDistinctAnsi(lifted, scheme);
 	return lifted;

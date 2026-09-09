@@ -1174,32 +1174,48 @@ function checkAnsiRamp(theme: ColorTheme, errors: Finding[], warnings: Finding[]
 		for (let j = i + 1; j < slots.length; j++) {
 			const [tokenA, colourA] = slots[i];
 			const [tokenB, colourB] = slots[j];
-			let worstObserver: CvdType | "normal" = "normal";
-			let worstDistance = Number.POSITIVE_INFINITY;
-			for (const observer of ["normal", ...CVD_TYPES] as const) {
+
+			// A collision a trichromat sees is a real defect in this theme: two SGR
+			// codes paint the same colour for everyone. A collision only a dichromat
+			// sees is a property of the 16-colour ANSI palette itself — red and green
+			// are mandated to be red and green, and no repalette fixes that without
+			// breaking the convention every terminal program relies on. Report the
+			// second so a theme author knows, but do not fail the build for it.
+			//
+			// THE SPLIT IS ON THE TRICHROMAT MEASUREMENT, NOT ON WHICH OBSERVER SCORED
+			// LOWEST, and that distinction was worth 52 hidden errors. Simulating a
+			// dichromat almost always SHRINKS a distance, so a pair that collides for a
+			// trichromat at 5.47 (Tide's ansiGreen #7FC79C / ansiBrightGreen #9CD8B4)
+			// scores lower still under protanopia — 4.94 — and a rule that files the
+			// finding under whichever observer scored lowest labelled that pair
+			// "a dichromat can't escape this" and demoted it to a warning. Every
+			// trichromat collision in the tree was reclassified that way, so the check
+			// reported zero errors while sixteen slots were painting nine colours.
+			// Which observer scored WORST is reporting detail; whether a trichromat can
+			// tell the two slots apart is the pass/fail question.
+			const normalDistance = perceptualDistance(colourA, colourB, "normal");
+			let cvdObserver: CvdType = CVD_TYPES[0];
+			let cvdDistance = Number.POSITIVE_INFINITY;
+			for (const observer of CVD_TYPES) {
 				const distance = perceptualDistance(colourA, colourB, observer);
-				if (distance < worstDistance) {
-					worstDistance = distance;
-					worstObserver = observer;
+				if (distance < cvdDistance) {
+					cvdDistance = distance;
+					cvdObserver = observer;
 				}
 			}
-			if (worstDistance < MIN_ANSI_DELTA_E) {
-				// A collision a trichromat sees is a real defect in this theme: two SGR
-				// codes paint the same colour for everyone. A collision only a dichromat
-				// sees is a property of the 16-colour ANSI palette itself — red and green
-				// are mandated to be red and green, and no repalette fixes that without
-				// breaking the convention every terminal program relies on. Report the
-				// second so a theme author knows, but do not fail the build for it.
-				(worstObserver === "normal" ? errors : warnings).push({
+			const trichromatCollides = normalDistance < MIN_ANSI_DELTA_E;
+			if (trichromatCollides || cvdDistance < MIN_ANSI_DELTA_E) {
+				const observer: CvdType | "normal" = trichromatCollides ? "normal" : cvdObserver;
+				const distance = trichromatCollides ? normalDistance : cvdDistance;
+				(trichromatCollides ? errors : warnings).push({
 					check: "ansi ramp separation",
 					token: `${tokenA} vs ${tokenB}`,
-					measured: `dE00 ${worstDistance.toFixed(2)} under ${worstObserver} (${formatRgb(colourA)} / ${formatRgb(colourB)})`,
+					measured: `dE00 ${distance.toFixed(2)} under ${observer} (${formatRgb(colourA)} / ${formatRgb(colourB)})`,
 					threshold: `>= ${MIN_ANSI_DELTA_E} dE00 under every observer`,
-					observer: worstObserver,
-					detail:
-						worstObserver === "normal"
-							? "Two ANSI slots collide for a trichromat as well: SGR codes that should differ paint the same colour."
-							: `Two ANSI slots collide for a ${worstObserver.replace("nopia", "nope")}, so any meaning a program encodes in them is lost.`,
+					observer,
+					detail: trichromatCollides
+						? `Two ANSI slots collide for a trichromat as well: SGR codes that should differ paint the same colour (worst observer ${cvdObserver}, dE00 ${cvdDistance.toFixed(2)}).`
+						: `Two ANSI slots collide for a ${observer.replace("nopia", "nope")}, so any meaning a program encodes in them is lost.`,
 				});
 			}
 		}

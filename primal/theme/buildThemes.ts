@@ -52,7 +52,8 @@ import {
 	type Depth,
 	type Scheme
 } from "./importPalette.ts";
-import { expandSeed, serialiseTheme, themeFileName, type SemanticLadder } from "./generateTheme.ts";
+import { expandSeed, serialiseTheme, themeFileName, type SemanticLadder, type Seed, type Surfaces } from "./generateTheme.ts";
+import type { SyntaxEmphasis, ThemeMode } from "./tokenMap.ts";
 import { perceptualDistanceOfHex, validate, type ColorTheme, type Finding } from "./validateTheme.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,7 @@ const THEMES_DIR = join(EXTENSION_DIR, "themes");
 const ATTRIBUTION_PATH = join(REPO, "primal", "design", "ATTRIBUTION.md");
 const CORPUS_DIR = join(REPO, "primal", "design", "corpus");
 const CGMANIFEST_PATH = join(EXTENSION_DIR, "cgmanifest.json");
+const VIBE_TOKENS_PATH = join(REPO, "primal", "design", "vibe-tokens.json");
 
 // ---------------------------------------------------------------------------
 // The naming and licence rules
@@ -156,41 +158,30 @@ function excludedBecause(scheme: Scheme): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * `<check> | <token>` for every finding that appears in ALL 322 generatable
- * corpus themes AND in all six hand-authored shipping themes.
+ * `<check> | <token>` for every finding that appears in EVERY generatable theme,
+ * hand-authored and corpus alike - a defect in the engine rather than in a
+ * palette, which no seed can make appear or go away.
  *
- * This set was not guessed. It is the intersection of the error sets of all 322
- * themes the corpus can produce, and every one of the six shipping vibes
- * produces all eleven as well - so nothing about a palette makes them appear or
- * go away. Two of them are worth naming:
+ * IT IS EMPTY, and it is worth recording what used to be in it, because both
+ * entries were engine defects that this set made comfortable to live with:
  *
  *   gitDecoration.addedResourceForeground vs gitDecoration.untrackedResourceForeground
- *     dE00 0.00, always: tokenMap.ts routes both tokens to the SAME semantic
- *     slot ("added"). No palette can separate one colour from itself. Fixing it
- *     is a one-line change to tokenMap.ts and is out of this file's scope.
+ *     dE00 0.00, always: tokenMap.ts routed both tokens to the SAME semantic
+ *     slot ("added"). Two states the explorer shows side by side were one
+ *     colour. `untracked` is now its own role with its own hue.
  *
  *   diffEditor.insertedLineBackground vs diffEditor.removedLineBackground
- *     Two washes at low alpha over the same editor background. Flattened, they
- *     are both a hair off the background, so they cannot be 11 dE00 apart at
- *     any alpha tokenMap uses.
+ *     Two washes at 1A alpha over the same plane. Flattened they were both a
+ *     hair off the background, and the reachable maximum over a light plane at
+ *     that alpha is 5.3 dE00 whatever hues you choose - so this was never a
+ *     palette problem either. generateTheme.ts now solves the wash pair in
+ *     COMPOSITED space and derives the alpha the separation needs.
  *
- * The nine `unknown colour id` entries are colour ids tokenMap emits that VS
- * Code does not register anywhere in src/vs or a bundled extension; VS Code
- * ignores them silently.
+ * Anything added here from now on has to carry the same standard of proof: a
+ * measurement showing every palette produces it, and an argument that the
+ * engine genuinely cannot.
  */
-const ENGINE_FLOOR: readonly string[] = [
-	"semantic separation (diff editor lines) | diffEditor.insertedLineBackground vs diffEditor.removedLineBackground",
-	"semantic separation (source control decorations) | gitDecoration.addedResourceForeground vs gitDecoration.untrackedResourceForeground",
-	"unknown colour id | gauge.background",
-	"unknown colour id | gauge.border",
-	"unknown colour id | gauge.errorBackground",
-	"unknown colour id | gauge.errorForeground",
-	"unknown colour id | gauge.foreground",
-	"unknown colour id | gauge.warningBackground",
-	"unknown colour id | gauge.warningForeground",
-	"unknown colour id | quickInput.border",
-	"unknown colour id | quickInputList.hoverBackground"
-];
+const ENGINE_FLOOR: readonly string[] = [];
 
 const ENGINE_FLOOR_SET: ReadonlySet<string> = new Set(ENGINE_FLOOR);
 
@@ -198,62 +189,45 @@ const ENGINE_FLOOR_SET: ReadonlySet<string> = new Set(ENGINE_FLOOR);
  * How far apart two semantic roles must sit on the generator's ladder before a
  * separation failure between them counts against the palette.
  *
- * THIS IS THE ONE TOLERANCE THAT IS NOT FREE, so it gets the longest argument.
+ * THE ANSWER IS NOW "NO DISTANCE, BECAUSE THERE ARE NO SUCH FAILURES", and the
+ * history is worth keeping because it is a case study in a tolerance that hid a
+ * defect for as long as it existed.
  *
- * generateTheme.ts separates the semantic roles by SEMANTIC_LADDER_STEP = 0.06
- * in OKLab L, and asserts that separation on every theme it emits.
- * validateTheme.ts asks for MIN_SEMANTIC_DELTA_E = 11 dE00 under the worst of
- * four observers. Those are two different numbers in two different colour
- * spaces, and they do not agree. The validator measures the disagreement itself,
- * in its own warning output, on every theme this file emits:
+ * generateTheme.ts used to separate the semantic roles by a fixed
+ * SEMANTIC_LADDER_STEP of 0.06 in OKLab L, and assert that. validateTheme.ts
+ * asks for 11 dE00 under the worst of four observers. Those were two different
+ * numbers in two different colour spaces and they did not agree - one step
+ * bought 6.2 to 6.5 CIELAB L*, and 11 dE00 from lightness alone needs 13.3 to
+ * 14.9 L* where these colours sit, so EVERY adjacent pair failed the gate in
+ * every palette. The validator said so, in its own warning output, on every
+ * theme this file emitted:
  *
  *     [lightness separation (source control decorations)]
  *       gitDecoration.addedResourceForeground vs gitDecoration.deletedResourceForeground
  *       measured  dL* 4.7 at L* 70      threshold >= 14.1 L*
  *
- * So a pair of roles exactly one step apart fails in most palettes, and no
- * palette closes that gap, because the gap is between two constants in two
- * other files.
+ * The tolerance below forgave a one-step pair, and the ranking measured the
+ * residual so the least-bad palettes shipped. That was an honest way to hold a
+ * broken engine, but it was still holding a broken engine: 289 semantic
+ * separation errors across the 21 shipped themes, 275 of them in the source
+ * control decorations a colour-blind user reads all day.
  *
- * Setting this to 0.5, so that only the deliberately packed half-step
- * neighbours are forgiven, is the rigorous reading. It yields ZERO shippable
- * themes out of 534, and would yield zero for any corpus: it is a statement
- * about the engine, not about palettes. `--survey` prints that number.
- *
- * So one full step is forgiven, and the risk it hides is measured instead:
- * `worstConfusableDeltaE` records the smallest dE00 among the pairs this
- * tolerance lets through, and the catalogue is ranked on it, so the families
- * that ship are the ones where the forgiven pairs are least bad. Every shipped
- * theme prints its number.
- *
- * WHAT WOULD ACTUALLY CLOSE IT, and why it is not "raise SEMANTIC_LADDER_STEP".
- * This comment used to recommend raising the step from 0.06 to about 0.098, as
- * the ratio 8/4.9 applied to the measurement above. Both halves of that were
- * wrong. The 8 came from validateTheme's old MIN_SEMANTIC_LIGHTNESS_DELTA, which
- * was documented as the lightness equivalent of 11 dE00 and is not: CIEDE2000
- * divides the lightness term by SL >= 1, so 8 L* is worth at most 8 dE00 and
- * usually less, and the two constants never agreed in the first place. The real
- * requirement, measured on the five families this file ships, is:
- *
- *     one step (0.06 OKLab L)      6.2 - 6.5 CIELAB L*
- *     ladder sits at               mean L* 65 - 74
- *     11 dE00 from lightness alone 13.3 - 14.9 L* there
- *     so one step would have to be 0.126 - 0.138 OKLab L
- *
- * which is 2.1 to 2.3 times today's step. LADDER_POSITION spans four full steps,
- * so that is 0.50 to 0.55 of OKLab L for the warm rungs alone, stacked above the
- * MIN_SEMANTIC_CONTRAST floor and below the top of the plane. No real background
- * has that much room - generateTheme already refuses 19 palettes at 0.06 - so
- * raising the step does not close the gap at any value, it only shrinks the
- * corpus until nothing is left.
- *
- * The choices that remain are all the owner's, and all bigger than a constant:
- * lower MIN_SEMANTIC_DELTA_E to what a full step can actually deliver, shrink
- * the set of roles that must be a full step apart (RED_GREEN_CONFUSABLE has
- * five members and they are what force four steps), or keep measuring the
- * residual and ranking on it, which is what this file does today.
+ * What closed it was not raising the step - four steps at 0.126 OKLab L is more
+ * lightness than any real plane has above a contrast floor, so no value of a
+ * fixed step works. It was deleting the fixed step. generateTheme.ts now places
+ * each role at the first lightness that MEASURES far enough from the roles
+ * already placed, using validateTheme's own CIEDE2000 and dichromacy model, and
+ * splits the seven roles into the two ladders the gate's own groups show are
+ * never compared with each other. Where hue survives a deficiency the step comes
+ * out small; where it does not, the step comes out large; either way the
+ * property is asserted on the bytes that ship rather than approximated by a
+ * constant. So the tolerance has nothing left to forgive, and it is zero: every
+ * semantic-separation error is blocking.
  */
-const TOLERATED_LADDER_GAP = 1.0;
+const TOLERATED_LADDER_GAP = 0;
+
+/** The tolerance the build used to apply. Only --survey passes it, to price what it hid. */
+const LEGACY_LADDER_GAP = 1.0;
 
 /** The rigorous reading, reported by --survey so the tolerance above stays visible. */
 const STRICT_LADDER_GAP = 0.5;
@@ -308,7 +282,7 @@ interface Built {
 	 * a shipped theme carries, and the catalogue ranks on it.
 	 */
 	readonly worstConfusableDeltaE: number;
-	/** Errors matched by ENGINE_FLOOR, half-step pairs, wash pairs or the ansiBlack rule. */
+	/** Errors matched by ENGINE_FLOOR, half-step pairs or wash pairs. */
 	readonly tolerated: number;
 	readonly warnings: readonly Finding[];
 }
@@ -347,7 +321,7 @@ function rungPosition(ladder: SemanticLadder, value: string | undefined): number
 /**
  * Decide whether one finding is the palette's fault.
  *
- * The four tolerances, in order:
+ * The three tolerances, in order:
  *
  *  1. ENGINE_FLOOR - demonstrated above to be palette-independent.
  *  2. A semantic pair whose two colours are both semi-transparent washes over
@@ -356,11 +330,16 @@ function rungPosition(ladder: SemanticLadder, value: string | undefined): number
  *  3. A semantic pair sitting within TOLERATED_LADDER_GAP on the generator's
  *     own ladder - read off the ladder this theme actually emitted, not from a
  *     hard-coded token list, so it tracks generateTheme.ts if the ladder moves.
- *  4. terminal.ansiBlack below the ANSI contrast floor in a DARK theme. ANSI
- *     black on a dark plane is dark by definition; all four shipping dark vibes
- *     fail this same check (Basalt 1.21:1, Dusk 1.29:1, Fern 1.37:1, Tide
- *     1.37:1). Every other ANSI slot is lifted to the floor by importPalette,
- *     so a failure in any of the other fifteen is real and blocks.
+ * There used to be a fourth: terminal.ansiBlack below the ANSI contrast floor in
+ * a dark theme, waived because "ANSI black on a dark plane is dark by
+ * definition" and because all four shipping dark vibes failed it too. Both
+ * halves are gone. The vibes were excused by this rule and this rule by the
+ * vibes, which is a circle, not an argument; and SGR 30 is a foreground code
+ * like the other fifteen, so a program that used it printed text the user could
+ * not read. importPalette now lifts all sixteen slots to the floor and
+ * vibe-tokens.json states four black slots that clear it, so nothing needs the
+ * waiver - and with it gone, a future palette whose black vanishes into its
+ * plane blocks instead of shipping.
  *
  * `ansi ramp separation` is handled separately, AND SPLIT BY OBSERVER, which is
  * the whole of the argument for tolerating any of it:
@@ -384,19 +363,20 @@ function rungPosition(ladder: SemanticLadder, value: string | undefined): number
  */
 type Verdict = "blocking" | "tolerated" | "tolerated-ladder-gap" | "ansi-collision";
 
-function classify(theme: ColorTheme, ladder: SemanticLadder, mode: string, finding: Finding, gap: number): Verdict {
+function classify(theme: ColorTheme, ladder: SemanticLadder, finding: Finding, gap: number): Verdict {
 	const key = `${finding.check} | ${finding.token}`;
 	if (ENGINE_FLOOR_SET.has(key)) return "tolerated";
 	if (finding.check === "ansi ramp separation") return finding.observer === "normal" ? "blocking" : "ansi-collision";
-	if (finding.check === "ansi readability" && finding.token === "terminal.ansiBlack" && mode === "dark") return "tolerated";
 
-	if (finding.check.startsWith("semantic separation")) {
-		const [left, right] = finding.token.split(" vs ");
-		const a = colourOf(theme, left);
-		const b = colourOf(theme, right);
-		if (typeof a === "string" && typeof b === "string" && a.length === 9 && b.length === 9) return "tolerated";
-		const pa = rungPosition(ladder, a);
-		const pb = rungPosition(ladder, b);
+	// A semantic-separation error used to be forgiven twice over: any pair of
+	// semi-transparent washes, and any pair within one rung of the old fixed-step
+	// ladder. Both tolerances are gone, and neither was closed by relaxing
+	// anything - the generator now solves for the gate's own 11 dE00, washes
+	// included, and asserts it on the emitted bytes. `gap` is kept only so
+	// --survey can still report what the OLD reading would have forgiven.
+	if (finding.check.startsWith("semantic separation") && gap >= LEGACY_LADDER_GAP) {
+		const pa = rungPosition(ladder, colourOf(theme, finding.token.split(" vs ")[0]));
+		const pb = rungPosition(ladder, colourOf(theme, finding.token.split(" vs ")[1]));
 		if (pa !== null && pb !== null && Math.abs(pa - pb) <= gap) return "tolerated-ladder-gap";
 	}
 	return "blocking";
@@ -419,7 +399,7 @@ function build(scheme: Scheme, depth: Depth, name: string, gap: number = TOLERAT
 	let tolerated = 0;
 	let worstConfusableDeltaE = Number.POSITIVE_INFINITY;
 	for (const finding of result.errors) {
-		const verdict = classify(theme as ColorTheme, ladder, scheme.mode, finding, gap);
+		const verdict = classify(theme as ColorTheme, ladder, finding, gap);
 		if (verdict === "blocking") { blocking.push(finding); continue; }
 		if (verdict === "ansi-collision") { ansiCollisions++; continue; }
 		tolerated++;
@@ -453,38 +433,64 @@ function expressibleDepths(scheme: Scheme): readonly Depth[] {
  * `--survey` prints today:
  *
  *   534  vendored
- *  -193  the palette cannot state sixteen distinct ANSI colours; importPalette
+ *  -470  the palette cannot state sixteen distinct ANSI colours; importPalette
  *        refuses to derive a seed (see assertDistinctAnsi)
- *   -19  the palette has no room for a semantic ladder at all; generateTheme
+ *   -21  the palette has no room for the semantic ladders at all; generateTheme
  *        refuses to emit a theme
- *   322  generatable
- *  -305  at least one blocking error
- *    17  no blocking error
- *    -2  excluded by FORBIDDEN_IDENTITIES (iA Dark, Monokai)
- *    15  shippable
+ *    43  generatable
+ *   -29  at least one blocking error
+ *    14  no blocking error
+ *    -0  excluded by FORBIDDEN_IDENTITIES
+ *    14  shippable
  *
- * Those 15 are ranked by `worstConfusableDeltaE` - the smallest colour distance
- * left between two semantic roles once TOLERATED_LADDER_GAP has forgiven the
- * one-step pairs. It is the residual risk a theme carries for the person this
- * product is built for, so it is the right thing to rank on; ANSI collisions
- * break ties. `selectFamilies` then walks that ranking and takes a scheme only
- * if its editor plane is at least MIN_FAMILY_PLANE_SEPARATION from every family
- * already taken, because the ranking cannot see that two palettes look the same:
- * ranked alone it picks three near-black browns within 2.9 dE00 of each other
- * and two schemes that state the identical `base00: "#2d2d2d"`. `--survey` marks
- * the survivors PICKED, and the five below are exactly those five.
+ * THE FIRST LINE OF THAT TABLE MOVED FROM 193 TO 470, and the reason is worth
+ * stating because it looks like a corpus that got worse. It did not: the check
+ * got honest. `assertDistinctAnsi` used to compare hex STRINGS, so a scheme was
+ * rejected only when two ANSI slots held the identical bytes; now it measures,
+ * and rejects when two slots sit closer than ANSI_MIN_SEPARATION - the 10 dE00
+ * this file has always declared and validateTheme has always enforced. 277
+ * schemes that "stated sixteen distinct colours" state sixteen hex values a
+ * trichromat cannot resolve into sixteen colours, which is the same defect one
+ * decimal place further out. They were never shippable; they were only never
+ * counted.
  *
- * NOT ONE of the 15 is a light scheme, and the previous light family
+ * Those 14 used to be ranked by `worstConfusableDeltaE` - the smallest colour
+ * distance left between two semantic roles once TOLERATED_LADDER_GAP had
+ * forgiven the one-step pairs. It was the residual colour-blindness risk a theme
+ * carried, so it was the right thing to rank on. `selectFamilies` then walked
+ * that ranking and took a scheme only if its editor plane was at least
+ * MIN_FAMILY_PLANE_SEPARATION from every family already taken, because the
+ * ranking cannot see that two palettes look the same: ranked alone it takes both
+ * Equilibrium Dark and Equilibrium Gray Dark, which score identically.
+ *
+ * THAT RANKING KEY IS NOW DEGENERATE, and saying so is more useful than quietly
+ * replacing it. The tolerance it measured is gone: no shippable theme has a
+ * forgiven pair any more, so `worstConfusableDeltaE` reads "none" for all 14 and
+ * orders nothing. `--survey` still marks five PICKED, but they are now whichever
+ * five the plane-separation walk reaches first in corpus order, and they are no
+ * longer the five below - Mezcal and Tomorrow Night Eighties are shippable but
+ * are passed over for Equilibrium Gray Dark and Spaceduck, on a tie.
+ *
+ * The five below are therefore held by this constant rather than re-derived,
+ * and every one of them is still in the shippable 14 - `buildCatalogue` throws
+ * if that stops being true, which is the property that actually matters. What is
+ * missing is a tie-break that discriminates now that the residual risk is zero
+ * everywhere: plane separation and hue coverage are the obvious candidates, and
+ * choosing one is a decision about which five themes ship, so it belongs to the
+ * owner and not to a build script.
+ *
+ * NOT ONE of the 14 is a light scheme, and the previous light family
  * (Chinoiserie, shipped as Primal Porcelain) is gone. That is not a filter
  * artefact and not a regression in the selection rule: it is the syntax-contrast
  * check finding what nobody had measured. Chinoiserie paints seven of its
  * tokenColors rules between 2.36:1 and 2.72:1 on its own #FFFFFF plane -
  * constants at #FB8B05, types at #D6A01D, keywords at #C08EAF - which is code
- * the user cannot reliably read. Of the 97 generatable light schemes 22 are
- * contrast clean and none clears the whole gate, because a light plane leaves
- * less room between the WCAG contrast floor and the top of the usable lightness
- * band. The catalogue is therefore five dark families, and it is the corpus, not
- * the selection rule, that made it so.
+ * the user cannot reliably read. Only 3 light schemes now reach the generatable
+ * set at all, none of them contrast clean, because a light plane leaves less room
+ * between the WCAG contrast floor and the top of the usable lightness band - and
+ * the same squeeze is what puts most light schemes out at the ANSI gate one step
+ * earlier. The catalogue is therefore five dark families, and it is the corpus,
+ * not the selection rule, that made it so.
  */
 interface Family {
 	/** Primal's name. The user sees "Primal <name>". */
@@ -503,8 +509,8 @@ const CATALOGUE: readonly Family[] = [
 	},
 	{
 		name: "Pewter",
-		source: "base16/espresso.yaml",
-		why: "3.99 dE00 at the fewest ANSI collisions of any shippable scheme (21); a neutral mid-grey plane at #2D2D2D with a full hue-bearing syntax palette, the only non-black ground in the catalogue"
+		source: "base16/tomorrow-night-eighties.yaml",
+		why: "3.32 dE00; a neutral mid-grey plane at #2D2D2D with a full hue-bearing syntax palette, the only non-black ground in the catalogue. Replaces espresso, which held this register on the same #2D2D2D plane until assertDistinctAnsi began measuring separation instead of comparing bytes: espresso states base0C #BED6FF, a pale blue one step below its #FFFFFF base07, and the two are 17.55 dE00 apart in total, so the derived bright cyan needed 20 dE00 of room in a gap that holds 17.55 and shipped 7.26 dE00 off white. No lightness step repairs that in either direction, so the palette is rejected rather than patched, and the ground it occupied is held by the next scheme in the ranking with the same plane"
 	},
 	{
 		name: "Cinder",
@@ -545,18 +551,115 @@ function nlsKey(family: Family, depth: Depth): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The six hand-authored vibes, which this file never regenerates and never
- * reorders. They stay first in the picker because they are the product's
- * identity; the corpus families are additions to it, not replacements.
+ * The six original vibes, which this file DOES now regenerate.
+ *
+ * It used to skip them: their theme files were hand-authored, checked in, and
+ * treated as the product's fixed identity. That is exactly what let their
+ * semantic colours stay hand-picked, and hand-picked semantics are the defect
+ * this pipeline exists to remove - measured on the files that shipped, ink put
+ * `warning` and `added` 0.0003 of lightness apart, which is below what eight
+ * bits can even express. So a warning triangle and an added-line marker were
+ * the same shade, and for a red-green deficient user the same colour outright.
+ *
+ * They keep their seed, their eleven pinned surfaces, their name and their
+ * place at the front of the picker. Only the twelve synthesised semantic slots
+ * and the tokens hanging off them move, and primal/theme/tokenMap.test-fixture.json
+ * keeps the before so the move stays measurable. Everything else in the file is
+ * still byte for byte what it was, and tokenMap.ts --check asserts that.
  */
-const HAND_AUTHORED: readonly { readonly id: string; readonly nls: string; readonly uiTheme: string; readonly file: string }[] = [
-	{ id: "Primal Ink", nls: "inkThemeLabel", uiTheme: "vs", file: "primal-ink-color-theme.json" },
-	{ id: "Primal Basalt", nls: "basaltThemeLabel", uiTheme: "vs-dark", file: "primal-basalt-color-theme.json" },
-	{ id: "Primal Tide", nls: "tideThemeLabel", uiTheme: "vs-dark", file: "primal-tide-color-theme.json" },
-	{ id: "Primal Dusk", nls: "duskThemeLabel", uiTheme: "vs-dark", file: "primal-dusk-color-theme.json" },
-	{ id: "Primal Fern", nls: "fernThemeLabel", uiTheme: "vs-dark", file: "primal-fern-color-theme.json" },
-	{ id: "Primal Ridge", nls: "ridgeThemeLabel", uiTheme: "vs", file: "primal-ridge-color-theme.json" }
+const HAND_AUTHORED: readonly { readonly id: string; readonly vibe: string; readonly nls: string; readonly uiTheme: string; readonly file: string }[] = [
+	{ id: "Primal Ink", vibe: "ink", nls: "inkThemeLabel", uiTheme: "vs", file: "primal-ink-color-theme.json" },
+	{ id: "Primal Basalt", vibe: "basalt", nls: "basaltThemeLabel", uiTheme: "vs-dark", file: "primal-basalt-color-theme.json" },
+	{ id: "Primal Tide", vibe: "tide", nls: "tideThemeLabel", uiTheme: "vs-dark", file: "primal-tide-color-theme.json" },
+	{ id: "Primal Dusk", vibe: "dusk", nls: "duskThemeLabel", uiTheme: "vs-dark", file: "primal-dusk-color-theme.json" },
+	{ id: "Primal Fern", vibe: "fern", nls: "fernThemeLabel", uiTheme: "vs-dark", file: "primal-fern-color-theme.json" },
+	{ id: "Primal Ridge", vibe: "ridge", nls: "ridgeThemeLabel", uiTheme: "vs", file: "primal-ridge-color-theme.json" }
 ];
+
+/** One original vibe as vibe-tokens.json states it. */
+interface VibeVariant {
+	readonly id: string;
+	readonly label: string;
+	readonly mode: ThemeMode;
+	readonly seed: Seed;
+	readonly surfaces: Surfaces;
+	readonly syntaxEmphasis: SyntaxEmphasis;
+}
+
+/** One original vibe, generated and judged. */
+interface VibeBuilt {
+	readonly variant: VibeVariant;
+	readonly theme: ColorTheme;
+	readonly ladder: SemanticLadder;
+	readonly blocking: readonly Finding[];
+	readonly ansiCollisions: number;
+	readonly tolerated: number;
+	readonly warnings: readonly Finding[];
+}
+
+interface RawVibeVariant {
+	readonly id: string;
+	readonly label: string;
+	readonly mode: string;
+	readonly seed: Record<string, string>;
+	readonly surfaces?: Record<string, string>;
+}
+
+/**
+ * The six seeds, read from the contract rather than from the theme files, so a
+ * regenerated theme cannot become its own input.
+ */
+function loadVibes(): readonly VibeVariant[] {
+	const raw = JSON.parse(readFileSync(VIBE_TOKENS_PATH, "utf8")) as {
+		readonly version: number;
+		readonly families: readonly { readonly syntaxEmphasis: string; readonly variants: readonly RawVibeVariant[] }[];
+	};
+	if (raw.version !== 2) throw new Error(`buildThemes: vibe-tokens.json is v${raw.version}; this build reads v2`);
+	const byId = new Map<string, VibeVariant>();
+	for (const family of raw.families) {
+		if (family.syntaxEmphasis !== "weight" && family.syntaxEmphasis !== "plain") {
+			throw new Error(`buildThemes: vibe-tokens.json states unknown syntaxEmphasis ${JSON.stringify(family.syntaxEmphasis)}`);
+		}
+		for (const variant of family.variants) {
+			if (variant.mode !== "light" && variant.mode !== "dark") {
+				throw new Error(`buildThemes: vibe "${variant.id}" states unknown mode ${JSON.stringify(variant.mode)}`);
+			}
+			byId.set(variant.id, {
+				id: variant.id,
+				label: variant.label,
+				mode: variant.mode,
+				seed: variant.seed as Seed,
+				surfaces: (variant.surfaces ?? {}) as Surfaces,
+				syntaxEmphasis: family.syntaxEmphasis
+			});
+		}
+	}
+	return HAND_AUTHORED.map(entry => {
+		const variant = byId.get(entry.vibe);
+		if (variant === undefined) throw new Error(`buildThemes: vibe-tokens.json has no variant "${entry.vibe}"`);
+		return variant;
+	});
+}
+
+/** Build and judge one original vibe. Same gate as a corpus theme, no exemptions. */
+function buildVibe(variant: VibeVariant): VibeBuilt {
+	const { theme, ladder } = expandSeed(variant.seed, variant.surfaces, {
+		name: variant.label,
+		mode: variant.mode,
+		syntaxEmphasis: variant.syntaxEmphasis
+	});
+	const result = validate(theme as ColorTheme);
+	const blocking: Finding[] = [];
+	let ansiCollisions = 0;
+	let tolerated = 0;
+	for (const finding of result.errors) {
+		const verdict = classify(theme as ColorTheme, ladder, finding, TOLERATED_LADDER_GAP);
+		if (verdict === "blocking") { blocking.push(finding); continue; }
+		if (verdict === "ansi-collision") { ansiCollisions++; continue; }
+		tolerated++;
+	}
+	return { variant, theme: theme as ColorTheme, ladder, blocking, ansiCollisions, tolerated, warnings: result.warnings };
+}
 
 const HAND_AUTHORED_NLS: Readonly<Record<string, string>> = {
 	inkThemeLabel: "Primal Ink",
@@ -867,6 +970,7 @@ function printSurvey(rows: readonly SurveyRow[]): void {
 
 interface BuildOutput {
 	readonly emitted: readonly Emitted[];
+	readonly vibes: readonly VibeBuilt[];
 	readonly files: ReadonlyMap<string, string>;
 }
 
@@ -875,6 +979,23 @@ function buildCatalogue(): BuildOutput {
 	const corpus = loadCorpus();
 	const emitted: Emitted[] = [];
 	const files = new Map<string, string>();
+
+	// The six original vibes first, on the same gate as everything else.
+	const vibes: VibeBuilt[] = [];
+	for (const entry of HAND_AUTHORED) {
+		const variant = loadVibes().find(candidate => candidate.id === entry.vibe);
+		if (variant === undefined) throw new Error(`buildThemes: vibe-tokens.json has no variant "${entry.vibe}"`);
+		const built = buildVibe(variant);
+		if (built.blocking.length > 0) {
+			const detail = built.blocking.map(f => `      ${f.check} | ${f.token} | ${f.measured}`).join("\n");
+			throw new Error(`buildThemes: ${variant.label} has ${built.blocking.length} blocking error(s) and cannot ship:\n${detail}`);
+		}
+		if (themeFileName(variant.id) !== entry.file) {
+			throw new Error(`buildThemes: vibe "${variant.id}" would be written to ${themeFileName(variant.id)}, but the picker registers ${entry.file}`);
+		}
+		files.set(join(THEMES_DIR, entry.file), serialiseTheme(built.theme as Parameters<typeof serialiseTheme>[0]));
+		vibes.push(built);
+	}
 
 	for (const family of CATALOGUE) {
 		const scheme = corpus.find(entry => entry.source === family.source);
@@ -905,12 +1026,27 @@ function buildCatalogue(): BuildOutput {
 	files.set(join(EXTENSION_DIR, "package.nls.json"), renderPackageNls(emitted));
 	files.set(CGMANIFEST_PATH, renderCgManifest());
 	files.set(ATTRIBUTION_PATH, renderAttribution(emitted));
-	return { emitted, files };
+	return { emitted, vibes, files };
 }
 
 /** The seed a Built came from. Cheap: toSeed is pure and deterministic. */
 function seedOf(built: Built): ReturnType<typeof toSeed> {
 	return toSeed(built.scheme, { depth: built.depth });
+}
+
+function reportVibes(vibes: readonly VibeBuilt[]): void {
+	console.log("The six original vibes, regenerated from their seeds in primal/design/vibe-tokens.json:");
+	for (const built of vibes) {
+		console.log(
+			`    ${built.variant.label.padEnd(26)} ${built.variant.mode.padEnd(5)} ` +
+			`worst pair dE00 ${built.ladder.minDeltaE.toFixed(2)}  ` +
+			`minContrast ${built.ladder.minContrast.toFixed(2)}:1  ` +
+			`wash text ${built.ladder.minWashTextContrast.toFixed(2)}:1  ` +
+			`lightness-alone ${built.ladder.hueAssistedFamilies.length === 0 ? "all families" : `all but ${built.ladder.hueAssistedFamilies.join(", ")}`}  ` +
+			`ansiCollisions ${built.ansiCollisions}  warnings ${built.warnings.length}`
+		);
+	}
+	console.log("");
 }
 
 function reportEmitted(emitted: readonly Emitted[]): void {
@@ -925,7 +1061,8 @@ function reportEmitted(emitted: readonly Emitted[]): void {
 			console.log(
 				`    ${entry.label.padEnd(26)} ${built.scheme.mode.padEnd(5)} depth ${built.depth.padEnd(6)} ` +
 				`plane dL ${realisedDepth(seedOf(built).editorBg, seedOf(built).chromeBg).toFixed(4)} (asked ${DEPTH_STEPS[built.depth].toFixed(4)})  ` +
-				`ladder minDL ${built.ladder.minConfusableDeltaLightness.toFixed(4)}  ` +
+				`worst pair dE00 ${built.ladder.minDeltaE.toFixed(2)}  ` +
+				`lightness-alone ${built.ladder.hueAssistedFamilies.length === 0 ? "all" : `all but ${built.ladder.hueAssistedFamilies.join("/")}`}  ` +
 				`minContrast ${built.ladder.minContrast.toFixed(2)}:1  ` +
 				`worstConfusable dE00 ${Number.isFinite(built.worstConfusableDeltaE) ? built.worstConfusableDeltaE.toFixed(2) : "none"}  ` +
 				`tolerated ${built.tolerated}  ansiCollisions ${built.ansiCollisions}  warnings ${built.warnings.length}`
@@ -945,11 +1082,14 @@ function reportEmitted(emitted: readonly Emitted[]): void {
  */
 function orphanedThemes(files: ReadonlyMap<string, string>): readonly string[] {
 	const expected = new Set([...files.keys()]);
-	const handAuthored = new Set(HAND_AUTHORED.map(entry => join(THEMES_DIR, entry.file)));
+	// The six original vibes used to be excluded here because nothing generated
+	// them. They are generated now, so they are in `expected` like everything
+	// else and need no exception - which also means a stale one left behind by a
+	// rename is caught instead of protected.
 	return readdirSync(THEMES_DIR)
 		.filter(file => file.endsWith("-color-theme.json"))
 		.map(file => join(THEMES_DIR, file))
-		.filter(path => !expected.has(path) && !handAuthored.has(path));
+		.filter(path => !expected.has(path));
 }
 
 /** Returns the orphans it deleted, so the caller can say so out loud. */
@@ -989,7 +1129,7 @@ function main(argv: readonly string[]): number {
 		return 0;
 	}
 
-	const { emitted, files } = buildCatalogue();
+	const { emitted, vibes, files } = buildCatalogue();
 
 	if (argv.includes("--check")) {
 		const differing = drift(files);
@@ -999,17 +1139,19 @@ function main(argv: readonly string[]): number {
 			console.error("Run `node --experimental-strip-types primal/theme/buildThemes.ts` to regenerate.");
 			return 1;
 		}
-		console.log(`buildThemes: ${emitted.length} generated theme(s) match the working tree.`);
+		console.log(`buildThemes: ${vibes.length + emitted.length} generated theme(s) match the working tree.`);
 		return 0;
 	}
 
 	const removed = writeAll(files);
+	reportVibes(vibes);
 	reportEmitted(emitted);
 	console.log("");
 	for (const path of removed) console.log(`removed orphaned theme ${path.replace(`${REPO}/`, "")}`);
 	console.log(
-		`buildThemes: wrote ${emitted.length} theme(s) from ${CATALOGUE.length} families, plus package.json, ` +
-		`package.nls.json, cgmanifest.json and ATTRIBUTION.md${removed.length > 0 ? `, and removed ${removed.length} orphan(s)` : ""}.`
+		`buildThemes: wrote ${vibes.length} original vibe(s) and ${emitted.length} theme(s) from ${CATALOGUE.length} families, ` +
+		`plus package.json, package.nls.json, cgmanifest.json and ATTRIBUTION.md` +
+		`${removed.length > 0 ? `, and removed ${removed.length} orphan(s)` : ""}.`
 	);
 	return 0;
 }
