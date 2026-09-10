@@ -5,7 +5,7 @@
 
 import { Color } from '../../../../../base/common/color.js';
 import { localize } from '../../../../../nls.js';
-import { IMotifFrame, IMotifHost, IMotifPalette, IMotifRenderer, PrimalMotifKind, registerMotif } from '../primalMotif.js';
+import { IMotifFrame, IMotifHost, IMotifPalette, IMotifRenderer, PrimalMotifKind, PrimalMotifRole, registerMotif } from '../primalMotif.js';
 import { getWashMap } from './globeGround.js';
 import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip } from './globeMask.js';
 
@@ -62,9 +62,19 @@ import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip }
  * (`composeAmbientWash` uses `foreground` at three alphas and says it
  * "introduces no hue that the theme did not already have"), it is the chrome
  * spec's rule that meaning is never carried by hue, and it is the only reading
- * of this picture that is identical for a colour blind user. `palette.dim` and
- * `palette.accent` are deliberately unused: a second hue in the ground would be
- * the one thing here that some users could not see.
+ * of this picture that is identical for a colour blind user. `palette.dim` is
+ * only ever a fallback for a theme that defines no `foreground` at all, and it
+ * is the same ink at a lower strength. `palette.accent` is not read anywhere in
+ * this file, and must not become one: it resolves to `focusBorder`, a saturated
+ * hue in four of the six vibes, and a second hue in the ground would be the one
+ * thing here that some users could not see. See {@link readGlobeInk}, which is
+ * where that used to be got wrong.
+ *
+ * WHERE THIS PAINTS. Two roles, and the composition differs between them
+ * because the amount of visible ground differs by two orders of magnitude - see
+ * {@link computeGlobePlacement}. `ground` is the strip described above.
+ * `stage` is a large code-free pane, where the same picture is drawn ten times
+ * bigger and cropped by the pane's own corner.
  *
  * THE RESTING FRAME. `settle` leaves this motif standing still most of the
  * time, so the resting frame is the product and the motion is the flourish. The
@@ -159,6 +169,31 @@ const CENTRE_X_RATIO = 0.74;
 /** Vertical placement, in screen pixels below the top edge: a third of the default 35px title bar. */
 const CENTRE_Y_PIXELS = 12;
 
+/**
+ * The `stage` role: the limb placement.
+ *
+ * A stage is a large code-free pane rather than a 35px strip, so the reasoning
+ * above inverts. There is real ground here, and the constants that put 94% of
+ * the disc above the window's top edge would put a small smudge behind the
+ * page's text instead.
+ *
+ * The centre therefore goes down and right, far enough that the pane crops the
+ * disc on both of those edges: what shows is a large arc rising into frame - a
+ * planet limb - and not a small disc, and not a full disc sitting behind the
+ * text column. The composition is anchored to the bottom-right corner rather
+ * than to the content, which is what makes it survive the ~263px the page's own
+ * height swings by as the recents list fills in asynchronously.
+ *
+ * The radius is a fraction of the pane's SHORTER side, unlike the ground role's
+ * fraction of height: a stage can be any shape a split leaves it, and a globe
+ * sized off the long side of a wide, short pane would be cropped to a band.
+ */
+const STAGE_RADIUS_RATIO = 0.55;
+const STAGE_RADIUS_MIN_PIXELS = 220;
+const STAGE_RADIUS_MAX_PIXELS = 560;
+const STAGE_CENTRE_X_RATIO = 0.86;
+const STAGE_CENTRE_Y_RATIO = 0.88;
+
 /** How far the globe's buffer size must move before the tables are worth rebuilding. */
 const REBUILD_EPSILON = 0.5;
 
@@ -242,6 +277,59 @@ const clamp = (value: number, low: number, high: number): number => value < low 
 
 const smoothstep = (t: number): number => t * t * (3 - 2 * t);
 
+/** Where the globe goes, in buffer coordinates. */
+export interface IGlobePlacement {
+	readonly centreX: number;
+	readonly centreY: number;
+	readonly radiusX: number;
+	readonly radiusY: number;
+}
+
+/**
+ * Where the globe goes, in buffer coordinates, for one role and one CSS size.
+ *
+ * Pure, exported and free of the renderer's state, because this is the one piece
+ * of arithmetic in the file whose answer is a *composition* rather than a
+ * picture: it is what decides whether the product shows a globe or a smudge, and
+ * it is therefore the piece worth a test rather than a screenshot.
+ *
+ * THE ASPECT CORRECTION, IN BOTH ROLES. A radius is chosen in screen pixels and
+ * then divided by the stretch on each axis, which is what corrects the fixed
+ * 640x360 buffer being pulled to a host of some other shape: an ellipse here is
+ * a circle there. Both roles do it identically, so
+ * `radiusX / bufferWidth * cssWidth === radiusY / bufferHeight * cssHeight`
+ * holds whatever shape the host is - which is the invariant the stage needed,
+ * since a pane is very rarely 16:9.
+ *
+ * @param role see {@link PrimalMotifRole}. `ground` reproduces the shipped
+ * title-strip composition exactly; nothing about it is derived from the stage.
+ */
+export function computeGlobePlacement(role: PrimalMotifRole, cssWidth: number, cssHeight: number, bufferWidth: number, bufferHeight: number): IGlobePlacement {
+	if (role === 'stage') {
+		const radius = clamp(STAGE_RADIUS_RATIO * Math.min(cssWidth, cssHeight), STAGE_RADIUS_MIN_PIXELS, STAGE_RADIUS_MAX_PIXELS);
+
+		return {
+			centreX: STAGE_CENTRE_X_RATIO * bufferWidth,
+			// A ratio, and not the ground role's fixed pixel offset: a stage has
+			// no fixed strip to be a third of the way down, and its height is
+			// whatever the editor group leaves it.
+			centreY: STAGE_CENTRE_Y_RATIO * bufferHeight,
+			radiusX: radius * bufferWidth / cssWidth,
+			radiusY: radius * bufferHeight / cssHeight
+		};
+	}
+
+	const radius = clamp(RADIUS_RATIO * cssHeight, RADIUS_MIN_PIXELS, RADIUS_MAX_PIXELS);
+
+	return {
+		centreX: CENTRE_X_RATIO * bufferWidth,
+		centreY: CENTRE_Y_PIXELS * bufferHeight / cssHeight,
+		radiusX: radius * bufferWidth / cssWidth,
+		radiusY: radius * bufferHeight / cssHeight
+	};
+}
+
+
 /**
  * The atmosphere's ink alpha at a point, before the theme's own alpha.
  *
@@ -278,6 +366,27 @@ const parseToken = (value: string): Color | undefined => {
 	}
 };
 
+/**
+ * The globe's ink: `foreground`, or `descriptionForeground` under a theme that
+ * defines no foreground at all. Both are the same ink by another name.
+ *
+ * `palette.accent` is deliberately NOT a third fallback, and must not be added
+ * back. It resolves to `focusBorder`, which is a saturated hue in four of the
+ * six vibes, and the header of this file states in as many words that a second
+ * hue in the ground "would be the one thing here that some users could not
+ * see". The code used to contradict its own comment: negligible at the title
+ * strip's opacity, a dominant hue field at stage scale, and in both cases the
+ * one reading of this picture that is not identical for a colour blind user.
+ *
+ * If neither token parses this returns `undefined` and the renderer declines to
+ * paint. Declining is a supported answer - the scheduler records the refusal
+ * against this motif and this palette and asks again when either changes - and
+ * it is a better one than inventing a colour.
+ */
+export function readGlobeInk(palette: IMotifPalette): Color | undefined {
+	return parseToken(palette.ink) ?? parseToken(palette.dim);
+}
+
 // --- the renderer ----------------------------------------------------------
 
 class GlobeMotifRenderer implements IMotifRenderer {
@@ -309,6 +418,16 @@ class GlobeMotifRenderer implements IMotifRenderer {
 	private cssWidth = DEFAULT_CSS_WIDTH;
 	private cssHeight = DEFAULT_CSS_HEIGHT;
 
+	/**
+	 * The kind of ground this renderer was handed, fixed at `create`.
+	 *
+	 * A host change rebuilds the renderer rather than mutating it (see
+	 * `ensureSurface` in primalMotifScheduler.ts), so this never changes under a
+	 * live picture and `ground` stays the answer for every window that has not
+	 * offered a stage.
+	 */
+	private role: PrimalMotifRole = 'ground';
+
 	/** Eased milliseconds of motion this renderer has been handed, wrapped to one turn. */
 	private spinMs = 0;
 
@@ -326,7 +445,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 				return false;
 			}
 
-			const ink = this.readInk(host.palette);
+			const ink = readGlobeInk(host.palette);
 			if (!ink) {
 				// A theme that defines no foreground at all is a theme this cannot
 				// be drawn from. Reporting it rather than guessing a colour is the
@@ -341,6 +460,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 			}
 
 			this.context = context;
+			this.role = host.role;
 			this.bufferWidth = host.bufferWidth;
 			this.bufferHeight = host.bufferHeight;
 			this.ink = packInk(ink);
@@ -416,17 +536,6 @@ class GlobeMotifRenderer implements IMotifRenderer {
 		this.geometry = undefined;
 	}
 
-	// --- palette ------------------------------------------------------------
-
-	/**
-	 * One token, and two fallbacks that are the same ink by another name. There
-	 * is no literal here and no guess: if none of the three parse, the caller
-	 * declines to paint.
-	 */
-	private readInk(palette: IMotifPalette): Color | undefined {
-		return parseToken(palette.ink) ?? parseToken(palette.dim) ?? parseToken(palette.accent);
-	}
-
 	// --- tables -------------------------------------------------------------
 
 	/**
@@ -464,21 +573,12 @@ class GlobeMotifRenderer implements IMotifRenderer {
 	}
 
 	/**
-	 * Where the globe goes, in buffer coordinates.
-	 *
-	 * The radius is chosen in screen pixels and then divided by the stretch on
-	 * each axis, which is what corrects the fixed 640x360 buffer being pulled to
-	 * a window of some other shape: an ellipse here is a circle there.
+	 * Where the globe goes, in buffer coordinates. The arithmetic itself is
+	 * {@link computeGlobePlacement}, which is pure and tested; this is only the
+	 * renderer's current state handed to it.
 	 */
-	private placement(): { centreX: number; centreY: number; radiusX: number; radiusY: number } {
-		const radius = clamp(RADIUS_RATIO * this.cssHeight, RADIUS_MIN_PIXELS, RADIUS_MAX_PIXELS);
-
-		return {
-			centreX: CENTRE_X_RATIO * this.bufferWidth,
-			centreY: CENTRE_Y_PIXELS * this.bufferHeight / this.cssHeight,
-			radiusX: radius * this.bufferWidth / this.cssWidth,
-			radiusY: radius * this.bufferHeight / this.cssHeight
-		};
+	private placement(): IGlobePlacement {
+		return computeGlobePlacement(this.role, this.cssWidth, this.cssHeight, this.bufferWidth, this.bufferHeight);
 	}
 
 	/**
@@ -614,10 +714,25 @@ class GlobeMotifRenderer implements IMotifRenderer {
 		const boxY = clamp(Math.floor(centreY - radiusY - halo), 0, height);
 		const boxBottom = clamp(Math.ceil(centreY + radiusY + halo) + 1, 0, height);
 
-		// The area of the ellipse plus a perimeter's worth of slack: the number of
-		// lattice points inside a conic exceeds its area by at most its boundary,
-		// and running out would silently clip a wedge off the sphere.
-		const capacity = Math.max(1, Math.ceil(Math.PI * radiusX * radiusY) + Math.ceil(4 * (radiusX + radiusY)) + 16);
+		// How many pixels the loops below can possibly record, by the tighter of
+		// the two bounds that hold.
+		//
+		// The first is the area of the ellipse plus a perimeter's worth of slack:
+		// the number of lattice points inside a conic exceeds its area by at most
+		// its boundary, and running out would silently clip a wedge off the
+		// sphere. The second is the clipped box the loops actually walk, which
+		// visits each `(x, y)` once and so cannot record more than its own area.
+		//
+		// Both are exact upper bounds, so the smaller is safe, and which one is
+		// smaller depends on the role. A ground globe sits inside the buffer and
+		// the ellipse binds. A stage globe is centred at 86%/88% of a fixed
+		// 640x360 buffer with a radius several times the ground's, so it always
+		// runs off the right and bottom edges: more than half of the ellipse's
+		// area is outside the buffer, and sizing seven parallel arrays from it
+		// allocated over a megabyte per rebuild that was never written to.
+		const boxArea = (boxRight - boxX) * (boxBottom - boxY);
+		const ellipseArea = Math.ceil(Math.PI * radiusX * radiusY) + Math.ceil(4 * (radiusX + radiusY)) + 16;
+		const capacity = Math.max(1, Math.min(ellipseArea, boxArea));
 		const dest = new Int32Array(capacity);
 		const base = new Int32Array(capacity);
 		const column = new Uint16Array(capacity);

@@ -16,6 +16,13 @@
  * editor, side bar, auxiliary bar, panel - still sit above the whole stratum.
  * Art can never end up behind code, and that is structural rather than tuned.
  *
+ * THE ONE EXCEPTION, AND WHAT IT COSTS. A code-free pane may offer itself as
+ * that window's host instead (`registerStage` in primalMotifScheduler.ts), and
+ * the same single surface then mounts there. Outside `.primal-wallpaper` it
+ * inherits none of the three guarantees above, so section 1b restates each one
+ * deliberately rather than inheriting it. This moves the surface; it does not
+ * add one.
+ *
  * ONE SURFACE PER WINDOW. There is exactly one element matched by these rules in
  * any window, because there is exactly one loop per window and the scheduler has
  * no API that could make a second. That is the performance argument: a no-op
@@ -51,6 +58,11 @@
 	 * that the motif does not pop. Zeroed under reduced motion below. */
 	--primal-motif-fade-duration: 240ms;
 
+	/* The stage's opacity ceiling. A FIXED CONSTANT, and deliberately not a
+	 * setting - see the stage rule below for why the number has to be decided
+	 * here rather than by the reader. */
+	--primal-motif-stage-strength: 0.14;
+
 	/* =====================================================================
 	 * 1. The surface
 	 * ================================================================== */
@@ -70,26 +82,76 @@
 		transition: opacity var(--primal-motif-fade-duration) ease-out;
 	}
 
+	/* =====================================================================
+	 * 1b. The stage
+	 *
+	 * The same single surface, mounted in a code-free pane instead of in the
+	 * wallpaper's layer, because the layer is only ever ~35px of title strip
+	 * and a picture composed for it is a smudge rather than a picture. The
+	 * scheduler moves the surface; it does not make a second one.
+	 *
+	 * THE THREE CEDED GUARANTEES, RESTATED. Outside `.primal-wallpaper` the
+	 * surface inherits none of what that element gave it, so each one is
+	 * written out again here on purpose:
+	 *
+	 * 1. The clamped opacity ceiling. `--primal-motif-stage-strength` is that
+	 *    ceiling, and it is a constant in this file rather than a setting.
+	 *    The wallpaper's own 0.35 clamp exists so that no configuration can
+	 *    put a bright ground behind chrome; a stage sits behind body text, so
+	 *    a setting here would reintroduce exactly the problem that clamp
+	 *    prevents, one layer closer to the reader. The page's own scrim
+	 *    (primalStart.css) is what protects the text; this is what keeps the
+	 *    picture quiet enough for the scrim to be enough.
+	 * 2. Grain above art. There is no grain on a stage: nothing is layered
+	 *    over the surface, so nothing has to be re-ordered above it.
+	 * 3. Stratum ordering. `z-index: 0` against the pane's own content at
+	 *    `z-index: 1`, inside a stacking context the pane establishes itself
+	 *    (`isolation: isolate`). Art is still never behind code - a stage may
+	 *    only be offered by a pane that shows no code at all.
+	 * ================================================================== */
+
+	&.primal-motif-on .primal-motif-stage > .primal-motif-surface {
+		display: block;
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 0;
+		pointer-events: none;
+
+		opacity: calc(var(--primal-motif-fade, 0) * var(--primal-motif-stage-strength));
+		transition: opacity var(--primal-motif-fade-duration) ease-out;
+	}
+
 	/* ---------------------------------------------------------------------
 	 * The seam: the wallpaper cedes its `background-image` and keeps the rest.
 	 *
-	 * While a motif actually holds the ground - `.primal-motif-on` is written
-	 * only when a surface exists and has been created successfully - the wash
-	 * underneath it is dropped, so the motif is not compositing over a second
-	 * gradient it knows nothing about. Everything else the wallpaper does is
-	 * untouched: the `z-index: -1` stratum, the clamped `opacity` ceiling, the
-	 * grain `::after` above the motion, and the opaque slabs above all of it.
+	 * While a motif actually holds the wallpaper's OWN ground the wash underneath
+	 * it is dropped, so the motif is not compositing over a second gradient it
+	 * knows nothing about. Everything else the wallpaper does is untouched: the
+	 * `z-index: -1` stratum, the clamped `opacity` ceiling, the grain `::after`
+	 * above the motion, and the opaque slabs above all of it.
+	 *
+	 * NOT WHILE THE SURFACE IS ON A STAGE, which is what `:not(.primal-motif-staged)`
+	 * is for. `.primal-motif-on` says only that this window has a surface
+	 * somewhere; the seam's premise is that the surface is in `.primal-wallpaper`
+	 * and would otherwise be painting over the wash. On a stage it is inside an
+	 * editor pane instead, and `.primal-wallpaper` carries nothing but the wash
+	 * and its grain - so dropping the image there would not avoid a double
+	 * gradient, it would flatten the title strip, the status strip and the corner
+	 * notches, which are the only ground the frame ever shows, every time a
+	 * code-free pane became the visible editor.
 	 *
 	 * The moment the motif is `static`, parked into non-existence, or has failed,
 	 * the scheduler removes the class and the wash is back with no second code
 	 * path and nothing to restore. `primalWallpaperService.ts` is not modified
 	 * and does not know this rule exists; the seam is one selector wide.
 	 *
-	 * It carries one class more than the rule it overrides, so it wins on
+	 * It carries two classes more than the rule it overrides, so it wins on
 	 * specificity rather than on stylesheet order.
 	 * ------------------------------------------------------------------ */
 
-	&.primal-wallpaper-on.primal-motif-on > .primal-wallpaper {
+	&.primal-wallpaper-on.primal-motif-on:not(.primal-motif-staged) > .primal-wallpaper {
 		background-image: none;
 	}
 
@@ -101,24 +163,30 @@
 	 * wash - the contrast is one number. Behind something that moves it becomes
 	 * per-pixel and per-frame, and is no longer checkable at all.
 	 *
-	 * So the tint is revoked while a non-static motif holds the ground. This is
-	 * done here, in CSS, rather than by writing the user's setting: the setting
-	 * keeps whatever value they chose and comes back the moment the motif is
-	 * `static` again, and there is no window in which a stale settings write
-	 * could leave the slabs translucent over a moving surface.
+	 * So the tint is revoked while a non-static motif holds the ground BEHIND THE
+	 * SLABS. This is done here, in CSS, rather than by writing the user's setting:
+	 * the setting keeps whatever value they chose and comes back the moment the
+	 * motif is `static` again, and there is no window in which a stale settings
+	 * write could leave the slabs translucent over a moving surface.
 	 *
-	 * These selectors carry one more class than the wallpaper's tint rules
-	 * (`.primal-wallpaper-on.primal-wallpaper-tint` plus `.primal-motif-on`), so
-	 * they win on specificity and not on file order - which is not something a
-	 * bundler guarantees.
+	 * `:not(.primal-motif-staged)` is what keeps the revocation honest about the
+	 * "behind the slabs" half. A staged surface is inside an editor pane; what
+	 * the side bar, auxiliary bar and panel let through is still the wallpaper's
+	 * static wash, which is one number and is checkable, so there is nothing here
+	 * to revoke and the user's setting is left alone.
+	 *
+	 * These selectors carry two more classes than the wallpaper's tint rules
+	 * (`.primal-wallpaper-on.primal-wallpaper-tint` plus `.primal-motif-on` and
+	 * the `:not()`), so they win on specificity and not on file order - which is
+	 * not something a bundler guarantees.
 	 * ================================================================== */
 
-	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.sidebar,
-	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.auxiliarybar {
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on:not(.primal-motif-staged) .part.sidebar,
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on:not(.primal-motif-staged) .part.auxiliarybar {
 		background-color: var(--vscode-sideBar-background) !important;
 	}
 
-	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on .part.panel {
+	&.primal-wallpaper-on.primal-wallpaper-tint.primal-motif-on:not(.primal-motif-staged) .part.panel {
 		background-color: var(--vscode-panel-background) !important;
 	}
 
@@ -130,17 +198,28 @@
 	 * CSS is the cross-fade, which is itself motion. `.primal-motif-instant` is
 	 * written by the scheduler from `IAccessibilityService.isMotionReduced()`,
 	 * which folds the `workbench.reduceMotion` setting together with the media
-	 * query; the media query is honoured on its own as well, for a window whose
-	 * setting says `auto` before the service has been consulted.
+	 * query. The media query is ALSO honoured on its own, and the two are
+	 * genuinely different sources rather than one written twice: the query is the
+	 * operating system's preference, and the class is what this contrib writes
+	 * once the setting has been folded in. primalBoot.css pairs the same two, for
+	 * the same reason.
+	 *
+	 * BOTH OF THEM LIVE INSIDE THE GUARD, and they have to. The 240ms above is
+	 * declared on the four-class selector, so a media query written at the top
+	 * level against a bare `.monaco-workbench` would lose the cascade to it every
+	 * time and be honoured in exactly none of the windows it was written for -
+	 * `@media` adds no specificity of its own, so it cannot make up the four
+	 * classes it is short. Nested here, `&` expands to the same selector, so it
+	 * ties on specificity and wins on source order.
 	 * ================================================================== */
 
 	&.primal-motif-instant {
 		--primal-motif-fade-duration: 0ms;
 	}
-}
 
-@media (prefers-reduced-motion: reduce) {
-	.monaco-workbench {
-		--primal-motif-fade-duration: 0ms;
+	@media (prefers-reduced-motion: reduce) {
+		& {
+			--primal-motif-fade-duration: 0ms;
+		}
 	}
 }

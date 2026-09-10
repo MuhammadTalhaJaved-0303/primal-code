@@ -6,7 +6,7 @@
 import { $ } from '../../../../base/browser/dom.js';
 import { CodeWindow } from '../../../../base/browser/window.js';
 import { Disposable, IDisposable, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
-import { IMotifRenderer, isMotifCanvas, PRIMAL_MOTIF_BUFFER_HEIGHT, PRIMAL_MOTIF_BUFFER_WIDTH, PRIMAL_MOTIF_SURFACE_CLASS } from './primalMotif.js';
+import { IMotifRenderer, isMotifCanvas, PRIMAL_MOTIF_BUFFER_HEIGHT, PRIMAL_MOTIF_BUFFER_WIDTH, PRIMAL_MOTIF_SURFACE_CLASS, PrimalMotifRole } from './primalMotif.js';
 
 /**
  * One motif surface: exactly one per workbench container, and therefore exactly
@@ -55,7 +55,34 @@ export class MotifSurface extends Disposable {
 		readonly renderer: IMotifRenderer,
 		/** The scheduler's content generation at the moment this was built. */
 		readonly contentGeneration: number,
-		layer: HTMLElement
+		/**
+		 * The element the canvas is appended to. Ordinarily the wallpaper's own
+		 * layer; a code-free pane that offered itself as a stage otherwise. Kept
+		 * as a field so the scheduler can notice the host has changed under an
+		 * existing surface and rebuild rather than leave the canvas orphaned in
+		 * the element it used to live in.
+		 */
+		readonly host: HTMLElement,
+		/**
+		 * Which kind of ground {@link host} is.
+		 *
+		 * Carried on the surface because the scheduler has to restate it on the
+		 * workbench container every pass - `media/primalMotif.css` has two rules
+		 * that may only fire while the wallpaper's own layer is the host - and
+		 * `applyTo` holds the surface rather than the mount that produced it.
+		 */
+		readonly role: PrimalMotifRole,
+		/**
+		 * The element whose CSS box the renderer is sized from.
+		 *
+		 * Defaults to the container, which is what every ground surface uses and
+		 * therefore leaves the existing behaviour untouched. A stage is a pane
+		 * inside the window rather than the window itself, and `placement()` in
+		 * `motifs/globe.ts` divides by this size to correct the fixed 640x360
+		 * buffer being stretched to the host: measuring the whole window for a
+		 * surface that only covers a pane would draw the disc as an ellipse.
+		 */
+		private readonly measure: HTMLElement = container
 	) {
 		super();
 
@@ -72,12 +99,16 @@ export class MotifSurface extends Disposable {
 			this.element.height = PRIMAL_MOTIF_BUFFER_HEIGHT;
 		}
 
-		// Inside the wallpaper's own layer, not beside it: the layer already
-		// carries `z-index: -1`, the clamped opacity ceiling and the grain
-		// pseudo-element that paints above its children. The motif inherits all
-		// three, and the four opaque slabs still sit on top of the whole
-		// stratum, so art can never end up behind code.
-		layer.appendChild(this.element);
+		// Inside the host, not beside it. For the wallpaper's own layer - which
+		// is the host in every window that has not offered a stage - that layer
+		// already carries `z-index: -1`, the clamped opacity ceiling and the
+		// grain pseudo-element that paints above its children. The motif
+		// inherits all three, and the four opaque slabs still sit on top of the
+		// whole stratum, so art can never end up behind code. A stage host is
+		// outside that layer and inherits none of them, which is why
+		// `media/primalMotif.css` restates each one for the stage rule and why a
+		// stage may only ever be offered by a pane that shows no code.
+		host.appendChild(this.element);
 		this._register(toDisposable(() => this.element.remove()));
 
 		this._register(renderer);
@@ -96,8 +127,8 @@ export class MotifSurface extends Disposable {
 
 	/** Tells the renderer about a new CSS size, at most once per actual change. */
 	layout(): void {
-		const width = Math.max(0, this.container.clientWidth);
-		const height = Math.max(0, this.container.clientHeight);
+		const width = Math.max(0, this.measure.clientWidth);
+		const height = Math.max(0, this.measure.clientHeight);
 		if (width === this.width && height === this.height) {
 			return;
 		}
