@@ -20,6 +20,7 @@ import { IWorkbenchLayoutService, LayoutSettings } from '../../../services/layou
 import { IPowerService, ThermalState } from '../../../services/power/common/powerService.js';
 import { IPrimalVibeService } from '../../primalVibes/browser/primalVibes.js';
 import { PRIMAL_WALLPAPER_LAYER_CLASS, PRIMAL_WALLPAPER_ON_CLASS, PRIMAL_WALLPAPER_SETTING_IDS } from '../../primalWallpaper/browser/primalWallpaper.js';
+import { PRIMAL_MOTIF_WORLD_ID } from './motifs/globe.js';
 import {
 	IMotifFrame,
 	IMotifHost,
@@ -38,7 +39,9 @@ import {
 	PRIMAL_MOTIF_ON_CLASS,
 	PRIMAL_MOTIF_PERPETUAL_ON_BATTERY_SETTING_ID,
 	PRIMAL_MOTIF_SETTING_IDS,
+	PRIMAL_MOTIF_STAGED_CLASS,
 	PrimalMotifMotion,
+	PrimalMotifRole,
 	PrimalMotifState,
 	PrimalMotifTrigger,
 	getMotifDescriptor,
@@ -54,6 +57,20 @@ const BUDGET_STRIKES = 30;
 
 /** How far over budget one frame has to be to count as a strike. */
 const BUDGET_STRIKE_FACTOR = 3;
+
+/**
+ * Main-thread work one coalesced re-measure is allowed before it is reported.
+ *
+ * A resize is not a frame and is not policed like one: it happens once per
+ * layout rather than thirty times a second, and the frame budget's remedy -
+ * halving the frame rate - would not make a rebuild any cheaper. But a renderer
+ * that rebuilds its tables from `resize()` can cost far more than a frame does,
+ * and {@link PrimalMotifScheduler.renderFrame} brackets only `render()`, so
+ * without this the most expensive thing this contrib does would be the one
+ * thing nothing ever measured. Eight frame budgets: generous for a one-off,
+ * still well inside a 60Hz frame, and it is a diagnostic rather than a throttle.
+ */
+const LAYOUT_BUDGET_MS = PRIMAL_MOTIF_FRAME_BUDGET_MS * 8;
 
 /**
  * How close to the next scheduled frame time a raw animation frame may land and
@@ -96,16 +113,73 @@ const INPUT_QUIET_MARGIN_MS = 16;
  * the wallpaper can be switched off, and the chrome design can be switched, at
  * any moment from settings this contrib does not own.
  *
+ * STAGES MOVE THE SURFACE; THEY DO NOT ADD ONE. A code-free pane may offer
+ * itself as this window's host through {@link registerStage}, and the window's
+ * single surface then mounts there instead of in the wallpaper layer. The count
+ * of surfaces, loops and graphics contexts is unchanged - which is the point,
+ * because the count is the whole performance argument. What changes is where the
+ * one surface can be seen: the chrome strip is ~35px tall, and a Start page is
+ * most of a window. See {@link resolveMount}.
+ *
  * THE LADDER. Seven conditions can degrade or stop motion, plus a self-imposed
  * budget guard, most restrictive wins, re-evaluated on every state change. The
  * decision is a pure function in `primalMotifLadder.ts`; this class keeps its
  * inputs current and obeys the answer.
+ *
+ * WHAT THE BUDGET GUARD COVERS, AND WHAT IT DOES NOT. `PRIMAL_MOTIF_FRAME_BUDGET_MS`
+ * and the strike counter in {@link renderFrame} bracket `render()` and nothing
+ * else, because throttling the frame rate is a remedy for per-frame cost and
+ * for no other kind. The other expensive thing a renderer does is rebuild its
+ * tables from `resize()`, which happens on a layout rather than on a frame;
+ * that path is coalesced by {@link relayout} and reported against
+ * `LAYOUT_BUDGET_MS`, which is a diagnostic and deliberately not a throttle.
  */
 export class PrimalMotifScheduler extends Disposable implements IPrimalMotifService {
 
 	declare readonly _serviceBrand: undefined;
 
 	private readonly surfaces = new Map<HTMLElement, MotifSurface>();
+
+	/**
+	 * Code-free panes that have offered themselves as this window's host, keyed
+	 * by the workbench container the pane lives in.
+	 *
+	 * Keyed by container and not by pane, deliberately: `PrimalStartInput` is a
+	 * singleton per editor *group*, not per window, an auxiliary window has its
+	 * own `EditorPart`, and the Start page and the Rig are two different inputs
+	 * that a split shows side by side - so several code-free panes are reachable
+	 * in one window at once. The budget this scheduler defends is per window, so
+	 * the map that decides where a window's one surface mounts has to be per
+	 * window too.
+	 *
+	 * EVERY LIVE OFFER IS KEPT, NEWEST LAST, and the newest is the one honoured.
+	 * A single-slot map would be wrong rather than merely lossy: a second pane
+	 * would silently supersede the first, and when the second withdrew, the
+	 * window would fall back to the wallpaper layer even though the first pane
+	 * was still on screen still offering itself. Nothing re-asks a pane - the
+	 * offer is withdrawn from the pane's own visibility, which has not changed -
+	 * so that surface would stay empty for the rest of that pane's visible
+	 * session. A list makes withdrawal fall back to the next live offer instead.
+	 *
+	 * A stage REPLACES the wallpaper layer as the mount. It never adds a second
+	 * surface, and there is no code path here that could: {@link surfaces} is
+	 * still keyed by container and {@link ensureSurface} is still the only place
+	 * a `MotifSurface` is constructed.
+	 */
+	private readonly stages = new Map<HTMLElement, readonly HTMLElement[]>();
+
+	/**
+	 * Containers whose surface owes a re-measure, and the one deferred slot they
+	 * share. See {@link relayout}.
+	 */
+	private readonly pendingLayouts = new Set<HTMLElement>();
+	private readonly deferredLayout = this._register(new MutableDisposable<IDisposable>());
+
+	/** So the "nowhere to paint" diagnostic is a line in the log, not a stream. */
+	private missingHostLogged = false;
+
+	/** The same, for the re-measure cost report. A window drag would stream it. */
+	private layoutCostLogged = false;
 
 	/**
 	 * Every container this scheduler has attached per-window listeners to, with
@@ -208,7 +282,11 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 
 		this.focused = this.hostService.hasFocus;
 
-		this._register(toDisposable(() => this.clearSurfaces()));
+		this._register(toDisposable(() => {
+			this.clearSurfaces();
+			this.stages.clear();
+			this.pendingLayouts.clear();
+		}));
 
 		this.registerLadderListeners();
 		this.registerTriggerListeners();
@@ -252,6 +330,61 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 
 		this.paused = paused;
 		this.update('command', /* restart */ !paused);
+	}
+
+	registerStage(container: HTMLElement, element: HTMLElement): IDisposable {
+		const offers = this.stages.get(container) ?? [];
+		this.stages.set(container, [...offers, element]);
+
+		// Coalesced through the one deferred slot rather than reconciled here.
+		// Panes are created, hidden, shown, moved between groups and disposed far
+		// more often than containers are, and every host change rebuilds the
+		// renderer - a fresh 2D context and about a megabyte of typed tables. A
+		// pane that is shown and hidden twice in one turn therefore costs one
+		// re-resolve, not four.
+		this.scheduleResolve();
+
+		let withdrawn = false;
+		return toDisposable(() => {
+			// Idempotent: a pane may clear its registration and be disposed after,
+			// and a second removal would take some other pane's offer with it.
+			if (withdrawn) {
+				return;
+			}
+			withdrawn = true;
+
+			const current = this.stages.get(container);
+			if (!current) {
+				return; // the window closed; `untrackContainer` dropped the lot.
+			}
+
+			// Exactly this offer leaves. Any other pane's offer stays live, and
+			// if one of them was made before this one it becomes the newest again
+			// and wins the mount back on the re-resolve below - which is the whole
+			// reason these are a list rather than a slot.
+			const index = current.lastIndexOf(element);
+			if (index === -1) {
+				return;
+			}
+
+			const remaining = [...current.slice(0, index), ...current.slice(index + 1)];
+			if (remaining.length === 0) {
+				this.stages.delete(container);
+			} else {
+				this.stages.set(container, remaining);
+			}
+
+			this.scheduleResolve();
+		});
+	}
+
+	relayout(container: HTMLElement): void {
+		if (this._store.isDisposed || !this.surfaces.has(container)) {
+			return;
+		}
+
+		this.pendingLayouts.add(container);
+		this.deferredLayout.value ??= disposableTimeout(() => this.flushLayouts(), 0);
 	}
 
 	// --- wiring -------------------------------------------------------------
@@ -346,6 +479,36 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	}
 
 	/**
+	 * Re-measures every surface a layout has touched since the last turn.
+	 *
+	 * The slot is released before the work rather than after, so a layout that
+	 * arrives while this is running arms the next turn instead of being dropped
+	 * into the batch that is already draining.
+	 */
+	private flushLayouts(): void {
+		this.deferredLayout.clear();
+
+		const containers = [...this.pendingLayouts];
+		this.pendingLayouts.clear();
+
+		for (const container of containers) {
+			const surface = this.surfaces.get(container);
+			if (!surface) {
+				continue; // the surface went away between the layout and this turn.
+			}
+
+			const startedAt = surface.targetWindow.performance.now();
+			surface.layout();
+			const cost = surface.targetWindow.performance.now() - startedAt;
+
+			if (cost > LAYOUT_BUDGET_MS && !this.layoutCostLogged) {
+				this.layoutCostLogged = true;
+				this.logService.warn(`[primalMotif] '${surface.renderer.id}' spent ${cost.toFixed(2)}ms on the main thread rebuilding for a new size, against a ${LAYOUT_BUDGET_MS}ms budget. The frame budget does not cover this path - see LAYOUT_BUDGET_MS. Logged once per session.`);
+			}
+		}
+	}
+
+	/**
 	 * Declares that what the motif paints has changed - the motif id, or the
 	 * palette it derives from.
 	 *
@@ -397,7 +560,13 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 			this.trackContainer(container);
 		}
 
-		this._register(this.layoutService.onDidLayoutContainer(({ container }) => this.surfaces.get(container)?.layout()));
+		// Through the coalesced slot, not straight into the surface: a container
+		// layout arrives in the middle of the workbench's own layout pass, and a
+		// renderer that rebuilds its tables from `resize()` would take a forced
+		// geometry read and several milliseconds of arithmetic there. Deferring by
+		// one turn also collapses the several layouts a single user action can
+		// produce into one re-measure.
+		this._register(this.layoutService.onDidLayoutContainer(({ container }) => this.relayout(container)));
 	}
 
 	/**
@@ -422,6 +591,11 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	private untrackContainer(container: HTMLElement): void {
 		this.trackedContainers.get(container)?.dispose();
 		this.trackedContainers.delete(container);
+		// A closed window's panes are not disposed in an order this scheduler can
+		// see, so the stage offer is dropped here as well. Leaving it would hold a
+		// detached element - and its whole document - for the rest of the session.
+		this.stages.delete(container);
+		this.pendingLayouts.delete(container);
 		this.removeSurface(container);
 	}
 
@@ -649,6 +823,12 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		}
 
 		container.classList.toggle(PRIMAL_MOTIF_ON_CLASS, true);
+		// Where the surface ended up, and not merely that there is one. Two rules
+		// in `media/primalMotif.css` give something of the chrome's up in exchange
+		// for the motif holding the chrome's ground - the wallpaper's wash and the
+		// user's `tintSlabs` - and neither trade is owed while the surface is
+		// inside an editor pane instead. See PRIMAL_MOTIF_STAGED_CLASS.
+		container.classList.toggle(PRIMAL_MOTIF_STAGED_CLASS, surface.role === 'stage');
 		container.classList.toggle(PRIMAL_MOTIF_INSTANT_CLASS, this.accessibilityService.isMotionReduced());
 		surface.element.style.setProperty(PRIMAL_MOTIF_FADE_PROPERTY, '1');
 		surface.layout();
@@ -833,6 +1013,45 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	}
 
 	/**
+	 * Where this window's one surface mounts, and what role that host implies.
+	 *
+	 * A registered stage wins; otherwise the wallpaper's own layer, which is what
+	 * every window used before stages existed and what every window without one
+	 * still uses. `undefined` means there is nowhere to paint at all, which is
+	 * ordinary during startup - the wallpaper contribution may not have run yet.
+	 *
+	 * RESTRICTED TO `world`, FOR NOW. `starfield` puts `tone: 'accent'` on its
+	 * brightest star layer and paints its nebula pools in `--vscode-focusBorder`
+	 * (`media/primalMotifStarfield.css`). At the wallpaper's 0.12 layer opacity,
+	 * across the title strip, that is negligible. At stage scale, across most of
+	 * a pane, it is a dominant hue field - and hue is precisely what this
+	 * product's rules say may never carry meaning, because it is the one thing
+	 * some users cannot see. Until `starfield` is reworked to one ink at varying
+	 * alpha the way `globe` already is, it does not get a stage; it falls back to
+	 * the wallpaper layer here, silently and correctly.
+	 */
+	private resolveMount(container: HTMLElement): { readonly host: HTMLElement; readonly role: PrimalMotifRole } | undefined {
+		// The newest live offer. See {@link stages} for why every offer is kept
+		// rather than only the newest: withdrawing this one has to hand the mount
+		// back to whichever pane offered before it, not to the wallpaper layer.
+		const offers = this.stages.get(container);
+		const stage = offers?.[offers.length - 1];
+		if (stage && this.activeMotifId === PRIMAL_MOTIF_WORLD_ID) {
+			return { host: stage, role: 'stage' };
+		}
+
+		// The wallpaper contribution owns this element and keeps its own
+		// container->layer map privately, so the motif layer has to find it. The
+		// selector is not a magic string: PRIMAL_WALLPAPER_LAYER_CLASS is exported
+		// by the wallpaper and imported here, which makes the class name a shared
+		// contract the compiler checks. Worth replacing with a service accessor if
+		// the wallpaper ever grows one.
+		// eslint-disable-next-line no-restricted-syntax
+		const layer = container.querySelector<HTMLElement>(`.${PRIMAL_WALLPAPER_LAYER_CLASS}`);
+		return layer ? { host: layer, role: 'ground' } : undefined;
+	}
+
+	/**
 	 * The wallpaper seam.
 	 *
 	 * The motif does not own a layer; it borrows the wallpaper's. `ensureLayer`
@@ -851,27 +1070,33 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	 * a new one. That is the right subordination, and it is one check in one place.
 	 */
 	private ensureSurface(container: HTMLElement): MotifSurface | undefined {
-		const existing = this.surfaces.get(container);
-		if (existing) {
-			if (existing.contentGeneration === this.contentGeneration) {
-				return existing;
+		const mount = this.resolveMount(container);
+		if (!mount) {
+			// Formerly a silent `return undefined`, which rendered nothing while
+			// the status bar went on reporting "moving". There is no recovery to
+			// attempt here - the next pass asks again - so this is a diagnostic
+			// and not a failure, and it is logged once so a window that keeps
+			// re-resolving does not fill the log with it.
+			if (!this.missingHostLogged) {
+				this.missingHostLogged = true;
+				const staged = this.stages.has(container) ? 'a stage is registered for it' : 'no stage is registered for it';
+				this.logService.warn(`[primalMotif] Nowhere to paint in this window: ${staged} and there is no '.${PRIMAL_WALLPAPER_LAYER_CLASS}' layer to fall back to. The ground keeps whatever it already shows. Logged once per session.`);
 			}
-			// The motif or the palette changed under it, so the renderer holds a
-			// picture that is no longer the right one. That - and only that - is
-			// what justifies dropping a graphics context.
-			this.removeSurface(container);
+			return undefined;
 		}
 
-		// The wallpaper contribution owns this element and keeps its own
-		// container->layer map privately, so the motif layer has to find it. The
-		// selector is not a magic string: PRIMAL_WALLPAPER_LAYER_CLASS is exported
-		// by the wallpaper and imported here, which makes the class name a shared
-		// contract the compiler checks. Worth replacing with a service accessor if
-		// the wallpaper ever grows one.
-		// eslint-disable-next-line no-restricted-syntax
-		const layer = container.querySelector<HTMLElement>(`.${PRIMAL_WALLPAPER_LAYER_CLASS}`);
-		if (!layer) {
-			return undefined; // the wallpaper contribution has not run yet
+		const existing = this.surfaces.get(container);
+		if (existing) {
+			if (existing.contentGeneration === this.contentGeneration && existing.host === mount.host) {
+				return existing;
+			}
+			// Either the motif or the palette changed under it, so the renderer
+			// holds a picture that is no longer the right one; or the host did,
+			// and the canvas would otherwise be left orphaned in the element it
+			// used to live in while the status bar reported motion. Both are
+			// rebuilds, and they are the only two things that justify dropping a
+			// graphics context.
+			this.removeSurface(container);
 		}
 
 		const descriptor = getMotifDescriptor(this.activeMotifId);
@@ -880,9 +1105,17 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		}
 
 		const renderer = descriptor.create();
-		const surface = new MotifSurface(container, getWindow(container), renderer, this.contentGeneration, layer);
+
+		// A stage measures itself, not the window. `placement()` in
+		// `motifs/globe.ts` divides by the CSS size to correct the fixed 640x360
+		// buffer being stretched to its host, so a pane-sized surface told the
+		// window's size would draw the disc as an ellipse. The ground role keeps
+		// the container, which is what it has always measured.
+		const measure = mount.role === 'stage' ? mount.host : container;
+		const surface = new MotifSurface(container, getWindow(container), renderer, this.contentGeneration, mount.host, mount.role, measure);
 		const host: IMotifHost = {
 			element: surface.element,
+			role: mount.role,
 			bufferWidth: PRIMAL_MOTIF_BUFFER_WIDTH,
 			bufferHeight: PRIMAL_MOTIF_BUFFER_HEIGHT,
 			palette: this.readPalette(this.themeService.getColorTheme()),
@@ -977,7 +1210,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	private removeSurface(container: HTMLElement): void {
 		this.surfaces.get(container)?.dispose();
 		this.surfaces.delete(container);
-		container.classList.remove(PRIMAL_MOTIF_ON_CLASS, PRIMAL_MOTIF_INSTANT_CLASS);
+		container.classList.remove(PRIMAL_MOTIF_ON_CLASS, PRIMAL_MOTIF_STAGED_CLASS, PRIMAL_MOTIF_INSTANT_CLASS);
 	}
 
 	private clearSurfaces(): void {

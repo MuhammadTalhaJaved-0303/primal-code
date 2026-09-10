@@ -10,7 +10,7 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { onUnexpectedError } from '../../../../base/common/errors.js';
 import { splitRecentLabel } from '../../../../base/common/labels.js';
-import { DisposableStore } from '../../../../base/common/lifecycle.js';
+import { IDisposable, MutableDisposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 import { isMacintosh, isNative } from '../../../../base/common/platform.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { localize } from '../../../../nls.js';
@@ -27,7 +27,9 @@ import { EditorPane } from '../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { IHostService } from '../../../services/host/browser/host.js';
+import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { ACTION_ID_NEW_CHAT, CHAT_OPEN_ACTION_ID } from '../../chat/browser/actions/chatActions.js';
+import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../primalMotif/browser/primalMotif.js';
 import { PRIMAL_THEME_GALLERY_COMMAND_ID } from '../../primalThemeGallery/common/primalThemeGallery.js';
 import { IPrimalVibe, IPrimalVibeService, PRIMAL_VIBES, PRIMAL_VIBE_CYCLE_COMMAND_ID, PRIMAL_VIBE_PICK_COMMAND_ID } from '../../primalVibes/browser/primalVibes.js';
 import { PrimalStartInput } from './primalStartInput.js';
@@ -105,6 +107,32 @@ export class PrimalStartEditor extends EditorPane {
 	private recentsList: HTMLElement | undefined;
 	private recentsRenderToken = 0;
 
+	//#region Motif stage
+
+	/**
+	 * The element this pane offers the motif layer as a host, and the workbench
+	 * container it was found in. The pane owns the element; the motif service
+	 * only mounts its one surface into it.
+	 */
+	private stage: HTMLElement | undefined;
+	private workbenchContainer: HTMLElement | undefined;
+	private targetWindow: Window | undefined;
+
+	/**
+	 * The live offer, or nothing while this pane is not on screen.
+	 *
+	 * A `MutableDisposable` because the offer is withdrawn and remade every time
+	 * the pane is shown and hidden, which is often, and it must never be possible
+	 * to hold two.
+	 */
+	private readonly stageRegistration = this._register(new MutableDisposable<IDisposable>());
+
+	/** The last size `layout` was given, so a layout that changed nothing costs nothing. */
+	private stageWidth = 0;
+	private stageHeight = 0;
+
+	//#endregion
+
 	constructor(
 		group: IEditorGroup,
 		@ITelemetryService telemetryService: ITelemetryService,
@@ -116,6 +144,8 @@ export class PrimalStartEditor extends EditorPane {
 		@IHostService private readonly hostService: IHostService,
 		@ILabelService private readonly labelService: ILabelService,
 		@IKeybindingService private readonly keybindingService: IKeybindingService,
+		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+		@IPrimalMotifService private readonly motifService: IPrimalMotifService,
 	) {
 		super(PrimalStartEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -123,6 +153,32 @@ export class PrimalStartEditor extends EditorPane {
 	protected override createEditor(parent: HTMLElement): void {
 		this.editorDisposables.clear();
 		this.vibeCards.clear();
+
+		// The offer names an element, so it cannot outlive the element it named.
+		this.stageRegistration.clear();
+
+		// The pane is the stacking context the stage and the page are ordered
+		// inside. Without it, `.editor-instance` is statically positioned (it is
+		// given nothing but `height: 100%` by editorgroupview.css) and an
+		// `inset: 0` layer would size itself to the nearest positioned ancestor -
+		// `.split-view-view`, which includes the tab strip - and escape this
+		// pane's own clip. `isolation: isolate` in primalStart.css is what makes
+		// the z-index pair below a guarantee rather than an accident against the
+		// editor part's own pseudo-elements at 10 and the sashes at 35.
+		parent.classList.add('primal-start-pane');
+
+		this.targetWindow = DOM.getWindow(parent);
+		this.workbenchContainer = this.layoutService.getContainer(this.targetWindow);
+
+		// Before the scroll container and as its sibling, never inside it:
+		// `.primal-start-editor` is `overflow-y: auto`, so a stage within it
+		// would scroll away from the page it is the ground for.
+		this.stage = DOM.append(parent, $('.' + PRIMAL_MOTIF_STAGE_CLASS, { 'aria-hidden': 'true' }));
+
+		// The document going hidden is as good as the pane going hidden: a loop
+		// rendering into a canvas nobody can see costs exactly what a visible one
+		// costs. This mirrors the rule primalDeckEditor.ts uses.
+		this.editorDisposables.add(DOM.addDisposableListener(this.targetWindow.document, 'visibilitychange', () => this.updateStage()));
 
 		this.scrollContainer = DOM.append(parent, $('.primal-start-editor'));
 		const page = DOM.append(this.scrollContainer, $('.primal-start-page'));
@@ -132,6 +188,10 @@ export class PrimalStartEditor extends EditorPane {
 		this.renderVibeStrip(page);
 		this.renderRecents(page);
 		this.renderFooter(page);
+
+		// A no-op unless this pane is already the visible one, which is the case
+		// `setInput` would otherwise be the first to notice.
+		this.updateStage();
 	}
 
 	//#region Hero
@@ -377,11 +437,61 @@ export class PrimalStartEditor extends EditorPane {
 		return this.keybindingService.lookupKeybinding(commandId)?.getLabel() ?? undefined;
 	}
 
+	//#region Motif stage
+
+	/**
+	 * The single decision: this pane offers itself as the motif's host exactly
+	 * while it is the visible pane in a visible document.
+	 *
+	 * `setEditorVisible` and not `Composite.setVisible` is the hook, because
+	 * `EditorPanes` removes `.editor-instance` from the DOM on an editor switch
+	 * while this object survives, and `requestAnimationFrame` fires per window
+	 * rather than per element - so a stage left registered from a detached pane
+	 * would keep the window's whole loop pointed at a canvas nobody can see.
+	 * Withdrawing the offer hands the surface to whichever other code-free pane
+	 * in this window is still offering itself, or back to the wallpaper layer,
+	 * which is visible - so nothing is lost by it either way.
+	 *
+	 * The early return may safely be read off this pane's own registration: the
+	 * scheduler keeps every live offer rather than only the newest, so a handle
+	 * this pane holds is always an offer the scheduler still knows about. It
+	 * would be a latch if a second pane could supersede it silently.
+	 */
+	private updateStage(): void {
+		const stage = this.stage;
+		const container = this.workbenchContainer;
+		const shouldHost = !!stage && !!container && this.isVisible() && this.targetWindow?.document.visibilityState === 'visible';
+
+		if (shouldHost === !!this.stageRegistration.value) {
+			return;
+		}
+
+		if (!shouldHost) {
+			this.stageRegistration.clear();
+			return;
+		}
+
+		this.stageRegistration.value = this.motifService.registerStage(container, stage);
+	}
+
+	//#endregion
+
 	override async setInput(input: PrimalStartInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
+		this.updateStage();
 
 		// Recents may have changed while the page sat in the background.
 		await this.updateRecents();
+	}
+
+	override clearInput(): void {
+		super.clearInput();
+		this.updateStage();
+	}
+
+	protected override setEditorVisible(visible: boolean): void {
+		super.setEditorVisible(visible);
+		this.updateStage();
 	}
 
 	override focus(): void {
@@ -391,5 +501,28 @@ export class PrimalStartEditor extends EditorPane {
 
 	override layout(dimension: Dimension): void {
 		this.scrollContainer?.classList.toggle('narrow', dimension.width < NARROW_WIDTH_THRESHOLD);
+
+		// The motif's own `onDidLayoutContainer` hook fires on *container* layout,
+		// and an editor resize is not one of those, so the surface would keep the
+		// size it was built at and draw the globe as an ellipse. Only a size that
+		// actually changed is forwarded: a sash drag is a great many layouts.
+		if (dimension.width === this.stageWidth && dimension.height === this.stageHeight) {
+			return;
+		}
+
+		this.stageWidth = dimension.width;
+		this.stageHeight = dimension.height;
+
+		// `relayout` and NOT `trigger`. A trigger is what the owner did something
+		// for: it re-resolves the whole ladder and re-arms the frame chain at
+		// `now`, which throws away the plan's frame-rate ceiling until the next
+		// pass. `EditorGroupView` calls this once per mouse-move of a sash drag,
+		// so triggering here would render the globe at the display's cadence
+		// rather than at the 30fps the ladder chose, synchronously inside the
+		// workbench's own layout pass, for as long as the drag lasted. A resize
+		// asks for none of that; it asks to be re-measured.
+		if (this.stageRegistration.value && this.workbenchContainer) {
+			this.motifService.relayout(this.workbenchContainer);
+		}
 	}
 }

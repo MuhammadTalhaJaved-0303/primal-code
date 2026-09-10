@@ -1155,6 +1155,7 @@
 		"--primal-deck-edge",
 		"--primal-motif-fade",
 		"--primal-motif-fade-duration",
+		"--primal-motif-stage-strength",
 		"--primal-rig-edge",
 		"--primal-start-edge",
 		"--primal-theme-edge",

@@ -418,3 +418,70 @@
 .monaco-workbench.hc-light .primal-rig-editor .primal-rig-session-status {
 	background: transparent;
 }
+
+/* ==========================================================================
+ * The motif stage
+ *
+ * The Start page's mechanism, verbatim - see the same block in
+ * `primalStart/browser/media/primalStart.css` for the full reasoning, and
+ * `primalMotif/browser/media/primalMotif.css` for the surface rule itself. The
+ * two pages are alternatives (`primalCode.startPage.surface`), so only one is
+ * ever the visible pane and the one-surface-per-window budget is unaffected.
+ *
+ * `position: relative` is load-bearing: `.editor-instance` gets nothing but
+ * `height: 100%` from editorgroupview.css, so an `inset: 0` layer would
+ * otherwise size to the whole editor-group box including the tab strip.
+ * `isolation: isolate` makes the 0/1 pair a guarantee against the editor part's
+ * own pseudo-elements at z-index 10 and the sashes at 35.
+ *
+ * The guard is the four classes primalMotif.css and primalWallpaper.css carry:
+ * high contrast opts out of the ground entirely, and `agent-sessions-workbench`
+ * / `modern-ui` own their own ground selectors.
+ * ========================================================================== */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-rig-pane {
+	position: relative;
+	isolation: isolate;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-rig-pane > .primal-motif-stage {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-rig-pane > .primal-rig-editor {
+	position: relative;
+	z-index: 1;
+
+	/* Same clip as the Start page, for the same reason and against the same
+	 * scrim: the plate's negative horizontal inset is scrollable overflow inside
+	 * this container, and an unspecified `overflow-x` beside a non-visible
+	 * `overflow-y` computes to `auto`, so the page grew a second scroll axis and
+	 * up to 48px of dead sideways pan. See primalStart.css for the full note. */
+	overflow: hidden auto;
+}
+
+/* The scrim, and it is mandatory here for the same reason it is on the Start
+ * page: the section labels, the project paths, the session rows and the footer
+ * are all `--vscode-descriptionForeground`, the low-contrast token in every
+ * vibe, and they sit directly on bare ground. A blurred plate in the ground's
+ * own colour feathers on all four sides at once while staying bounded to the
+ * text's height, so the arc still rises into the band below the footer. */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-rig-pane .primal-rig-page {
+	position: relative;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-rig-pane .primal-rig-page::before {
+	content: '';
+	position: absolute;
+	inset: -96px -48px -32px;
+	z-index: -1;
+	pointer-events: none;
+	background: var(--vscode-editor-background);
+	opacity: 0.9;
+	filter: blur(24px);
+}

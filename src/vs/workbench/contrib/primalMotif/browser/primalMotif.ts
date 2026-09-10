@@ -155,11 +155,33 @@ export function settleIntensity(elapsedMs: number): number {
 /** The element the scheduler owns inside the wallpaper's layer. */
 export const PRIMAL_MOTIF_SURFACE_CLASS = 'primal-motif-surface';
 
+/**
+ * The element a code-free pane offers as a host, through
+ * {@link IPrimalMotifService.registerStage}. The pane creates and owns it; the
+ * scheduler only mounts its one surface into it.
+ */
+export const PRIMAL_MOTIF_STAGE_CLASS = 'primal-motif-stage';
+
 /** On the workbench container while a non-static motif holds the ground. */
 export const PRIMAL_MOTIF_ON_CLASS = 'primal-motif-on';
 
 /** On the workbench container while the surface should appear without a cross-fade. */
 export const PRIMAL_MOTIF_INSTANT_CLASS = 'primal-motif-instant';
+
+/**
+ * On the workbench container while the surface is mounted on a stage rather
+ * than in the wallpaper's own layer - see {@link PrimalMotifRole}.
+ *
+ * {@link PRIMAL_MOTIF_ON_CLASS} says only that a surface exists somewhere in
+ * this window, which is not enough for the two rules in `media/primalMotif.css`
+ * that trade something away *because* the motif is holding the chrome's ground:
+ * the wallpaper's `background-image` seam and the `tintSlabs` revocation. Both
+ * of those premises are false for a staged surface - it is inside an editor
+ * pane, nowhere near the wash it would otherwise be compositing over and
+ * nowhere near the slabs the tint bleeds through - so they are written to skip
+ * this class rather than to key on the presence of a surface alone.
+ */
+export const PRIMAL_MOTIF_STAGED_CLASS = 'primal-motif-staged';
 
 /**
  * The other chrome designs that ship in this fork, both of which own the ground
@@ -208,6 +230,23 @@ export interface IMotifPalette {
 }
 
 /**
+ * What kind of ground a motif has been handed.
+ *
+ * A literal union rather than a boolean, deliberately: the next host this layer
+ * grows - a full-window overlay, a splash, an empty-group watermark - is then a
+ * new member and a new `switch` arm, not a second flag that has to be read
+ * together with the first to mean anything.
+ *
+ * `ground` is the workbench chrome's own strip: the ~35px title bar, the status
+ * bar and the slabs' corner notches, which is all the ground a workbench with
+ * four flush opaque slabs actually shows.
+ * `stage` is a large code-free pane - Primal Start, the Rig - which is mostly
+ * empty and is therefore the one place a picture can be big enough to read as
+ * one. A motif that does not care may ignore this entirely.
+ */
+export type PrimalMotifRole = 'ground' | 'stage';
+
+/**
  * Everything a motif is given. Note what is absent: no window, no document, no
  * scheduler, no service. A motif can paint and it can report that it cannot,
  * and that is the whole of its authority.
@@ -215,6 +254,9 @@ export interface IMotifPalette {
 export interface IMotifHost {
 	/** The element the motif paints into. A `<canvas>` for the canvas kinds, a `<div>` for `css`. */
 	readonly element: HTMLElement;
+
+	/** What kind of ground this is. See {@link PrimalMotifRole}. */
+	readonly role: PrimalMotifRole;
 
 	/** The fixed backing store, in device-independent buffer pixels. Never the device resolution. */
 	readonly bufferWidth: number;
@@ -456,6 +498,50 @@ export interface IPrimalMotifService {
 
 	/** Pauses or resumes perpetual motion. Persists for the session only. */
 	setPaused(paused: boolean): void;
+
+	/**
+	 * Offers a code-free pane as this window's motif host, and returns the
+	 * disposable that withdraws the offer.
+	 *
+	 * One method, and no `start`, `stop`, timing or frame rate reaches the
+	 * caller: a pane says only "there is ground here", and the scheduler still
+	 * decides everything else. The offer is honoured on the next re-resolve
+	 * rather than where the caller stands, because panes are created, hidden,
+	 * shown, moved between groups and disposed far more often than containers
+	 * are, and reconciling a surface synchronously from inside a pane callback
+	 * would rebuild a graphics context on every one of those.
+	 *
+	 * It does NOT add a surface. There is still exactly one per container: a
+	 * stage REPLACES the wallpaper layer as the mount for that window's single
+	 * surface. That is the whole performance argument (a no-op passthrough
+	 * shader at 120fps took an M3 Pro from ~2% to 95% GPU, each extra surface
+	 * adding ~25%), and it is kept structural rather than tuned.
+	 *
+	 * @param container the workbench container the pane lives in, from
+	 * `IWorkbenchLayoutService.getContainer(getWindow(element))`. Never the pane.
+	 * @param element the pane's own stage element - see {@link PRIMAL_MOTIF_STAGE_CLASS}.
+	 */
+	registerStage(container: HTMLElement, element: HTMLElement): IDisposable;
+
+	/**
+	 * Tells this container's surface that its host's CSS box may have changed.
+	 *
+	 * The cheap half of {@link trigger}, and the only half a layout is entitled
+	 * to. `trigger` re-resolves the whole ladder and re-arms the frame chain at
+	 * `now`, which defeats the plan's own frame-rate ceiling: a pane forwarding
+	 * every mouse-move of a sash drag through it would render at the display's
+	 * cadence rather than at the 30fps the ladder decided on, synchronously
+	 * inside the workbench's layout pass. A resize needs none of that. It needs
+	 * the surface re-measured and the picture repainted at the new shape, which
+	 * is what this does and all it does.
+	 *
+	 * Coalesced, so a burst of layouts in one turn costs one re-measure, and
+	 * deferred out of the caller's layout pass, so the forced geometry read is
+	 * not interleaved with the workbench's own layout writes.
+	 *
+	 * @param container the workbench container, exactly as for {@link registerStage}.
+	 */
+	relayout(container: HTMLElement): void;
 }
 
 /**
