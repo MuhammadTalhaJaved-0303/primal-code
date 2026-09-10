@@ -180,19 +180,19 @@
 		"problemsInfoIcon.foreground": "#648099",
 		"editorGutter.background": "#131211",
 		"editorGutter.addedBackground": "#6A845C",
-		"editorGutter.deletedBackground": "#F9C2B8",
-		"editorGutter.modifiedBackground": "#8DABC5",
+		"editorGutter.deletedBackground": "#F9C4BB",
+		"editorGutter.modifiedBackground": "#8EACC6",
 		"diffEditor.insertedTextBackground": "#54674A4D",
 		"diffEditor.insertedLineBackground": "#3A4B3040",
-		"diffEditor.removedTextBackground": "#FAD1C94D",
-		"diffEditor.removedLineBackground": "#FAD4CD40",
+		"diffEditor.removedTextBackground": "#FAD2CB4D",
+		"diffEditor.removedLineBackground": "#FAD2CB40",
 		"diffEditor.unchangedRegionBackground": "#191817",
 		"diffEditor.diagonalFill": "#2B282699",
 		"editorOverviewRuler.border": "#00000000",
 		"editorOverviewRuler.findMatchForeground": "#92794A66",
 		"editorOverviewRuler.addedForeground": "#6A845C",
-		"editorOverviewRuler.modifiedForeground": "#8DABC5",
-		"editorOverviewRuler.deletedForeground": "#F9C2B8",
+		"editorOverviewRuler.modifiedForeground": "#8EACC6",
+		"editorOverviewRuler.deletedForeground": "#F9C4BB",
 		"editorOverviewRuler.errorForeground": "#D4897D",
 		"editorOverviewRuler.warningForeground": "#92794A",
 		"editorOverviewRuler.infoForeground": "#648099",
@@ -297,14 +297,14 @@
 		"terminal.ansiBrightCyan": "#A6CFC7",
 		"terminal.ansiBrightWhite": "#E8E4DE",
 		"gitDecoration.addedResourceForeground": "#6A845C",
-		"gitDecoration.modifiedResourceForeground": "#8DABC5",
-		"gitDecoration.deletedResourceForeground": "#F9C2B8",
+		"gitDecoration.modifiedResourceForeground": "#8EACC6",
+		"gitDecoration.deletedResourceForeground": "#F9C4BB",
 		"gitDecoration.renamedResourceForeground": "#6A845C",
 		"gitDecoration.untrackedResourceForeground": "#8F758A",
 		"gitDecoration.ignoredResourceForeground": "#6E6862",
-		"gitDecoration.conflictingResourceForeground": "#CE9B73",
-		"gitDecoration.stageModifiedResourceForeground": "#8DABC5",
-		"gitDecoration.stageDeletedResourceForeground": "#F9C2B8",
+		"gitDecoration.conflictingResourceForeground": "#CF9C74",
+		"gitDecoration.stageModifiedResourceForeground": "#8EACC6",
+		"gitDecoration.stageDeletedResourceForeground": "#F9C4BB",
 		"gitDecoration.submoduleResourceForeground": "#648099",
 		"notificationCenter.border": "#2B2826",
 		"notificationCenterHeader.background": "#201E1C",
@@ -337,7 +337,7 @@
 		"keybindingLabel.border": "#383430",
 		"keybindingLabel.bottomBorder": "#383430",
 		"settings.headerForeground": "#E8E4DE",
-		"settings.modifiedItemIndicator": "#8DABC5",
+		"settings.modifiedItemIndicator": "#8EACC6",
 		"settings.dropdownBackground": "#1B1A18",
 		"settings.dropdownBorder": "#383430",
 		"settings.dropdownListBorder": "#2B2826",
@@ -360,7 +360,7 @@
 		"debugToolBar.border": "#2B2826",
 		"debugIcon.breakpointForeground": "#D4897D",
 		"debugIcon.startForeground": "#6A845C",
-		"debugIcon.stopForeground": "#F9C2B8",
+		"debugIcon.stopForeground": "#F9C4BB",
 		"debugIcon.restartForeground": "#6A845C",
 		"debugIcon.pauseForeground": "#648099",
 		"debugConsole.errorForeground": "#D4897D",
@@ -390,7 +390,7 @@
 		"charts.red": "#C1786C",
 		"charts.blue": "#7D9AB4",
 		"charts.yellow": "#BEA474",
-		"charts.orange": "#CE9B73",
+		"charts.orange": "#CF9C74",
 		"charts.green": "#8BA67D",
 		"charts.purple": "#A58AA0",
 		"editorCommentsWidget.rangeBackground": "#E8E4DE1A",
@@ -405,7 +405,7 @@
 		"chat.avatarForeground": "#E8E4DE",
 		"chat.editedFileForeground": "#92794A",
 		"chat.linesAddedForeground": "#6A845C",
-		"chat.linesRemovedForeground": "#F9C2B8",
+		"chat.linesRemovedForeground": "#F9C4BB",
 		"chat.inputWorkingBorderColor1": "#E8E4DE",
 		"chat.inputWorkingBorderColor2": "#807A73",
 		"chat.inputWorkingBorderColor3": "#F5F2ED",
@@ -418,7 +418,7 @@
 		"inlineChatInput.focusBorder": "#E8E4DEB3",
 		"inlineChatInput.placeholderForeground": "#807A73",
 		"inlineChatDiff.inserted": "#4152374D",
-		"inlineChatDiff.removed": "#E6BDB54D",
+		"inlineChatDiff.removed": "#E6BEB74D",
 		"interactive.activeCodeBorder": "#807A73",
 		"interactive.inactiveCodeBorder": "#2B2826",
 		"agents.background": "#131211",
@@ -703,7 +703,7 @@
 				"punctuation.definition.deleted"
 			],
 			"settings": {
-				"foreground": "#F9C2B8"
+				"foreground": "#F9C4BB"
 			}
 		},
 		{
@@ -712,7 +712,7 @@
 				"punctuation.definition.changed"
 			],
 			"settings": {
-				"foreground": "#8DABC5"
+				"foreground": "#8EACC6"
 			}
 		},
 		{

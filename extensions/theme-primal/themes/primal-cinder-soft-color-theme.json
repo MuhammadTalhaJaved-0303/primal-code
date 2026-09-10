@@ -180,8 +180,8 @@
 		"problemsInfoIcon.foreground": "#6E79B0",
 		"editorGutter.background": "#1A0F0A",
 		"editorGutter.addedBackground": "#7A8229",
-		"editorGutter.deletedBackground": "#F9CBC4",
-		"editorGutter.modifiedBackground": "#9EABE5",
+		"editorGutter.deletedBackground": "#FACCC5",
+		"editorGutter.modifiedBackground": "#9FABE5",
 		"diffEditor.insertedTextBackground": "#60662A4D",
 		"diffEditor.insertedLineBackground": "#44481340",
 		"diffEditor.removedTextBackground": "#EDCAC54D",
@@ -191,8 +191,8 @@
 		"editorOverviewRuler.border": "#00000000",
 		"editorOverviewRuler.findMatchForeground": "#9E752A66",
 		"editorOverviewRuler.addedForeground": "#7A8229",
-		"editorOverviewRuler.modifiedForeground": "#9EABE5",
-		"editorOverviewRuler.deletedForeground": "#F9CBC4",
+		"editorOverviewRuler.modifiedForeground": "#9FABE5",
+		"editorOverviewRuler.deletedForeground": "#FACCC5",
 		"editorOverviewRuler.errorForeground": "#F37769",
 		"editorOverviewRuler.warningForeground": "#9E752A",
 		"editorOverviewRuler.infoForeground": "#6E79B0",
@@ -297,14 +297,14 @@
 		"terminal.ansiBrightCyan": "#95F2E1",
 		"terminal.ansiBrightWhite": "#FFFAF4",
 		"gitDecoration.addedResourceForeground": "#7A8229",
-		"gitDecoration.modifiedResourceForeground": "#9EABE5",
-		"gitDecoration.deletedResourceForeground": "#F9CBC4",
+		"gitDecoration.modifiedResourceForeground": "#9FABE5",
+		"gitDecoration.deletedResourceForeground": "#FACCC5",
 		"gitDecoration.renamedResourceForeground": "#7A8229",
 		"gitDecoration.untrackedResourceForeground": "#B96179",
 		"gitDecoration.ignoredResourceForeground": "#765E4D",
-		"gitDecoration.conflictingResourceForeground": "#F49345",
-		"gitDecoration.stageModifiedResourceForeground": "#9EABE5",
-		"gitDecoration.stageDeletedResourceForeground": "#F9CBC4",
+		"gitDecoration.conflictingResourceForeground": "#F49446",
+		"gitDecoration.stageModifiedResourceForeground": "#9FABE5",
+		"gitDecoration.stageDeletedResourceForeground": "#FACCC5",
 		"gitDecoration.submoduleResourceForeground": "#6E79B0",
 		"notificationCenter.border": "#3C2116",
 		"notificationCenterHeader.background": "#2C1910",
@@ -337,7 +337,7 @@
 		"keybindingLabel.border": "#472C20",
 		"keybindingLabel.bottomBorder": "#472C20",
 		"settings.headerForeground": "#F0D8C0",
-		"settings.modifiedItemIndicator": "#9EABE5",
+		"settings.modifiedItemIndicator": "#9FABE5",
 		"settings.dropdownBackground": "#21130D",
 		"settings.dropdownBorder": "#472C20",
 		"settings.dropdownListBorder": "#3C2116",
@@ -360,7 +360,7 @@
 		"debugToolBar.border": "#3C2116",
 		"debugIcon.breakpointForeground": "#F37769",
 		"debugIcon.startForeground": "#7A8229",
-		"debugIcon.stopForeground": "#F9CBC4",
+		"debugIcon.stopForeground": "#FACCC5",
 		"debugIcon.restartForeground": "#7A8229",
 		"debugIcon.pauseForeground": "#6E79B0",
 		"debugConsole.errorForeground": "#F37769",
@@ -390,7 +390,7 @@
 		"charts.red": "#F2685A",
 		"charts.blue": "#9AA6E0",
 		"charts.yellow": "#F0B23A",
-		"charts.orange": "#F49345",
+		"charts.orange": "#F49446",
 		"charts.green": "#B8C24A",
 		"charts.purple": "#E68AA2",
 		"editorCommentsWidget.rangeBackground": "#9AA6E01A",
@@ -405,7 +405,7 @@
 		"chat.avatarForeground": "#F0D8C0",
 		"chat.editedFileForeground": "#9E752A",
 		"chat.linesAddedForeground": "#7A8229",
-		"chat.linesRemovedForeground": "#F9CBC4",
+		"chat.linesRemovedForeground": "#FACCC5",
 		"chat.inputWorkingBorderColor1": "#9AA6E0",
 		"chat.inputWorkingBorderColor2": "#7A6150",
 		"chat.inputWorkingBorderColor3": "#BCC4EB",
@@ -418,7 +418,7 @@
 		"inlineChatInput.focusBorder": "#9AA6E0B3",
 		"inlineChatInput.placeholderForeground": "#8B7260",
 		"inlineChatDiff.inserted": "#575D1F40",
-		"inlineChatDiff.removed": "#FCE2DE40",
+		"inlineChatDiff.removed": "#FCE0DC40",
 		"interactive.activeCodeBorder": "#7A6150",
 		"interactive.inactiveCodeBorder": "#3C2116",
 		"agents.background": "#1A0F0A",
@@ -699,7 +699,7 @@
 				"punctuation.definition.deleted"
 			],
 			"settings": {
-				"foreground": "#F9CBC4"
+				"foreground": "#FACCC5"
 			}
 		},
 		{
@@ -708,7 +708,7 @@
 				"punctuation.definition.changed"
 			],
 			"settings": {
-				"foreground": "#9EABE5"
+				"foreground": "#9FABE5"
 			}
 		},
 		{
