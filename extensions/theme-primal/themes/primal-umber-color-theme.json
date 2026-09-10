@@ -418,7 +418,7 @@
 		"inlineChatInput.focusBorder": "#8AA6C0B3",
 		"inlineChatInput.placeholderForeground": "#7E7461",
 		"inlineChatDiff.inserted": "#545D1F40",
-		"inlineChatDiff.removed": "#FBDCD440",
+		"inlineChatDiff.removed": "#FBD9D040",
 		"interactive.activeCodeBorder": "#6E6450",
 		"interactive.inactiveCodeBorder": "#2F2A1B",
 		"agents.background": "#13110E",

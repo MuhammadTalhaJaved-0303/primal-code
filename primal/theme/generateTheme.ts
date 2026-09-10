@@ -95,12 +95,12 @@ import {
 	type Rgb
 } from "./color.ts";
 
-import { CVD_TYPES, simulateCvd } from "./cvd.ts";
-
-// The gate's own CIEDE2000, imported rather than reimplemented. The generator
+// The gate's own CIEDE2000 and its own observer list, imported from the module
+// validateTheme.ts imports them from, rather than reimplemented. The generator
 // has to optimise the number the validator will report, or the two files agree
-// about a theme only by luck.
-import { perceptualDistanceOfHex } from "./validateTheme.ts";
+// about a theme only by luck — and when they disagreed by an 8-bit rounding
+// step they did exactly that. See worstObserverDistance.
+import { OBSERVERS, perceptualDistance } from "../../src/vs/base/common/primalColorScience.ts";
 
 // ---------------------------------------------------------------------------
 // The semantic ladders.
@@ -555,19 +555,31 @@ function placeOnLadder(C: number, h: number, L: number): string {
  * Perceptual distance between two emitted hexes under the worst of the four
  * observers validateTheme.ts simulates.
  *
- * This is the gate's own CIEDE2000 and the gate's own dichromacy model, called
- * through their exported entry points rather than reimplemented, so the number
- * the generator optimises and the number the validator reports cannot drift.
+ * This calls `perceptualDistance` — the gate's own entry point — once per
+ * observer, on the parsed triples. It used to simulate each observer here and
+ * push the result back through `formatHex` before measuring, which re-quantised
+ * the simulated colour to 8 bits; the gate measures the unrounded triple, and
+ * `simulateCvd` says so in as many words ("distances measured on simulated
+ * colours are not quantised by an 8-bit round trip").
+ *
+ * The docstring that used to sit here claimed the two numbers "cannot drift".
+ * They did: over 200,000 random pairs the generator read between 0.96 dE00
+ * below and 1.14 dE00 above the gate, and 0.099% of pairs landed on the wrong
+ * side of the threshold. Because the ladder search stops at the FIRST lightness
+ * clearing its target, it selects for boundary pairs on purpose, so the error
+ * concentrated exactly where it did damage: 4.91% of themes whose `assertLadder`
+ * passed were then failed by `validate` on semantic separation.
+ *
+ * Measuring the way the gate measures makes the disagreement identically zero
+ * rather than something a tolerance has to cover.
  */
 function worstObserverDistance(a: string, b: string): { readonly deltaE: number; readonly observer: string } {
-	let deltaE = perceptualDistanceOfHex(a, b);
-	let observer = "normal";
 	const parsedA = parseHex(a);
 	const parsedB = parseHex(b);
-	for (const type of CVD_TYPES) {
-		const seenA = formatHex(simulateCvd({ r: parsedA.r, g: parsedA.g, b: parsedA.b }, type));
-		const seenB = formatHex(simulateCvd({ r: parsedB.r, g: parsedB.g, b: parsedB.b }, type));
-		const distance = perceptualDistanceOfHex(seenA, seenB);
+	let deltaE = Number.POSITIVE_INFINITY;
+	let observer = "normal";
+	for (const type of OBSERVERS) {
+		const distance = perceptualDistance(parsedA, parsedB, type);
 		if (distance < deltaE) {
 			deltaE = distance;
 			observer = type;
