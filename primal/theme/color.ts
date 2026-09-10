@@ -44,245 +44,93 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** sRGB, 8-bit per channel, the space every theme hex is written in. */
-export interface Rgb {
-	readonly r: number;
-	readonly g: number;
-	readonly b: number;
-}
-
-/** An sRGB colour with an alpha in 0..1. Alpha 1 means an opaque `#RRGGBB`. */
-export interface Rgba extends Rgb {
-	readonly alpha: number;
-}
-
-/** Linear-light sRGB, channels in 0..1 (may fall outside when out of gamut). */
-export interface LinearRgb {
-	readonly r: number;
-	readonly g: number;
-	readonly b: number;
-}
-
-/** OKLab. L in 0..1, a/b roughly -0.4..0.4. */
-export interface Oklab {
-	readonly L: number;
-	readonly a: number;
-	readonly b: number;
-}
-
-/** OKLCH: OKLab in polar form. L in 0..1, C >= 0, h in degrees 0..360. */
-export interface Oklch {
-	readonly L: number;
-	readonly C: number;
-	readonly h: number;
-}
+import {
+	compositeOver,
+	contrastRatio,
+	formatHexColor,
+	formatHexaColor,
+	inGamut,
+	linearToOklab,
+	linearToRgb,
+	linearToSrgb,
+	maxChroma,
+	oklabToLinear,
+	oklabToOklch,
+	oklchToOklab,
+	oklchToRgb,
+	relativeLuminance,
+	rgbToLinear,
+	rgbToOklch,
+	srgbToLinear,
+	tryParseHexColor,
+	type LinearRgb,
+	type Oklab,
+	type Oklch,
+	type Rgb,
+	type Rgba
+} from "../../src/vs/base/common/primalColorScience.ts";
 
 // ---------------------------------------------------------------------------
-// Hex parsing and formatting
+// Where the maths lives now
 // ---------------------------------------------------------------------------
+//
+// The primitives below used to be implemented in this file. They moved to
+// src/vs/base/common/primalColorScience.ts so that the WORKBENCH can compute the
+// same verdict at runtime for any theme a user installs - the theme gallery does
+// exactly that. There is one implementation; this file re-exports it under the
+// names the generator has always used, and keeps the derived helpers and the
+// --check suite, which is what verifies the shared code against published
+// reference data.
+//
+// The shared module deliberately has no imports of its own: this file reaches it
+// by a relative .ts path under `node --experimental-strip-types`, which cannot
+// resolve the `.js` specifiers the rest of src/vs uses.
 
-const HEX_PATTERN = /^#?([0-9a-fA-F]{3,8})$/;
+export type { LinearRgb, Oklab, Oklch, Rgb, Rgba };
+export {
+	compositeOver,
+	contrastRatio,
+	inGamut,
+	linearToOklab,
+	linearToRgb,
+	linearToSrgb,
+	maxChroma,
+	oklabToLinear,
+	oklabToOklch,
+	oklchToOklab,
+	oklchToRgb,
+	relativeLuminance,
+	rgbToLinear,
+	rgbToOklch,
+	srgbToLinear
+};
+
+/** Formats as uppercase `#RRGGBB`. Alpha is dropped; use `formatHexa` to keep it. */
+export const formatHex = formatHexColor;
+
+/** Formats as `#RRGGBB`, or `#RRGGBBAA` when alpha is below 1. */
+export const formatHexa = formatHexaColor;
+
+/**
+ * Parses `#RGB`, `#RGBA`, `#RRGGBB` or `#RRGGBBAA`. Throws on anything else - a
+ * malformed hex in a palette is a bug in the palette, not something to silently
+ * default away. The workbench needs a non-throwing reader instead, so the parse
+ * itself lives in the shared module as `tryParseHexColor` and this is its
+ * build-time wrapper.
+ */
+export function parseHex(hex: string): Rgba {
+	const parsed = tryParseHexColor(hex);
+	if (parsed === undefined) throw new Error(`color: not a hex colour: ${JSON.stringify(hex)}`);
+	return parsed;
+}
 
 function clamp(value: number, min: number, max: number): number {
 	return value < min ? min : value > max ? max : value;
 }
 
-function byte(value: number): number {
-	return clamp(Math.round(value), 0, 255);
-}
-
-/**
- * Parses `#RGB`, `#RGBA`, `#RRGGBB` or `#RRGGBBAA`. Throws on anything else -
- * a malformed hex in a palette is a bug in the palette, not something to
- * silently default away.
- */
-export function parseHex(hex: string): Rgba {
-	const match = HEX_PATTERN.exec(hex.trim());
-	if (match === null) throw new Error(`color: not a hex colour: ${JSON.stringify(hex)}`);
-	const digits = match[1];
-	const expand = (pair: string): number => parseInt(pair.length === 1 ? pair + pair : pair, 16);
-
-	switch (digits.length) {
-		case 3:
-			return { r: expand(digits[0]), g: expand(digits[1]), b: expand(digits[2]), alpha: 1 };
-		case 4:
-			return { r: expand(digits[0]), g: expand(digits[1]), b: expand(digits[2]), alpha: expand(digits[3]) / 255 };
-		case 6:
-			return { r: expand(digits.slice(0, 2)), g: expand(digits.slice(2, 4)), b: expand(digits.slice(4, 6)), alpha: 1 };
-		case 8:
-			return {
-				r: expand(digits.slice(0, 2)),
-				g: expand(digits.slice(2, 4)),
-				b: expand(digits.slice(4, 6)),
-				alpha: expand(digits.slice(6, 8)) / 255
-			};
-		default:
-			throw new Error(`color: hex colour must have 3, 4, 6 or 8 digits: ${JSON.stringify(hex)}`);
-	}
-}
-
-function hex2(value: number): string {
-	return byte(value).toString(16).toUpperCase().padStart(2, "0");
-}
-
-/** Formats as uppercase `#RRGGBB`. Alpha is dropped; use `formatHexa` to keep it. */
-export function formatHex(rgb: Rgb): string {
-	return `#${hex2(rgb.r)}${hex2(rgb.g)}${hex2(rgb.b)}`;
-}
-
-/** Formats as `#RRGGBB`, or `#RRGGBBAA` when alpha is below 1. */
-export function formatHexa(rgba: Rgba): string {
-	const base = formatHex(rgba);
-	if (rgba.alpha >= 1) return base;
-	return base + hex2(rgba.alpha * 255);
-}
-
-// ---------------------------------------------------------------------------
-// sRGB transfer function
-// ---------------------------------------------------------------------------
-
-/** sRGB 0..1 -> linear-light 0..1. The IEC 61966-2-1 piecewise curve. */
-export function srgbToLinear(channel: number): number {
-	return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
-}
-
-/** Linear-light 0..1 -> sRGB 0..1. Inverse of `srgbToLinear`. */
-export function linearToSrgb(channel: number): number {
-	return channel <= 0.0031308 ? channel * 12.92 : 1.055 * Math.pow(channel, 1 / 2.4) - 0.055;
-}
-
-/** 8-bit sRGB -> linear-light. */
-export function rgbToLinear(rgb: Rgb): LinearRgb {
-	return {
-		r: srgbToLinear(rgb.r / 255),
-		g: srgbToLinear(rgb.g / 255),
-		b: srgbToLinear(rgb.b / 255)
-	};
-}
-
-/** Linear-light -> 8-bit sRGB, clamped into gamut. Use `inGamut` to test first. */
-export function linearToRgb(linear: LinearRgb): Rgb {
-	return {
-		r: byte(linearToSrgb(clamp(linear.r, 0, 1)) * 255),
-		g: byte(linearToSrgb(clamp(linear.g, 0, 1)) * 255),
-		b: byte(linearToSrgb(clamp(linear.b, 0, 1)) * 255)
-	};
-}
-
-/** True when a linear-light colour is representable in sRGB without clipping. */
-export function inGamut(linear: LinearRgb, epsilon = 1e-6): boolean {
-	return (
-		linear.r >= -epsilon && linear.r <= 1 + epsilon &&
-		linear.g >= -epsilon && linear.g <= 1 + epsilon &&
-		linear.b >= -epsilon && linear.b <= 1 + epsilon
-	);
-}
-
-// ---------------------------------------------------------------------------
-// WCAG relative luminance and contrast
-// ---------------------------------------------------------------------------
-
-/** WCAG 2.x relative luminance, 0 (black) .. 1 (white). */
-export function relativeLuminance(rgb: Rgb): number {
-	const linear = rgbToLinear(rgb);
-	return 0.2126 * linear.r + 0.7152 * linear.g + 0.0722 * linear.b;
-}
-
-/** WCAG 2.x contrast ratio, 1..21. Order of the arguments does not matter. */
-export function contrastRatio(a: Rgb, b: Rgb): number {
-	const la = relativeLuminance(a);
-	const lb = relativeLuminance(b);
-	const lighter = Math.max(la, lb);
-	const darker = Math.min(la, lb);
-	return (lighter + 0.05) / (darker + 0.05);
-}
-
-// ---------------------------------------------------------------------------
-// OKLab / OKLCH
-// ---------------------------------------------------------------------------
-// Matrices from Bjorn Ottosson's original derivation (2020). The forward path
-// is linear sRGB -> LMS -> cube root -> OKLab; the inverse cubes and undoes it.
-
-export function linearToOklab(linear: LinearRgb): Oklab {
-	const l = 0.4122214708 * linear.r + 0.5363325363 * linear.g + 0.0514459929 * linear.b;
-	const m = 0.2119034982 * linear.r + 0.6806995451 * linear.g + 0.1073969566 * linear.b;
-	const s = 0.0883024619 * linear.r + 0.2817188376 * linear.g + 0.6299787005 * linear.b;
-
-	const l_ = Math.cbrt(l);
-	const m_ = Math.cbrt(m);
-	const s_ = Math.cbrt(s);
-
-	return {
-		L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-		a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-		b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
-	};
-}
-
-export function oklabToLinear(lab: Oklab): LinearRgb {
-	const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
-	const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
-	const s_ = lab.L - 0.0894841775 * lab.a - 1.2914855480 * lab.b;
-
-	const l = l_ * l_ * l_;
-	const m = m_ * m_ * m_;
-	const s = s_ * s_ * s_;
-
-	return {
-		r: +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-		g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-		b: -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
-	};
-}
-
-export function oklabToOklch(lab: Oklab): Oklch {
-	const C = Math.hypot(lab.a, lab.b);
-	// A colour with no chroma has no meaningful hue; pin it at 0 so round-trips
-	// stay deterministic instead of depending on floating-point noise in atan2.
-	const h = C < 1e-7 ? 0 : ((Math.atan2(lab.b, lab.a) * 180) / Math.PI + 360) % 360;
-	return { L: lab.L, C, h };
-}
-
-export function oklchToOklab(lch: Oklch): Oklab {
-	const radians = (lch.h * Math.PI) / 180;
-	return { L: lch.L, a: Math.cos(radians) * lch.C, b: Math.sin(radians) * lch.C };
-}
-
-/** 8-bit sRGB -> OKLCH. */
-export function rgbToOklch(rgb: Rgb): Oklch {
-	return oklabToOklch(linearToOklab(rgbToLinear(rgb)));
-}
-
 /** Convenience: hex string -> OKLCH, alpha ignored. */
 export function hexToOklch(hex: string): Oklch {
 	return rgbToOklch(parseHex(hex));
-}
-
-/**
- * OKLCH -> 8-bit sRGB, gamut-mapped by reducing chroma.
- *
- * Naive channel clipping shifts hue (clipping only the blue channel of an
- * out-of-gamut purple turns it pink). Instead: hold L and h, bisect C down to
- * the largest in-gamut value. Fixed iteration count, so the result is
- * deterministic - the generator must emit byte-identical JSON for a given seed.
- */
-export function oklchToRgb(lch: Oklch): Rgb {
-	const L = clamp(lch.L, 0, 1);
-	const direct = oklabToLinear(oklchToOklab({ L, C: lch.C, h: lch.h }));
-	if (inGamut(direct)) return linearToRgb(direct);
-
-	let lo = 0;
-	let hi = lch.C;
-	for (let i = 0; i < 28; i++) {
-		const mid = (lo + hi) / 2;
-		if (inGamut(oklabToLinear(oklchToOklab({ L, C: mid, h: lch.h })))) lo = mid;
-		else hi = mid;
-	}
-	return linearToRgb(oklabToLinear(oklchToOklab({ L, C: lo, h: lch.h })));
 }
 
 /** OKLCH -> `#RRGGBB`. */
@@ -310,55 +158,6 @@ export function withLightness(hex: string, L: number): string {
 export function withChromaScaled(hex: string, factor: number): string {
 	const lch = hexToOklch(hex);
 	return oklchToHex({ L: lch.L, C: Math.max(0, lch.C * factor), h: lch.h });
-}
-
-/**
- * The largest chroma sRGB can show at this lightness and hue - the gamut cusp
- * along one L/h line.
- *
- * The generator needs this because the sRGB gamut is far narrower at the light
- * and dark ends than in the middle. Moving a mid-tone colour to an extreme
- * lightness while holding its chroma presses it flat against the boundary,
- * where it stops reading as "this palette's red" and starts reading as "red".
- * Knowing where the wall is lets a caller stop short of it.
- *
- * Bisection at a fixed iteration count, so it is deterministic.
- */
-export function maxChroma(L: number, h: number): number {
-	let lo = 0;
-	let hi = 0.5; // Comfortably outside sRGB at every hue.
-	for (let i = 0; i < 28; i++) {
-		const mid = (lo + hi) / 2;
-		if (inGamut(oklabToLinear(oklchToOklab({ L: clamp(L, 0, 1), C: mid, h })))) lo = mid;
-		else hi = mid;
-	}
-	return lo;
-}
-
-// ---------------------------------------------------------------------------
-// Alpha compositing
-// ---------------------------------------------------------------------------
-
-/**
- * Composites `fg` over an opaque `bg` using source-over, in LINEAR light.
- *
- * Compositing in gamma-encoded sRGB - the naive `fg*a + bg*(1-a)` on 8-bit
- * values - is what makes a 50%-alpha overlay look wrong; it is what the CSS
- * spec calls out and what the GPU actually avoids. Doing it in linear light is
- * what the workbench compositor does, so the number this returns is the colour
- * the user really sees, which is the only one worth measuring contrast on.
- */
-export function compositeOver(fg: Rgba, bg: Rgb): Rgb {
-	if (fg.alpha >= 1) return { r: fg.r, g: fg.g, b: fg.b };
-	if (fg.alpha <= 0) return { r: bg.r, g: bg.g, b: bg.b };
-	const f = rgbToLinear(fg);
-	const b = rgbToLinear(bg);
-	const a = fg.alpha;
-	return linearToRgb({
-		r: f.r * a + b.r * (1 - a),
-		g: f.g * a + b.g * (1 - a),
-		b: f.b * a + b.b * (1 - a)
-	});
 }
 
 /** `compositeOver` on hex strings. `fgHex` may carry an `AA` suffix. */

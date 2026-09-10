@@ -60,167 +60,49 @@
  */
 
 /** A colour in sRGB, channels 0..255. Not necessarily integral: simulation output is continuous. */
-export interface Rgb {
-	readonly r: number;
-	readonly g: number;
-	readonly b: number;
-}
+import {
+	applyMatrix3,
+	CVD_LINEAR_RGB_FROM_LMS,
+	CVD_LMS_FROM_LINEAR_RGB,
+	CVD_MISSING_CONE,
+	CVD_PLANE_COEFFICIENTS,
+	CVD_TYPES,
+	linearToSrgb,
+	linearTripleToRgb,
+	rgbToLinearTriple,
+	simulateCvd,
+	srgbToLinear,
+	type CvdType,
+	type Rgb,
+	type Vector3
+} from "../../src/vs/base/common/primalColorScience.ts";
 
-export type CvdType = "protanopia" | "deuteranopia" | "tritanopia";
+// ---------------------------------------------------------------------------
+// Where the maths lives now
+// ---------------------------------------------------------------------------
+//
+// The derivation described above used to be implemented here. It moved to
+// src/vs/base/common/primalColorScience.ts so the WORKBENCH can run the same
+// simulation at runtime - the theme gallery scores every installed theme for a
+// dichromat, which is the one check the build-time validator could never reach.
+// There is one implementation. This file re-exports it under the names the
+// generator has always used and keeps the --self-test below, which is what ties
+// the derived planes to the published coefficients.
 
-/** The three dichromacies, in the order reports should list them. */
-export const CVD_TYPES: readonly CvdType[] = ["protanopia", "deuteranopia", "tritanopia"];
-
-type Vector3 = readonly [number, number, number];
-type Matrix3 = readonly [Vector3, Vector3, Vector3];
-
-/**
- * Linear RGB -> LMS cone response.
- *
- * Smith & Pokorny cone fundamentals as tabulated by Viénot et al. (1999) for a
- * standard display primary set. The absolute scale is arbitrary and cancels: the
- * pipeline goes straight back out through the inverse.
- */
-const LMS_FROM_LINEAR_RGB: Matrix3 = [
-	[17.8824, 43.5161, 4.11935],
-	[3.45565, 27.1554, 3.86714],
-	[0.0299566, 0.184309, 1.46709],
-];
-
-/** Which cone is missing, as an index into an LMS triple. */
-const MISSING_CONE: Readonly<Record<CvdType, 0 | 1 | 2>> = {
-	protanopia: 0, // no L cone
-	deuteranopia: 1, // no M cone
-	tritanopia: 2, // no S cone
-};
-
-/**
- * The anchor stimulus each dichromatic plane is hinged to, in linear RGB.
- *
- * Brettel's anchors are monochromatic lights: 475nm and 575nm for protanopes and
- * deuteranopes, 485nm and 660nm for tritanopes. The nearest thing a display can
- * actually emit is its own primaries, and each anchor pair reduces to one plane:
- * blue and yellow for the red-green deficiencies, red and cyan for tritanopia.
- * Only one of each pair is needed - the other is its complement about the white
- * point and spans the same plane.
- */
-const PLANE_ANCHOR: Readonly<Record<CvdType, Vector3>> = {
-	protanopia: [0, 0, 1], // blue primary
-	deuteranopia: [0, 0, 1], // blue primary
-	tritanopia: [1, 0, 0], // red primary
-};
-
-function invert3(m: Matrix3): Matrix3 {
-	const [[a, b, c], [d, e, f], [g, h, i]] = m;
-	const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-	if (!Number.isFinite(det) || Math.abs(det) < 1e-12) {
-		throw new Error(`cvd: cone-response matrix is singular (det=${det}); cannot invert`);
-	}
-	return [
-		[(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det],
-		[(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det],
-		[(d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det],
-	];
-}
-
-function apply3(m: Matrix3, v: Vector3): Vector3 {
-	return [
-		m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
-		m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
-		m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
-	];
-}
-
-function cross(a: Vector3, b: Vector3): Vector3 {
-	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-const LINEAR_RGB_FROM_LMS: Matrix3 = invert3(LMS_FROM_LINEAR_RGB);
-
-/** LMS of equal-energy display white: the neutral axis every dichromatic plane contains. */
-const WHITE_LMS: Vector3 = apply3(LMS_FROM_LINEAR_RGB, [1, 1, 1]);
-
-/**
- * The two coefficients that reconstruct the missing cone's response from the other
- * two, i.e. the equation of the dichromatic plane, solved for the missing axis.
- *
- * The plane through the origin containing white and the anchor has normal
- * n = white x anchor. Requiring n . lms = 0 and holding the two present cone
- * responses fixed gives the missing one as a linear combination of them.
- */
-function derivePlaneCoefficients(type: CvdType): readonly [number, number] {
-	const missing = MISSING_CONE[type];
-	const anchorLms = apply3(LMS_FROM_LINEAR_RGB, PLANE_ANCHOR[type]);
-	const normal = cross(WHITE_LMS, anchorLms);
-	if (Math.abs(normal[missing]) < 1e-9) {
-		throw new Error(
-			`cvd: the ${type} plane is parallel to the missing cone axis; anchor ${PLANE_ANCHOR[type].join()} cannot define it`
-		);
-	}
-	const present = [0, 1, 2].filter((i) => i !== missing) as [number, number];
-	return [-normal[present[0]] / normal[missing], -normal[present[1]] / normal[missing]];
-}
-
-const PLANE_COEFFICIENTS: Readonly<Record<CvdType, readonly [number, number]>> = {
-	protanopia: derivePlaneCoefficients("protanopia"),
-	deuteranopia: derivePlaneCoefficients("deuteranopia"),
-	tritanopia: derivePlaneCoefficients("tritanopia"),
-};
-
-/** sRGB electro-optical transfer function (IEC 61966-2-1). Channel in 0..1. */
-export function srgbToLinear(channel: number): number {
-	return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
-}
-
-/** Inverse of srgbToLinear. Channel in 0..1. */
-export function linearToSrgb(channel: number): number {
-	return channel <= 0.0031308 ? channel * 12.92 : 1.055 * Math.pow(channel, 1 / 2.4) - 0.055;
-}
-
-function clamp01(value: number): number {
-	return value < 0 ? 0 : value > 1 ? 1 : value;
-}
+export type { CvdType, Rgb, Vector3 };
+export { CVD_TYPES, linearToSrgb, simulateCvd, srgbToLinear };
 
 /** sRGB 0..255 -> linear RGB 0..1. */
-export function toLinear(rgb: Rgb): Vector3 {
-	return [
-		srgbToLinear(clamp01(rgb.r / 255)),
-		srgbToLinear(clamp01(rgb.g / 255)),
-		srgbToLinear(clamp01(rgb.b / 255)),
-	];
-}
+export const toLinear = rgbToLinearTriple;
 
 /** linear RGB 0..1 -> sRGB 0..255, clipped to the displayable cube. */
-export function fromLinear(linear: Vector3): Rgb {
-	return {
-		r: clamp01(linearToSrgb(clamp01(linear[0]))) * 255,
-		g: clamp01(linearToSrgb(clamp01(linear[1]))) * 255,
-		b: clamp01(linearToSrgb(clamp01(linear[2]))) * 255,
-	};
-}
+export const fromLinear = linearTripleToRgb;
 
-/** Project an LMS triple onto the plane a dichromat of this type can see. */
-function projectLms(lms: Vector3, type: CvdType): Vector3 {
-	const missing = MISSING_CONE[type];
-	const [first, second] = PLANE_COEFFICIENTS[type];
-	const present = [0, 1, 2].filter((i) => i !== missing) as [number, number];
-	const replaced = first * lms[present[0]] + second * lms[present[1]];
-	const out: [number, number, number] = [lms[0], lms[1], lms[2]];
-	out[missing] = replaced;
-	return out;
-}
-
-/**
- * Render `rgb` as a dichromat of the given type sees it.
- *
- * Returns a new colour; the input is never touched. Output channels are continuous
- * (not rounded) so perceptual distances measured on simulated colours are not
- * quantised by an 8-bit round trip.
- */
-export function simulateCvd(rgb: Rgb, type: CvdType): Rgb {
-	const lms = apply3(LMS_FROM_LINEAR_RGB, toLinear(rgb));
-	return fromLinear(apply3(LINEAR_RGB_FROM_LMS, projectLms(lms, type)));
-}
+const LMS_FROM_LINEAR_RGB = CVD_LMS_FROM_LINEAR_RGB;
+const LINEAR_RGB_FROM_LMS = CVD_LINEAR_RGB_FROM_LMS;
+const MISSING_CONE = CVD_MISSING_CONE;
+const PLANE_COEFFICIENTS = CVD_PLANE_COEFFICIENTS;
+const apply3 = applyMatrix3;
 
 // ---------------------------------------------------------------------------
 // Self-test. Not a substitute for validateTheme.ts's checks: it exists so that a

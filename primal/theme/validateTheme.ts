@@ -38,7 +38,20 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CVD_TYPES, simulateCvd, srgbToLinear, type CvdType, type Rgb } from "./cvd.ts";
+import { CVD_TYPES, simulateCvd, type CvdType, type Rgb } from "./cvd.ts";
+import {
+	contrastRatio,
+	compositeOverSrgb as composite,
+	deltaE2000,
+	formatHexColor as formatRgb,
+	lightnessWeight,
+	opaqueOf as opaque,
+	perceptualDistance,
+	rgbToLab as toLab,
+	tryParseHexColor,
+	type Lab,
+	type Rgba
+} from "../../src/vs/base/common/primalColorScience.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SHIPPING_THEMES_DIR = join(ROOT, "extensions", "theme-primal", "themes");
@@ -171,213 +184,33 @@ const MIN_PLAUSIBLE_REGISTRY_SIZE = 500;
 // Colour maths
 // ---------------------------------------------------------------------------
 
-/** An sRGB colour with straight (non-premultiplied) alpha, exactly as a theme writes it. */
-interface Rgba {
-	readonly r: number;
-	readonly g: number;
-	readonly b: number;
-	readonly a: number;
-}
-
-interface Lab {
-	readonly l: number;
-	readonly a: number;
-	readonly b: number;
-}
-
-const HEX_PATTERN = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /**
  * Parse the colour syntax a VS Code theme may use: #RGB, #RGBA, #RRGGBB, #RRGGBBAA.
  * Returns null for anything else so the caller can report it as a bad value rather
  * than silently measure garbage.
+ *
+ * The parse itself lives in src/vs/base/common/primalColorScience.ts, shared with the
+ * workbench; this only adapts its `undefined` to the `null` this file uses and
+ * refuses a non-string.
  */
+const HEX_PATTERN = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
 function parseColor(value: unknown): Rgba | null {
+	// The shared parser is deliberately forgiving (it also takes a bare "RGB" and
+	// trims). A theme file is not: a value VS Code would not accept must be
+	// reported as bad syntax, not quietly measured.
 	if (typeof value !== "string" || !HEX_PATTERN.test(value)) {
 		return null;
 	}
-	const hex = value.slice(1);
-	const expand = (short: string): number => parseInt(short + short, 16);
-	if (hex.length === 3 || hex.length === 4) {
-		return {
-			r: expand(hex[0]),
-			g: expand(hex[1]),
-			b: expand(hex[2]),
-			a: hex.length === 4 ? expand(hex[3]) / 255 : 1,
-		};
-	}
-	return {
-		r: parseInt(hex.slice(0, 2), 16),
-		g: parseInt(hex.slice(2, 4), 16),
-		b: parseInt(hex.slice(4, 6), 16),
-		a: hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1,
-	};
+	return tryParseHexColor(value) ?? null;
 }
 
-function formatRgb(rgb: Rgb): string {
-	const channel = (v: number): string => Math.round(v).toString(16).padStart(2, "0").toUpperCase();
-	return `#${channel(rgb.r)}${channel(rgb.g)}${channel(rgb.b)}`;
-}
-
-/** Flatten a translucent colour over an opaque base, the way a compositor would. */
-function composite(over: Rgba, base: Rgb): Rgb {
-	const a = over.a;
-	return {
-		r: over.r * a + base.r * (1 - a),
-		g: over.g * a + base.g * (1 - a),
-		b: over.b * a + base.b * (1 - a),
-	};
-}
-
-function opaque(colour: Rgba): Rgb {
-	return { r: colour.r, g: colour.g, b: colour.b };
-}
-
-/** WCAG 2.2 relative luminance. */
-function relativeLuminance(rgb: Rgb): number {
-	const r = srgbToLinear(Math.min(Math.max(rgb.r / 255, 0), 1));
-	const g = srgbToLinear(Math.min(Math.max(rgb.g / 255, 0), 1));
-	const b = srgbToLinear(Math.min(Math.max(rgb.b / 255, 0), 1));
-	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** WCAG 2.2 contrast ratio, 1..21. Order of arguments does not matter. */
-function contrastRatio(a: Rgb, b: Rgb): number {
-	const la = relativeLuminance(a);
-	const lb = relativeLuminance(b);
-	return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-
-/** Linear sRGB -> CIEXYZ (IEC 61966-2-1, D65). */
-const XYZ_FROM_LINEAR_SRGB: ReadonlyArray<readonly [number, number, number]> = [
-	[0.4124564, 0.3575761, 0.1804375],
-	[0.2126729, 0.7151522, 0.072175],
-	[0.0193339, 0.119192, 0.9503041],
-];
-
-/**
- * The reference white, taken as the matrix's own response to linear white rather
- * than as the tabulated D65 triple. They differ in the seventh decimal, which is
- * enough to give a pure grey a non-zero a* and b* - harmless in itself, but it
- * would mean neutrals never test as exactly neutral, and a check nobody can state
- * exactly is a check nobody trusts.
- */
-const XYZ_WHITE: readonly [number, number, number] = [
-	XYZ_FROM_LINEAR_SRGB[0][0] + XYZ_FROM_LINEAR_SRGB[0][1] + XYZ_FROM_LINEAR_SRGB[0][2],
-	XYZ_FROM_LINEAR_SRGB[1][0] + XYZ_FROM_LINEAR_SRGB[1][1] + XYZ_FROM_LINEAR_SRGB[1][2],
-	XYZ_FROM_LINEAR_SRGB[2][0] + XYZ_FROM_LINEAR_SRGB[2][1] + XYZ_FROM_LINEAR_SRGB[2][2],
-];
-
-/** sRGB -> CIELAB, D65, the white point sRGB is defined against. */
-function toLab(rgb: Rgb): Lab {
-	const r = srgbToLinear(Math.min(Math.max(rgb.r / 255, 0), 1));
-	const g = srgbToLinear(Math.min(Math.max(rgb.g / 255, 0), 1));
-	const b = srgbToLinear(Math.min(Math.max(rgb.b / 255, 0), 1));
-	const [xr, yr, zr] = XYZ_FROM_LINEAR_SRGB;
-	const x = (xr[0] * r + xr[1] * g + xr[2] * b) / XYZ_WHITE[0];
-	const y = (yr[0] * r + yr[1] * g + yr[2] * b) / XYZ_WHITE[1];
-	const z = (zr[0] * r + zr[1] * g + zr[2] * b) / XYZ_WHITE[2];
-	const epsilon = (6 / 29) ** 3;
-	const f = (t: number): number => (t > epsilon ? Math.cbrt(t) : t / (3 * (6 / 29) ** 2) + 4 / 29);
-	const fx = f(x);
-	const fy = f(y);
-	const fz = f(z);
-	return { l: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
-}
-
-const toDegrees = (radians: number): number => (radians * 180) / Math.PI;
-const toRadians = (degrees: number): number => (degrees * Math.PI) / 180;
-
-/**
- * CIEDE2000 colour difference (CIE 142-2001), kL = kC = kH = 1.
- *
- * Plain euclidean distance in Lab (CIE76) would be simpler, but it badly
- * overestimates differences in the blue region and underestimates them in the
- * neutrals - exactly where a de-saturated editor palette lives. Getting that wrong
- * in either direction defeats the point of the check.
- */
-/**
- * CIEDE2000's lightness weight SL, which is what stops a lightness difference from
- * being worth its face value in dE00.
- *
- * It is >= 1 everywhere and equals 1 only at Lbar 50, so dL* / SL <= dL* always, and the
- * penalty grows towards both ends of the range - which is where dark and light themes
- * put their text. It is factored out of deltaE2000 rather than written twice because
- * requiredLightnessDelta inverts it: the two must never be able to disagree.
- */
-function lightnessWeight(lBar: number): number {
-	return 1 + (0.015 * (lBar - 50) ** 2) / Math.sqrt(20 + (lBar - 50) ** 2);
-}
-
-function deltaE2000(first: Lab, second: Lab): number {
-	const c1 = Math.hypot(first.a, first.b);
-	const c2 = Math.hypot(second.a, second.b);
-	const cBar = (c1 + c2) / 2;
-	const g = 0.5 * (1 - Math.sqrt(cBar ** 7 / (cBar ** 7 + 25 ** 7)));
-
-	const a1p = (1 + g) * first.a;
-	const a2p = (1 + g) * second.a;
-	const c1p = Math.hypot(a1p, first.b);
-	const c2p = Math.hypot(a2p, second.b);
-
-	const hue = (a: number, b: number): number => {
-		if (a === 0 && b === 0) {
-			return 0;
-		}
-		const h = toDegrees(Math.atan2(b, a));
-		return h >= 0 ? h : h + 360;
-	};
-	const h1p = hue(a1p, first.b);
-	const h2p = hue(a2p, second.b);
-
-	const deltaLp = second.l - first.l;
-	const deltaCp = c2p - c1p;
-
-	let deltahp: number;
-	if (c1p * c2p === 0) {
-		deltahp = 0;
-	} else if (Math.abs(h2p - h1p) <= 180) {
-		deltahp = h2p - h1p;
-	} else if (h2p - h1p > 180) {
-		deltahp = h2p - h1p - 360;
-	} else {
-		deltahp = h2p - h1p + 360;
-	}
-	const deltaHp = 2 * Math.sqrt(c1p * c2p) * Math.sin(toRadians(deltahp) / 2);
-
-	const lBarp = (first.l + second.l) / 2;
-	const cBarp = (c1p + c2p) / 2;
-
-	let hBarp: number;
-	if (c1p * c2p === 0) {
-		hBarp = h1p + h2p;
-	} else if (Math.abs(h1p - h2p) <= 180) {
-		hBarp = (h1p + h2p) / 2;
-	} else if (h1p + h2p < 360) {
-		hBarp = (h1p + h2p + 360) / 2;
-	} else {
-		hBarp = (h1p + h2p - 360) / 2;
-	}
-
-	const t =
-		1 -
-		0.17 * Math.cos(toRadians(hBarp - 30)) +
-		0.24 * Math.cos(toRadians(2 * hBarp)) +
-		0.32 * Math.cos(toRadians(3 * hBarp + 6)) -
-		0.2 * Math.cos(toRadians(4 * hBarp - 63));
-
-	const deltaTheta = 30 * Math.exp(-(((hBarp - 275) / 25) ** 2));
-	const rc = 2 * Math.sqrt(cBarp ** 7 / (cBarp ** 7 + 25 ** 7));
-	const sl = lightnessWeight(lBarp);
-	const sc = 1 + 0.045 * cBarp;
-	const sh = 1 + 0.015 * cBarp * t;
-	const rt = -Math.sin(toRadians(2 * deltaTheta)) * rc;
-
-	const termL = deltaLp / sl;
-	const termC = deltaCp / sc;
-	const termH = deltaHp / sh;
-	return Math.sqrt(termL ** 2 + termC ** 2 + termH ** 2 + rt * termC * termH);
-}
+// CIELAB, CIEDE2000 and its lightness weight SL now live in
+// src/vs/base/common/primalColorScience.ts, imported above, so the workbench can
+// measure a theme with exactly the arithmetic that gates the build. The
+// CIEDE2000 reference data from Sharma, Wu & Dalal is still checked here, by
+// --self-test, because this is the file that states what the numbers must mean.
 
 /**
  * Perceptual distance between two opaque colours written as theme values.
@@ -393,13 +226,6 @@ export function perceptualDistanceOfHex(a: string, b: string): number {
 		throw new Error(`validateTheme: cannot measure distance between ${JSON.stringify(a)} and ${JSON.stringify(b)}`);
 	}
 	return deltaE2000(toLab(opaque(first)), toLab(opaque(second)));
-}
-
-/** Perceptual distance between two opaque colours as seen by a given observer. */
-function perceptualDistance(a: Rgb, b: Rgb, observer: CvdType | "normal"): number {
-	const seenA = observer === "normal" ? a : simulateCvd(a, observer);
-	const seenB = observer === "normal" ? b : simulateCvd(b, observer);
-	return deltaE2000(toLab(seenA), toLab(seenB));
 }
 
 // ---------------------------------------------------------------------------
@@ -810,7 +636,7 @@ function resolveOpaque(
 	if (!parsed) {
 		return null;
 	}
-	if (parsed.a >= 1 || !base) {
+	if (parsed.alpha >= 1 || !base) {
 		return opaque(parsed);
 	}
 	return composite(parsed, base);
@@ -925,7 +751,7 @@ function checkReadingContrast(theme: ColorTheme, errors: Finding[], warnings: Fi
 		});
 		return;
 	}
-	const comment = parsed.a >= 1 ? opaque(parsed) : composite(parsed, background);
+	const comment = parsed.alpha >= 1 ? opaque(parsed) : composite(parsed, background);
 	const commentContrast = contrastRatio(comment, background);
 	const finding: Finding = {
 		check: "comment contrast",
@@ -994,7 +820,7 @@ function checkSyntaxContrast(theme: ColorTheme, errors: Finding[], warnings: Fin
 			continue; // comments have their own floor and their own finding; see MIN_COMMENT_CONTRAST_ERROR
 		}
 
-		const composited = parsed.a >= 1 ? opaque(parsed) : composite(parsed, background);
+		const composited = parsed.alpha >= 1 ? opaque(parsed) : composite(parsed, background);
 		const ratio = contrastRatio(composited, background);
 		if (ratio >= MIN_SYNTAX_CONTRAST_WARN) {
 			continue;
@@ -1048,7 +874,7 @@ function checkSemanticSeparation(theme: ColorTheme, errors: Finding[], warnings:
 			if (parsed) {
 				members.push([
 					`tokenColors "${scope}"`,
-					parsed.a >= 1 || !editorBackground ? opaque(parsed) : composite(parsed, editorBackground),
+					parsed.alpha >= 1 || !editorBackground ? opaque(parsed) : composite(parsed, editorBackground),
 				]);
 			}
 		}
@@ -1299,8 +1125,8 @@ function selfTest(): number {
 	}
 
 	// Compositing at 50% must land halfway, and at 0% must vanish.
-	const half = composite({ r: 255, g: 255, b: 255, a: 0.5 }, { r: 0, g: 0, b: 0 });
-	const none = composite({ r: 255, g: 0, b: 0, a: 0 }, { r: 10, g: 20, b: 30 });
+	const half = composite({ r: 255, g: 255, b: 255, alpha: 0.5 }, { r: 0, g: 0, b: 0 });
+	const none = composite({ r: 255, g: 0, b: 0, alpha: 0 }, { r: 10, g: 20, b: 30 });
 	const compositeOk =
 		Math.abs(half.r - 127.5) < 1e-9 && none.r === 10 && none.g === 20 && none.b === 30;
 	console.log(`  ${compositeOk ? "ok  " : "FAIL"}  alpha compositing`);

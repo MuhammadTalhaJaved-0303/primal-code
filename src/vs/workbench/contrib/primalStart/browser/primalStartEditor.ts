@@ -30,6 +30,7 @@ import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { ACTION_ID_NEW_CHAT, CHAT_OPEN_ACTION_ID } from '../../chat/browser/actions/chatActions.js';
 import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../primalMotif/browser/primalMotif.js';
+import { PRIMAL_THEME_GALLERY_COMMAND_ID } from '../../primalThemeGallery/common/primalThemeGallery.js';
 import { IPrimalVibe, IPrimalVibeService, PRIMAL_VIBES, PRIMAL_VIBE_CYCLE_COMMAND_ID, PRIMAL_VIBE_PICK_COMMAND_ID } from '../../primalVibes/browser/primalVibes.js';
 import { PrimalStartInput } from './primalStartInput.js';
 
@@ -406,6 +407,10 @@ export class PrimalStartEditor extends EditorPane {
 		const hints: ReadonlyArray<{ readonly commandId: string; readonly text: string }> = [
 			{ commandId: PRIMAL_VIBE_CYCLE_COMMAND_ID, text: localize('primalStart.hint.cycleVibes', "cycle vibes") },
 			{ commandId: PRIMAL_VIBE_PICK_COMMAND_ID, text: localize('primalStart.hint.pickVibe', "pick vibe") },
+			// The way out of the six-card strip and into the whole catalogue. It sits
+			// in the footer rather than in the strip because the strip is a fixed
+			// six-column grid: a seventh child would reflow it.
+			{ commandId: PRIMAL_THEME_GALLERY_COMMAND_ID, text: localize('primalStart.hint.browseThemes', "browse themes") },
 			{ commandId: CHAT_OPEN_ACTION_ID, text: localize('primalStart.hint.chat', "chat") }
 		];
 
