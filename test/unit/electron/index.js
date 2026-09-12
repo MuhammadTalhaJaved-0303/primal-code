@@ -11,6 +11,31 @@
 process.env.MOCHA_COLORS = '1';
 
 const { app, BrowserWindow, ipcMain, crashReporter, session } = require('electron');
+
+// A broken stdout pipe must not crash the run. The reporters write results with
+// console.log, so if whatever launched the tests goes away — a killed shell, a
+// closed tool pipe, a terminal that shut before the run finished — the next
+// write raises EPIPE in the MAIN process. Electron answers an uncaught
+// main-process exception with a modal dialog, so a run that had already done
+// its work would sit on screen blocking until somebody clicked OK, and on
+// macOS it does that wearing the product's own icon, which reads as the
+// shipped app crashing rather than as a test harness losing its terminal.
+// Writing to a file never produces this; only a pipe does.
+//
+// Nothing here can be reported any more once the pipe is gone, so the only
+// useful response is to stop. Narrow on purpose: EPIPE on these two streams
+// only, so a genuine failure still surfaces as a failure.
+for (const stream of [process.stdout, process.stderr]) {
+	stream.on('error', err => {
+		if (err && err.code === 'EPIPE') {
+			app.exit(0);
+			return;
+		}
+
+		throw err;
+	});
+}
+
 const product = require('../../../product.json');
 const { tmpdir } = require('os');
 const { existsSync, mkdirSync, promises } = require('fs');
