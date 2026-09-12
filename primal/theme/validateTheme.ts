@@ -40,6 +40,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CVD_TYPES, simulateCvd, type CvdType, type Rgb } from "./cvd.ts";
 import {
+	OBSERVERS,
 	contrastRatio,
 	compositeOverSrgb as composite,
 	deltaE2000,
@@ -605,6 +606,44 @@ const ANSI_SLOTS: readonly string[] = [
 /** Scopes that carry a theme's comment colour, most specific first. */
 const COMMENT_SCOPES: readonly string[] = ["comment", "comment.line", "comment.block"];
 
+/**
+ * How far apart two DIFFERENT syntax roles must sit before the pair is reported,
+ * in dE00 under the worst of the four observers.
+ *
+ * 2.3 is this file's own quoted just-noticeable difference for ordinary viewing
+ * (see MIN_SEMANTIC_DELTA_E). Two roles closer than that are one role wearing
+ * two names.
+ *
+ * IT IS A WARNING AND IT CANNOT BE AN ERROR. Every one of the six shipping vibes
+ * ALIASES roles on purpose - `keyword`, `type`, `operator` and `accent` are all
+ * the editor ink in Ink, Basalt and Ridge; `type` is `function` and `accent` is
+ * `keyword` in Tide, Dusk and Fern - so an error-level check here would fail the
+ * product's own flagship on the day it landed. What it is for is the case
+ * nothing in this repository measures today: a generator that OWNS all seven
+ * slots landing two of them two dE00 apart, which is neither a deliberate alias
+ * nor a visible difference. The synthesiser asserts the same number as an ERROR
+ * for the pairs its own grammar does not declare as aliases.
+ */
+const MIN_SYNTAX_SEPARATION = 2.3;
+
+/**
+ * One representative scope per syntax role, chosen because `tokenMap.ts` routes
+ * it to that role and to nothing else.
+ *
+ * `comment` is deliberately absent: it has its own floor, its own finding, and
+ * it is the one role every theme in the product deliberately pushes toward the
+ * plane, so measuring it against the loud roles would report a distance nobody
+ * would act on.
+ */
+const SYNTAX_SEPARATION_SCOPES: readonly { readonly role: string; readonly scope: string }[] = [
+	{ role: "keyword", scope: "keyword" },
+	{ role: "string", scope: "string" },
+	{ role: "function", scope: "entity.name.function" },
+	{ role: "type", scope: "entity.name.type" },
+	{ role: "constant", scope: "constant.numeric" },
+	{ role: "operator", scope: "keyword.operator" },
+];
+
 // ---------------------------------------------------------------------------
 // The checks
 // ---------------------------------------------------------------------------
@@ -846,6 +885,71 @@ function checkSyntaxContrast(theme: ColorTheme, errors: Finding[], warnings: Fin
 	}
 }
 
+/**
+ * Every pair of syntax roles a reader is meant to tell apart, measured under all
+ * four observers.
+ *
+ * Nothing else in this file looks at the RELATIONSHIP between two syntax
+ * colours - `checkSyntaxContrast` measures each one against the background and
+ * stops there - so before this a theme could paint `keyword` and `type` two dE00
+ * apart and every check would report clean. Reported as warnings; see
+ * MIN_SYNTAX_SEPARATION for why it cannot be an error.
+ *
+ * A byte-identical pair is reported too, and reported as such. It is almost
+ * always a deliberate alias, and saying "0.00 dE00, identical" is what lets a
+ * reader tell that case from a near miss at a glance.
+ */
+function checkSyntaxSeparation(theme: ColorTheme, warnings: Finding[]): void {
+	const colors = theme.colors ?? {};
+	const background = resolveOpaque(colors, "editor.background", null);
+	if (!background) {
+		return; // already reported by checkRequiredAndKnownTokens
+	}
+	const resolved: { readonly role: string; readonly rgb: Rgb }[] = [];
+	for (const entry of SYNTAX_SEPARATION_SCOPES) {
+		const foreground = foregroundForScope(theme, entry.scope);
+		if (foreground === null) {
+			continue;
+		}
+		const parsed = parseColor(foreground);
+		if (!parsed) {
+			continue; // reported by checkSyntaxContrast as bad syntax
+		}
+		resolved.push({ role: entry.role, rgb: parsed.alpha >= 1 ? opaque(parsed) : composite(parsed, background) });
+	}
+	for (let i = 0; i < resolved.length; i++) {
+		for (let j = i + 1; j < resolved.length; j++) {
+			const first = resolved[i];
+			const second = resolved[j];
+			let worst = Number.POSITIVE_INFINITY;
+			let observer: CvdType | "normal" = "normal";
+			for (const type of OBSERVERS) {
+				const distance = perceptualDistance(first.rgb, second.rgb, type);
+				if (distance < worst) {
+					worst = distance;
+					observer = type;
+				}
+			}
+			if (worst >= MIN_SYNTAX_SEPARATION) {
+				continue;
+			}
+			const identical = formatRgb(first.rgb) === formatRgb(second.rgb);
+			warnings.push({
+				check: "syntax role separation",
+				token: `tokenColors "${first.role}" vs tokenColors "${second.role}"`,
+				measured: identical
+					? `dE00 0.00 - identical (${formatRgb(first.rgb)})`
+					: `dE00 ${worst.toFixed(2)} under ${observer} (${formatRgb(first.rgb)} / ${formatRgb(second.rgb)})`,
+				threshold: `>= ${MIN_SYNTAX_SEPARATION} dE00 under every observer`,
+				detail: identical
+					? "Two syntax roles are the same colour. Every Primal vibe aliases roles on purpose, so this is usually intended - but nothing else in this file would tell you it had happened."
+					: "Two syntax roles are close enough that a reader cannot reliably tell them apart, without being close enough to read as one deliberate colour.",
+				observer,
+			});
+		}
+	}
+}
+
 function checkSemanticSeparation(theme: ColorTheme, errors: Finding[], warnings: Finding[]): void {
 	const colors = theme.colors ?? {};
 	const editorBackground = resolveOpaque(colors, "editor.background", null);
@@ -1061,6 +1165,7 @@ export function validate(theme: ColorTheme): ValidationResult {
 	checkRequiredAndKnownTokens(theme, errors);
 	checkReadingContrast(theme, errors, warnings);
 	checkSyntaxContrast(theme, errors, warnings);
+	checkSyntaxSeparation(theme, warnings);
 	checkSemanticSeparation(theme, errors, warnings);
 	checkHighlightBackgrounds(theme, errors);
 	checkAnsiRamp(theme, errors, warnings);

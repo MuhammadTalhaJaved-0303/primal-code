@@ -138,6 +138,1302 @@
         "label": "%nightshadeHardThemeLabel%",
         "uiTheme": "vs-dark",
         "path": "./themes/primal-nightshade-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Harbour Soft",
+        "label": "%harbourSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-harbour-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Harbour",
+        "label": "%harbourThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-harbour-color-theme.json"
+      },
+      {
+        "id": "Primal Harbour Hard",
+        "label": "%harbourHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-harbour-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Quarry Soft",
+        "label": "%quarrySoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-quarry-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Quarry",
+        "label": "%quarryThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-quarry-color-theme.json"
+      },
+      {
+        "id": "Primal Marsh Soft",
+        "label": "%marshSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-marsh-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Marsh",
+        "label": "%marshThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-marsh-color-theme.json"
+      },
+      {
+        "id": "Primal Marsh Hard",
+        "label": "%marshHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-marsh-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Thicket Soft",
+        "label": "%thicketSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-thicket-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Thicket",
+        "label": "%thicketThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-thicket-color-theme.json"
+      },
+      {
+        "id": "Primal Thicket Hard",
+        "label": "%thicketHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-thicket-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Ember Soft",
+        "label": "%emberSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ember-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Ember",
+        "label": "%emberThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ember-color-theme.json"
+      },
+      {
+        "id": "Primal Ember Hard",
+        "label": "%emberHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ember-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Anvil Soft",
+        "label": "%anvilSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-anvil-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Anvil",
+        "label": "%anvilThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-anvil-color-theme.json"
+      },
+      {
+        "id": "Primal Anvil Hard",
+        "label": "%anvilHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-anvil-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Clay Soft",
+        "label": "%claySoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-clay-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Clay",
+        "label": "%clayThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-clay-color-theme.json"
+      },
+      {
+        "id": "Primal Clay Hard",
+        "label": "%clayHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-clay-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Gorse Soft",
+        "label": "%gorseSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gorse-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Gorse",
+        "label": "%gorseThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gorse-color-theme.json"
+      },
+      {
+        "id": "Primal Gorse Hard",
+        "label": "%gorseHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gorse-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Hollow Soft",
+        "label": "%hollowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hollow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Hollow",
+        "label": "%hollowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hollow-color-theme.json"
+      },
+      {
+        "id": "Primal Hollow Hard",
+        "label": "%hollowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hollow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Kelp Soft",
+        "label": "%kelpSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-kelp-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Kelp",
+        "label": "%kelpThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-kelp-color-theme.json"
+      },
+      {
+        "id": "Primal Kelp Hard",
+        "label": "%kelpHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-kelp-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Loam Soft",
+        "label": "%loamSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-loam-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Loam",
+        "label": "%loamThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-loam-color-theme.json"
+      },
+      {
+        "id": "Primal Moss Soft",
+        "label": "%mossSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-moss-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Moss",
+        "label": "%mossThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-moss-color-theme.json"
+      },
+      {
+        "id": "Primal Moss Hard",
+        "label": "%mossHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-moss-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Peat Soft",
+        "label": "%peatSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-peat-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Peat",
+        "label": "%peatThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-peat-color-theme.json"
+      },
+      {
+        "id": "Primal Quartz Soft",
+        "label": "%quartzSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-quartz-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Quartz",
+        "label": "%quartzThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-quartz-color-theme.json"
+      },
+      {
+        "id": "Primal Quartz Hard",
+        "label": "%quartzHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-quartz-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Reed Soft",
+        "label": "%reedSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-reed-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Reed",
+        "label": "%reedThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-reed-color-theme.json"
+      },
+      {
+        "id": "Primal Reed Hard",
+        "label": "%reedHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-reed-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Sable Soft",
+        "label": "%sableSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sable-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Sable",
+        "label": "%sableThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sable-color-theme.json"
+      },
+      {
+        "id": "Primal Sable Hard",
+        "label": "%sableHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sable-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Shale Soft",
+        "label": "%shaleSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-shale-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Shale",
+        "label": "%shaleThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-shale-color-theme.json"
+      },
+      {
+        "id": "Primal Shale Hard",
+        "label": "%shaleHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-shale-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Slate Soft",
+        "label": "%slateSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-slate-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Slate",
+        "label": "%slateThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-slate-color-theme.json"
+      },
+      {
+        "id": "Primal Slate Hard",
+        "label": "%slateHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-slate-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Spruce Soft",
+        "label": "%spruceSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-spruce-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Spruce",
+        "label": "%spruceThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-spruce-color-theme.json"
+      },
+      {
+        "id": "Primal Spruce Hard",
+        "label": "%spruceHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-spruce-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Thorn Soft",
+        "label": "%thornSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-thorn-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Thorn",
+        "label": "%thornThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-thorn-color-theme.json"
+      },
+      {
+        "id": "Primal Thorn Hard",
+        "label": "%thornHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-thorn-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Vellum Soft",
+        "label": "%vellumSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-vellum-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Vellum",
+        "label": "%vellumThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-vellum-color-theme.json"
+      },
+      {
+        "id": "Primal Vellum Hard",
+        "label": "%vellumHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-vellum-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Willow Soft",
+        "label": "%willowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-willow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Willow",
+        "label": "%willowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-willow-color-theme.json"
+      },
+      {
+        "id": "Primal Willow Hard",
+        "label": "%willowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-willow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Alder Soft",
+        "label": "%alderSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-alder-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Alder",
+        "label": "%alderThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-alder-color-theme.json"
+      },
+      {
+        "id": "Primal Alder Hard",
+        "label": "%alderHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-alder-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Birch Soft",
+        "label": "%birchSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-birch-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Birch",
+        "label": "%birchThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-birch-color-theme.json"
+      },
+      {
+        "id": "Primal Birch Hard",
+        "label": "%birchHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-birch-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Cairn Soft",
+        "label": "%cairnSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cairn-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Cairn",
+        "label": "%cairnThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cairn-color-theme.json"
+      },
+      {
+        "id": "Primal Cairn Hard",
+        "label": "%cairnHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cairn-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Cove Soft",
+        "label": "%coveSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cove-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Cove",
+        "label": "%coveThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cove-color-theme.json"
+      },
+      {
+        "id": "Primal Cove Hard",
+        "label": "%coveHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-cove-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Dune Soft",
+        "label": "%duneSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-dune-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Dune",
+        "label": "%duneThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-dune-color-theme.json"
+      },
+      {
+        "id": "Primal Dune Hard",
+        "label": "%duneHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-dune-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Elm Soft",
+        "label": "%elmSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-elm-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Elm",
+        "label": "%elmThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-elm-color-theme.json"
+      },
+      {
+        "id": "Primal Elm Hard",
+        "label": "%elmHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-elm-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Fjord Soft",
+        "label": "%fjordSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fjord-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Fjord",
+        "label": "%fjordThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fjord-color-theme.json"
+      },
+      {
+        "id": "Primal Fjord Hard",
+        "label": "%fjordHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fjord-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Flint Soft",
+        "label": "%flintSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-flint-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Flint",
+        "label": "%flintThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-flint-color-theme.json"
+      },
+      {
+        "id": "Primal Flint Hard",
+        "label": "%flintHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-flint-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Glade Soft",
+        "label": "%gladeSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-glade-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Glade",
+        "label": "%gladeThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-glade-color-theme.json"
+      },
+      {
+        "id": "Primal Glade Hard",
+        "label": "%gladeHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-glade-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Granite Soft",
+        "label": "%graniteSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-granite-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Granite",
+        "label": "%graniteThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-granite-color-theme.json"
+      },
+      {
+        "id": "Primal Granite Hard",
+        "label": "%graniteHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-granite-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Heather Soft",
+        "label": "%heatherSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-heather-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Heather",
+        "label": "%heatherThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-heather-color-theme.json"
+      },
+      {
+        "id": "Primal Juniper Soft",
+        "label": "%juniperSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-juniper-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Juniper",
+        "label": "%juniperThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-juniper-color-theme.json"
+      },
+      {
+        "id": "Primal Juniper Hard",
+        "label": "%juniperHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-juniper-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Lichen Soft",
+        "label": "%lichenSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-lichen-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Lichen",
+        "label": "%lichenThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-lichen-color-theme.json"
+      },
+      {
+        "id": "Primal Lichen Hard",
+        "label": "%lichenHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-lichen-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Mica Soft",
+        "label": "%micaSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-mica-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Mica",
+        "label": "%micaThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-mica-color-theme.json"
+      },
+      {
+        "id": "Primal Mica Hard",
+        "label": "%micaHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-mica-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Morrow Soft",
+        "label": "%morrowSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-morrow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Morrow",
+        "label": "%morrowThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-morrow-color-theme.json"
+      },
+      {
+        "id": "Primal Oak Soft",
+        "label": "%oakSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-oak-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Oak",
+        "label": "%oakThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-oak-color-theme.json"
+      },
+      {
+        "id": "Primal Oak Hard",
+        "label": "%oakHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-oak-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Onyx Soft",
+        "label": "%onyxSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-onyx-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Onyx",
+        "label": "%onyxThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-onyx-color-theme.json"
+      },
+      {
+        "id": "Primal Onyx Hard",
+        "label": "%onyxHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-onyx-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Pine Soft",
+        "label": "%pineSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-pine-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Pine",
+        "label": "%pineThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-pine-color-theme.json"
+      },
+      {
+        "id": "Primal Pine Hard",
+        "label": "%pineHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-pine-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Rill Soft",
+        "label": "%rillSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rill-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Rill",
+        "label": "%rillThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rill-color-theme.json"
+      },
+      {
+        "id": "Primal Rill Hard",
+        "label": "%rillHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rill-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Sedge Soft",
+        "label": "%sedgeSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sedge-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Sedge",
+        "label": "%sedgeThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sedge-color-theme.json"
+      },
+      {
+        "id": "Primal Sedge Hard",
+        "label": "%sedgeHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sedge-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Silt Soft",
+        "label": "%siltSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-silt-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Silt",
+        "label": "%siltThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-silt-color-theme.json"
+      },
+      {
+        "id": "Primal Silt Hard",
+        "label": "%siltHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-silt-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Sorrel Soft",
+        "label": "%sorrelSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sorrel-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Sorrel",
+        "label": "%sorrelThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sorrel-color-theme.json"
+      },
+      {
+        "id": "Primal Sorrel Hard",
+        "label": "%sorrelHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-sorrel-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Tallow Soft",
+        "label": "%tallowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tallow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Tallow",
+        "label": "%tallowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tallow-color-theme.json"
+      },
+      {
+        "id": "Primal Tallow Hard",
+        "label": "%tallowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tallow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Tundra Soft",
+        "label": "%tundraSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tundra-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Tundra",
+        "label": "%tundraThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-tundra-color-theme.json"
+      },
+      {
+        "id": "Primal Vetch Soft",
+        "label": "%vetchSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-vetch-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Vetch",
+        "label": "%vetchThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-vetch-color-theme.json"
+      },
+      {
+        "id": "Primal Vetch Hard",
+        "label": "%vetchHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-vetch-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Wick Soft",
+        "label": "%wickSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-wick-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Wick",
+        "label": "%wickThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-wick-color-theme.json"
+      },
+      {
+        "id": "Primal Wick Hard",
+        "label": "%wickHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-wick-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Yarrow Soft",
+        "label": "%yarrowSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-yarrow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Yarrow",
+        "label": "%yarrowThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-yarrow-color-theme.json"
+      },
+      {
+        "id": "Primal Yarrow Hard",
+        "label": "%yarrowHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-yarrow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Bracken Soft",
+        "label": "%brackenSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-bracken-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Bracken",
+        "label": "%brackenThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-bracken-color-theme.json"
+      },
+      {
+        "id": "Primal Bracken Hard",
+        "label": "%brackenHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-bracken-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Copper Soft",
+        "label": "%copperSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-copper-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Copper",
+        "label": "%copperThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-copper-color-theme.json"
+      },
+      {
+        "id": "Primal Copper Hard",
+        "label": "%copperHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-copper-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Delta Soft",
+        "label": "%deltaSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-delta-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Delta",
+        "label": "%deltaThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-delta-color-theme.json"
+      },
+      {
+        "id": "Primal Delta Hard",
+        "label": "%deltaHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-delta-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Drift Soft",
+        "label": "%driftSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-drift-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Drift",
+        "label": "%driftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-drift-color-theme.json"
+      },
+      {
+        "id": "Primal Drift Hard",
+        "label": "%driftHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-drift-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Fallow Soft",
+        "label": "%fallowSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fallow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Fallow",
+        "label": "%fallowThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fallow-color-theme.json"
+      },
+      {
+        "id": "Primal Fallow Hard",
+        "label": "%fallowHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-fallow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Furrow Soft",
+        "label": "%furrowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-furrow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Furrow",
+        "label": "%furrowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-furrow-color-theme.json"
+      },
+      {
+        "id": "Primal Furrow Hard",
+        "label": "%furrowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-furrow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Gable Soft",
+        "label": "%gableSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gable-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Gable",
+        "label": "%gableThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gable-color-theme.json"
+      },
+      {
+        "id": "Primal Gable Hard",
+        "label": "%gableHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gable-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Gulf Soft",
+        "label": "%gulfSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gulf-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Gulf",
+        "label": "%gulfThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gulf-color-theme.json"
+      },
+      {
+        "id": "Primal Gulf Hard",
+        "label": "%gulfHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-gulf-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Harrow Soft",
+        "label": "%harrowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-harrow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Harrow",
+        "label": "%harrowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-harrow-color-theme.json"
+      },
+      {
+        "id": "Primal Harrow Hard",
+        "label": "%harrowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-harrow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Hazel Soft",
+        "label": "%hazelSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hazel-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Hazel",
+        "label": "%hazelThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hazel-color-theme.json"
+      },
+      {
+        "id": "Primal Hazel Hard",
+        "label": "%hazelHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-hazel-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Isle Soft",
+        "label": "%isleSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-isle-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Isle",
+        "label": "%isleThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-isle-color-theme.json"
+      },
+      {
+        "id": "Primal Isle Hard",
+        "label": "%isleHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-isle-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Ledge Soft",
+        "label": "%ledgeSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-ledge-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Ledge",
+        "label": "%ledgeThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-ledge-color-theme.json"
+      },
+      {
+        "id": "Primal Ledge Hard",
+        "label": "%ledgeHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-ledge-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Linen Soft",
+        "label": "%linenSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-linen-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Linen",
+        "label": "%linenThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-linen-color-theme.json"
+      },
+      {
+        "id": "Primal Linen Hard",
+        "label": "%linenHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-linen-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Meadow Soft",
+        "label": "%meadowSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-meadow-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Meadow",
+        "label": "%meadowThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-meadow-color-theme.json"
+      },
+      {
+        "id": "Primal Meadow Hard",
+        "label": "%meadowHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-meadow-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Mesa Soft",
+        "label": "%mesaSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mesa-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Mesa",
+        "label": "%mesaThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mesa-color-theme.json"
+      },
+      {
+        "id": "Primal Mesa Hard",
+        "label": "%mesaHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mesa-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Mire Soft",
+        "label": "%mireSoftThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mire-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Mire",
+        "label": "%mireThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mire-color-theme.json"
+      },
+      {
+        "id": "Primal Mire Hard",
+        "label": "%mireHardThemeLabel%",
+        "uiTheme": "vs",
+        "path": "./themes/primal-mire-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Nettle Soft",
+        "label": "%nettleSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-nettle-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Nettle",
+        "label": "%nettleThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-nettle-color-theme.json"
+      },
+      {
+        "id": "Primal Nettle Hard",
+        "label": "%nettleHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-nettle-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Orchard Soft",
+        "label": "%orchardSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-orchard-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Orchard",
+        "label": "%orchardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-orchard-color-theme.json"
+      },
+      {
+        "id": "Primal Orchard Hard",
+        "label": "%orchardHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-orchard-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Plume Soft",
+        "label": "%plumeSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-plume-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Plume",
+        "label": "%plumeThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-plume-color-theme.json"
+      },
+      {
+        "id": "Primal Plume Hard",
+        "label": "%plumeHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-plume-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Rapids Soft",
+        "label": "%rapidsSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rapids-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Rapids",
+        "label": "%rapidsThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rapids-color-theme.json"
+      },
+      {
+        "id": "Primal Rapids Hard",
+        "label": "%rapidsHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rapids-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Ravine Soft",
+        "label": "%ravineSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ravine-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Ravine",
+        "label": "%ravineThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ravine-color-theme.json"
+      },
+      {
+        "id": "Primal Ravine Hard",
+        "label": "%ravineHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-ravine-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Rowan Soft",
+        "label": "%rowanSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rowan-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Rowan",
+        "label": "%rowanThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rowan-color-theme.json"
+      },
+      {
+        "id": "Primal Rowan Hard",
+        "label": "%rowanHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rowan-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Rushes Soft",
+        "label": "%rushesSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rushes-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Rushes",
+        "label": "%rushesThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rushes-color-theme.json"
+      },
+      {
+        "id": "Primal Rushes Hard",
+        "label": "%rushesHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-rushes-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Sandstone Soft",
+        "label": "%sandstoneSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sandstone-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Sandstone",
+        "label": "%sandstoneThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sandstone-color-theme.json"
+      },
+      {
+        "id": "Primal Sandstone Hard",
+        "label": "%sandstoneHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-sandstone-hard-color-theme.json"
+      },
+      {
+        "id": "Primal Shore Soft",
+        "label": "%shoreSoftThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-shore-soft-color-theme.json"
+      },
+      {
+        "id": "Primal Shore",
+        "label": "%shoreThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-shore-color-theme.json"
+      },
+      {
+        "id": "Primal Shore Hard",
+        "label": "%shoreHardThemeLabel%",
+        "uiTheme": "vs-dark",
+        "path": "./themes/primal-shore-hard-color-theme.json"
       }
     ]
   },
