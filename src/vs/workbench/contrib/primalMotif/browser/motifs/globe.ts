@@ -88,6 +88,32 @@ import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip }
 
 export const PRIMAL_MOTIF_WORLD_ID = 'world';
 
+/**
+ * The measured median cost of one `render()`, in milliseconds, at the role and
+ * host size that cost the most - which for this motif is the stage, by a factor
+ * of eighteen.
+ *
+ * The table in the header above is the per-window-size measurement at the
+ * `ground` role, taken with node, and it is still what that role costs. This is
+ * what the workbench's own Electron renderer measures for the whole frame
+ * including the `putImageData` upload, at both roles
+ * (`test/browser/motifBudget.test.ts` is the harness and re-measures it on every
+ * run):
+ *
+ *     ground  1920x1080 window   0.019ms     3.8% of the 0.5ms budget
+ *     stage   1428x1025 pane     0.360ms    72.0%
+ *
+ * THE STAGE FIGURE IS THE LEAST MARGIN ANY MOTIF HERE HAS, and it is not a
+ * surprise: {@link STAGE_RADIUS_RATIO} makes the disc about ten times the
+ * ground role's radius, which is a hundred times the pixels, and the
+ * `putImageData` rectangle grows with it until it is most of the buffer. It
+ * holds the 0.5ms budget on this machine and the ladder's own `overBudget` rung
+ * catches a machine where it does not - but it is the one number in this contrib
+ * that would not survive being made bigger, and anything that raises the stage
+ * radius has to be measured rather than reasoned about.
+ */
+export const GLOBE_FRAME_COST_MS = 0.360;
+
 // --- the sphere ------------------------------------------------------------
 
 /** Axial tilt, in radians. The real 23.44 degrees, tipping the north pole towards the viewer. */
@@ -888,5 +914,6 @@ registerMotif({
 	description: localize('primalCode.motif.world.description', "A globe in the ground behind the workbench, turning once every three minutes, drawn from the active theme's foreground at low opacity. Land, sea and light are all the same ink - no second colour is introduced."),
 	kind: 'canvas2d',
 	allowsPerpetual: true,
+	frameCostMs: GLOBE_FRAME_COST_MS,
 	create: () => new GlobeMotifRenderer()
 });

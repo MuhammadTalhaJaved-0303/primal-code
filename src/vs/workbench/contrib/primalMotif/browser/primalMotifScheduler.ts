@@ -20,7 +20,6 @@ import { IWorkbenchLayoutService, LayoutSettings } from '../../../services/layou
 import { IPowerService, ThermalState } from '../../../services/power/common/powerService.js';
 import { IPrimalVibeService } from '../../primalVibes/browser/primalVibes.js';
 import { PRIMAL_WALLPAPER_LAYER_CLASS, PRIMAL_WALLPAPER_ON_CLASS, PRIMAL_WALLPAPER_SETTING_IDS } from '../../primalWallpaper/browser/primalWallpaper.js';
-import { PRIMAL_MOTIF_WORLD_ID } from './motifs/globe.js';
 import {
 	IMotifFrame,
 	IMotifHost,
@@ -1020,15 +1019,23 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	 * still uses. `undefined` means there is nowhere to paint at all, which is
 	 * ordinary during startup - the wallpaper contribution may not have run yet.
 	 *
-	 * RESTRICTED TO `world`, FOR NOW. `starfield` puts `tone: 'accent'` on its
-	 * brightest star layer and paints its nebula pools in `--vscode-focusBorder`
-	 * (`media/primalMotifStarfield.css`). At the wallpaper's 0.12 layer opacity,
-	 * across the title strip, that is negligible. At stage scale, across most of
-	 * a pane, it is a dominant hue field - and hue is precisely what this
-	 * product's rules say may never carry meaning, because it is the one thing
-	 * some users cannot see. Until `starfield` is reworked to one ink at varying
-	 * alpha the way `globe` already is, it does not get a stage; it falls back to
-	 * the wallpaper layer here, silently and correctly.
+	 * OPEN TO EVERY MOTIF. This used to read `&& this.activeMotifId === 'world'`,
+	 * because `starfield` painted its brightest layer and two of its three nebula
+	 * pools in `focusBorder` - negligible across a 35px strip at the wallpaper's
+	 * 0.12 ceiling, a dominant hue field across most of a pane. That was a fact
+	 * about one motif's palette, not about stages, and it is now fixed where it
+	 * belonged: `starfield` is one ink at a varying alpha like everything else in
+	 * `motifs/`, so there is nothing left for an id test here to protect.
+	 *
+	 * The rule that replaced it is structural rather than a list. A motif reads
+	 * its ink through `readMotifInk` in `motifs/motifPaint.ts`, which offers
+	 * `foreground` and `descriptionForeground` and nothing else, and a motif that
+	 * cannot get ink from those declines in `create()`. So a motif that would
+	 * bring a hue to a stage cannot be written without deleting that function's
+	 * doctrine first, and `motifRegistry.test.ts` asserts the refusal for every
+	 * registered motif. An id list here would have had to be maintained by hand
+	 * against exactly that property, and would have been wrong the first time
+	 * somebody forgot.
 	 */
 	private resolveMount(container: HTMLElement): { readonly host: HTMLElement; readonly role: PrimalMotifRole } | undefined {
 		// The newest live offer. See {@link stages} for why every offer is kept
@@ -1036,7 +1043,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		// back to whichever pane offered before it, not to the wallpaper layer.
 		const offers = this.stages.get(container);
 		const stage = offers?.[offers.length - 1];
-		if (stage && this.activeMotifId === PRIMAL_MOTIF_WORLD_ID) {
+		if (stage) {
 			return { host: stage, role: 'stage' };
 		}
 

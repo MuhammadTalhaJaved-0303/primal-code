@@ -339,6 +339,26 @@ export interface IMotifDescriptor {
 	 */
 	readonly allowsPerpetual: boolean;
 
+	/**
+	 * The MEASURED main-thread cost of one {@link IMotifRenderer.render} call, in
+	 * milliseconds, at whichever role and host size costs this motif the most.
+	 *
+	 * A declaration, not a target, and it has to be a number somebody took off a
+	 * clock: `test/browser/motifBudget.test.ts` runs every registered motif for a
+	 * few hundred frames and holds its median against this figure, so a motif
+	 * whose cost drifted upwards fails a test rather than quietly eating a
+	 * thirtieth of a second somewhere in the field. The reason it lives on the
+	 * descriptor rather than only in each motif's header is that the test is
+	 * written over {@link getMotifDescriptors}, so a motif that ships without
+	 * measuring itself cannot exist.
+	 *
+	 * It must be at or under {@link PRIMAL_MOTIF_FRAME_BUDGET_MS}, which is the
+	 * budget itself and is never relaxed to fit a renderer. `0` is the honest
+	 * answer for a motif the scheduler never calls `render` on - `static` is the
+	 * only one.
+	 */
+	readonly frameCostMs: number;
+
 	/** Builds a fresh renderer. Called once per surface, and again after a theme change. */
 	create(): IMotifRenderer;
 }
@@ -418,6 +438,8 @@ registerMotif({
 	description: localize('primalCode.motif.static.description', "No motion at all. The ground keeps the wallpaper's own wash, and nothing in this window runs per frame."),
 	kind: 'css',
 	allowsPerpetual: false,
+	// Nothing is scheduled and `render` is never called: see the class above.
+	frameCostMs: 0,
 	create: () => new StaticMotifRenderer()
 });
 
