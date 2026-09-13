@@ -24,12 +24,21 @@
  * and bottom edges for exactly that reason, and a third, smaller one keeps the
  * top strip from reading as a single even glow.
  *
+ * ONE INK, AT THREE ALPHAS. Every pool is `foreground` or `descriptionForeground`
+ * - the same ink at two strengths - and there is no second hue anywhere in this
+ * file. The two upper pools used to be `focusBorder`, which is a saturated hue
+ * in four of the six shipping vibes; across a 35px strip at the wallpaper's 0.12
+ * ceiling that was negligible, but the same nebula on a code-free pane is most
+ * of what the reader sees, and it is why the scheduler barred this motif from
+ * the stage. The pools now differ from each other by alpha and by placement
+ * only, which is the one reading of the picture that is identical for a colour
+ * blind user. Both tokens contrast the theme's background by construction, so
+ * the same three pools lift a dark ground and deepen a light one with no
+ * light/dark branch here.
+ *
  * NO COLOR LITERALS. Every stop is `color-mix` over a workbench token, and every
  * token has a token fallback, so a theme missing one of them degrades to a
- * quieter sky instead of dropping the whole declaration. `focusBorder` is the one
- * accent the workbench guarantees and `descriptionForeground` is secondary ink;
- * both contrast the theme's background by construction, so the same three pools
- * lift a dark ground and deepen a light one with no light/dark branch here.
+ * quieter sky instead of dropping the whole declaration.
  *
  * THE `transparent` END STOPS ARE SAFE. A gradient that fades to `transparent`
  * is the classic way to accidentally fade through black, because `transparent`
@@ -60,28 +69,40 @@
 .monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
 
 	/*
-	 * One class more than the rule in primalMotif.css that lays the surface out,
-	 * so this wins on specificity rather than on stylesheet order - which is not
-	 * something a bundler guarantees.
+	 * BOTH HOSTS, because this motif may now hold either. The scheduler mounts a
+	 * window's one surface in the wallpaper's own layer, or - where a code-free
+	 * pane has offered one - on a stage; the nebula is the element's own
+	 * background, so it has to follow the element to whichever host it landed in.
+	 * A single rule with two selectors rather than two rules, so the two hosts
+	 * cannot drift apart.
+	 *
+	 * Each selector carries one class more than the rule in primalMotif.css that
+	 * lays the surface out, so this wins on specificity rather than on stylesheet
+	 * order - which is not something a bundler guarantees.
 	 *
 	 * The stars themselves are drawn into the canvas at 640x360 and upscaled by
 	 * the browser's default smoothing, which is what turns a one-pixel square
 	 * into a soft round dot. `image-rendering` is deliberately left alone:
 	 * `pixelated` would give hard square stars and cost the illusion for nothing.
 	 */
-	&.primal-motif-on .primal-wallpaper > .primal-motif-surface.primal-motif-starfield {
+	&.primal-motif-on .primal-wallpaper > .primal-motif-surface.primal-motif-starfield,
+	&.primal-motif-on .primal-motif-stage > .primal-motif-surface.primal-motif-starfield {
 		background-image:
-			/* The near pool, in the accent. Its core sits inside the box at the top
-			 * left so the title bar strip cuts across the bright part of it. */
+			/* The near pool, the brightest of the three. Its core sits inside the
+			 * box at the top left so the title bar strip cuts across the bright
+			 * part of it, and so a stage opens on a lit corner rather than on an
+			 * even field. */
 			radial-gradient(115% 100% at 18% 4%,
-				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 88%, transparent) 0%,
-				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 34%, transparent) 34%,
+				color-mix(in srgb, var(--vscode-foreground, var(--vscode-descriptionForeground)) 88%, transparent) 0%,
+				color-mix(in srgb, var(--vscode-foreground, var(--vscode-descriptionForeground)) 34%, transparent) 34%,
 				transparent 72%),
 
-			/* A second, smaller accent pool further along the top strip, so that
-			 * strip is a gradient across its width and not one even glow. */
+			/* A second, smaller and much fainter pool further along the top strip,
+			 * so that strip is a gradient across its width and not one even glow.
+			 * The gap in strength between this and the pool above is what separates
+			 * them; they are the same ink. */
 			radial-gradient(64% 52% at 63% 10%,
-				color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-foreground)) 30%, transparent) 0%,
+				color-mix(in srgb, var(--vscode-foreground, var(--vscode-descriptionForeground)) 30%, transparent) 0%,
 				transparent 62%),
 
 			/* The counter pool, in secondary ink, for the status bar strip. */

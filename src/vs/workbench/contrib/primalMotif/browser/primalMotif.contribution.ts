@@ -4,12 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import './media/primalMotif.css';
-// Motifs register themselves as a side effect of being imported. This is the
-// only reference to them anywhere: `registerMotif` is the seam, the settings
-// enum below is regenerated from the registry, and nothing here has to know
-// what a motif does.
-import './motifs/globe.js';
-import './motifs/starfield.js';
+// Motifs register themselves as a side effect of being imported, and
+// `motifs/motifs.ts` is the one list of which ones. This is the only reference
+// to them anywhere: `registerMotif` is the seam, the settings enum below is
+// regenerated from the registry, and nothing here has to know what a motif does.
+// The tests import that same list, so what ships is what is tested.
+import './motifs/motifs.js';
 import { Disposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { localize, localize2 } from '../../../../nls.js';
 import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';

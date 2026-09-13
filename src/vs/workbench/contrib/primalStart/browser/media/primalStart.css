@@ -337,9 +337,12 @@
  *
  * See primalMotif/browser/media/primalMotif.css. The motif layer runs exactly
  * one surface per window; while this page is the visible pane it offers itself
- * as that surface's host, so the globe is drawn here instead of into the ~35px
- * of title strip that is all the ground a workbench with four flush opaque
- * slabs actually shows.
+ * as that surface's host, so the active motif is drawn here instead of into
+ * the ~35px of title strip that is all the ground a workbench with four flush
+ * opaque slabs actually shows. ANY registered motif may take the stage - the
+ * globe, the starfield, the contours, the horizon, the orrery - which is
+ * decided by `resolveMount` in primalMotifScheduler.ts and not by anything
+ * here; nothing in this file may assume the picture is a globe.
  *
  * THE STACKING CONTEXT IS LOAD-BEARING. `.editor-instance` gets nothing but
  * `height: 100%` from editorgroupview.css, `.editor-container` and
@@ -411,7 +414,7 @@
  *
  * WHY A BLURRED RECTANGLE AND NOT A GRADIENT. The plate is painted in
  * `--vscode-editor-background`, the ground's own colour, so it has no shape of
- * its own: what it reads as is the globe fading out behind the words. That only
+ * its own: what it reads as is the motif fading out behind the words. That only
  * works if it has no edge, and it has to be feathered on all four sides at once
  * while staying bounded to the text's own height - a full-height band would
  * take the whole right gutter and the space below the footer with it, which is
@@ -420,7 +423,9 @@
  *
  * The top inset carries the plate off the top of the scroll area so its feather
  * is never on screen; the bottom one stops short of the footer's own margin so
- * the arc rises into a clean band below it.
+ * whatever the active motif composes for the lower part of the pane - the
+ * globe's arc, the orrery's outer ring, the horizon's near field - rises into a
+ * clean band below it.
  *
  * It sits at `z-index: -1` inside `.primal-start-editor`, which establishes its
  * own stacking context above, so the scrim can never fall behind the stage.

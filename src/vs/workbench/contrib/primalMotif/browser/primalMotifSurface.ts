@@ -125,17 +125,25 @@ export class MotifSurface extends Disposable {
 		return this._register(disposable);
 	}
 
-	/** Tells the renderer about a new CSS size, at most once per actual change. */
-	layout(): void {
+	/**
+	 * Tells the renderer about a new CSS size, at most once per actual change.
+	 *
+	 * Returns whether the size did change, because the scheduler owes a resized
+	 * surface a repaint and an unchanged one nothing: no renderer paints from
+	 * `resize()`, so a surface at rest would otherwise show its last frame
+	 * stretched to the new box until the next trigger.
+	 */
+	layout(): boolean {
 		const width = Math.max(0, this.measure.clientWidth);
 		const height = Math.max(0, this.measure.clientHeight);
 		if (width === this.width && height === this.height) {
-			return;
+			return false;
 		}
 
 		this.width = width;
 		this.height = height;
 		this.renderer.resize(width, height);
+		return true;
 	}
 
 	/**

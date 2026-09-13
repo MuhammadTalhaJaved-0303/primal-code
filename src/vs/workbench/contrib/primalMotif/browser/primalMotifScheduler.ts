@@ -20,7 +20,6 @@ import { IWorkbenchLayoutService, LayoutSettings } from '../../../services/layou
 import { IPowerService, ThermalState } from '../../../services/power/common/powerService.js';
 import { IPrimalVibeService } from '../../primalVibes/browser/primalVibes.js';
 import { PRIMAL_WALLPAPER_LAYER_CLASS, PRIMAL_WALLPAPER_ON_CLASS, PRIMAL_WALLPAPER_SETTING_IDS } from '../../primalWallpaper/browser/primalWallpaper.js';
-import { PRIMAL_MOTIF_WORLD_ID } from './motifs/globe.js';
 import {
 	IMotifFrame,
 	IMotifHost,
@@ -35,6 +34,8 @@ import {
 	PRIMAL_MOTIF_ID_SETTING_ID,
 	PRIMAL_MOTIF_INPUT_QUIET_MS,
 	PRIMAL_MOTIF_INSTANT_CLASS,
+	PRIMAL_MOTIF_LAYOUT_BUDGET_MS,
+	PRIMAL_MOTIF_MAX_FPS,
 	PRIMAL_MOTIF_MOTION_SETTING_ID,
 	PRIMAL_MOTIF_ON_CLASS,
 	PRIMAL_MOTIF_PERPETUAL_ON_BATTERY_SETTING_ID,
@@ -49,7 +50,7 @@ import {
 	toMotifId,
 	toMotifMotion
 } from './primalMotif.js';
-import { IMotifPlan, MotifPowerSource, MotifRunMode, SPEED_LIMIT_NOMINAL, resolveMotifPlan } from './primalMotifLadder.js';
+import { IMotifPlan, MotifPowerSource, MotifRunMode, SPEED_LIMIT_NOMINAL, motifBudgetKey, resolveMotifPlan } from './primalMotifLadder.js';
 import { MotifSurface } from './primalMotifSurface.js';
 
 /** Rendered frames in a row over budget before the scheduler throttles itself. */
@@ -59,18 +60,19 @@ const BUDGET_STRIKES = 30;
 const BUDGET_STRIKE_FACTOR = 3;
 
 /**
- * Main-thread work one coalesced re-measure is allowed before it is reported.
+ * The least time between two re-measures of the same surfaces.
  *
- * A resize is not a frame and is not policed like one: it happens once per
- * layout rather than thirty times a second, and the frame budget's remedy -
- * halving the frame rate - would not make a rebuild any cheaper. But a renderer
- * that rebuilds its tables from `resize()` can cost far more than a frame does,
- * and {@link PrimalMotifScheduler.renderFrame} brackets only `render()`, so
- * without this the most expensive thing this contrib does would be the one
- * thing nothing ever measured. Eight frame budgets: generous for a one-off,
- * still well inside a 60Hz frame, and it is a diagnostic rather than a throttle.
+ * `PRIMAL_MOTIF_LAYOUT_BUDGET_MS` bounds what ONE re-measure may cost; this
+ * bounds how many there can be. A sash drag lays a pane out once per mouse
+ * move, at the display's cadence, and `world` at the stage rebuilds its tables
+ * for most of them - at 120 events a second that is more main thread than the
+ * frame loop is allowed in total. The first layout after a quiet spell is
+ * flushed on the next turn, so a single window resize is never held; the ones
+ * behind it wait until the ceiling frame interval has passed, which is also the
+ * soonest a repaint could have shown them. A layout is re-measured no more
+ * often than a frame is painted.
  */
-const LAYOUT_BUDGET_MS = PRIMAL_MOTIF_FRAME_BUDGET_MS * 8;
+const LAYOUT_THROTTLE_MS = 1000 / PRIMAL_MOTIF_MAX_FPS;
 
 /**
  * How close to the next scheduled frame time a raw animation frame may land and
@@ -131,8 +133,11 @@ const INPUT_QUIET_MARGIN_MS = 16;
  * else, because throttling the frame rate is a remedy for per-frame cost and
  * for no other kind. The other expensive thing a renderer does is rebuild its
  * tables from `resize()`, which happens on a layout rather than on a frame;
- * that path is coalesced by {@link relayout} and reported against
- * `LAYOUT_BUDGET_MS`, which is a diagnostic and deliberately not a throttle.
+ * that path is throttled by {@link relayout} to the ceiling frame interval,
+ * measured by `motifBudget.test.ts` and reported here against
+ * `PRIMAL_MOTIF_LAYOUT_BUDGET_MS`, which is a diagnostic and deliberately not a
+ * throttle. Its remedy, when the guard does fire, lands on the (motif, role)
+ * pair that earned it and on nothing else: see {@link overBudgetMotifs}.
  */
 export class PrimalMotifScheduler extends Disposable implements IPrimalMotifService {
 
@@ -180,6 +185,9 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 
 	/** The same, for the re-measure cost report. A window drag would stream it. */
 	private layoutCostLogged = false;
+
+	/** Wall-clock time of the last layout flush, for {@link LAYOUT_THROTTLE_MS}. */
+	private lastLayoutFlushAt = 0;
 
 	/**
 	 * Every container this scheduler has attached per-window listeners to, with
@@ -251,8 +259,22 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	private unavailable = false;
 	private unavailableLogged = false;
 
-	/** The budget guard has fired at least once this session. */
-	private overBudget = false;
+	/**
+	 * The (motif, role) pairs whose `render()` blew the frame budget for
+	 * {@link BUDGET_STRIKES} frames in a row this session - see
+	 * {@link motifBudgetKey} for why a role is part of the key.
+	 *
+	 * Keyed, and not a flag, because the ladder's remedy has to land on what
+	 * earned it. A flag set by `world` at the stage stayed set after the user
+	 * switched to `horizon`, or closed the Start page and sent `world` back to a
+	 * strip where it costs a fiftieth as much, and halved every motif's frame
+	 * rate in every window for the rest of the session with no reason shown in
+	 * the status bar. A key is consulted against the motif and roles actually
+	 * mounted now ({@link activeMotifOverBudget}), so switching either one
+	 * restores the full rate at once, and the pair that struck out stays
+	 * throttled if it comes back - the machine has not changed.
+	 */
+	private readonly overBudgetMotifs = new Set<string>();
 
 	private readonly inputQuietTimer = this._register(new MutableDisposable<IDisposable>());
 
@@ -384,7 +406,13 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		}
 
 		this.pendingLayouts.add(container);
-		this.deferredLayout.value ??= disposableTimeout(() => this.flushLayouts(), 0);
+		if (!this.deferredLayout.value) {
+			// `Date.now()`, as `noteInput` uses, because the scheduler spans
+			// windows with different `performance` epochs; a 33ms gate does not
+			// care about the wall clock's coarseness.
+			const wait = Math.max(0, this.lastLayoutFlushAt + LAYOUT_THROTTLE_MS - Date.now());
+			this.deferredLayout.value = disposableTimeout(() => this.flushLayouts(), wait);
+		}
 	}
 
 	// --- wiring -------------------------------------------------------------
@@ -479,33 +507,61 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	}
 
 	/**
-	 * Re-measures every surface a layout has touched since the last turn.
+	 * Re-measures every surface a layout has touched since the last flush, and
+	 * repaints the ones that changed size and have no frame coming.
 	 *
 	 * The slot is released before the work rather than after, so a layout that
-	 * arrives while this is running arms the next turn instead of being dropped
+	 * arrives while this is running arms the next flush instead of being dropped
 	 * into the batch that is already draining.
+	 *
+	 * THE REPAINT IS OWED HERE AND NOWHERE ELSE. No renderer paints from
+	 * `resize()` - `IMotifRenderer.resize` says so - and under the default
+	 * `settle` motion a surface is at rest almost all of the time, with its frame
+	 * chain cleared. A resize that only re-measured would therefore leave the
+	 * last frame on screen stretched to the new box: every ring an ellipse, the
+	 * vanishing point in the wrong place, until the next trigger, which a sash
+	 * drag or a window resize never is. So a surface whose size changed and
+	 * whose chain is not armed gets the same delta-zero resting frame
+	 * {@link applyTo} gives a surface that has never painted. A running chain
+	 * needs nothing: its next frame is already the repaint.
 	 */
 	private flushLayouts(): void {
 		this.deferredLayout.clear();
+		this.lastLayoutFlushAt = Date.now();
 
 		const containers = [...this.pendingLayouts];
 		this.pendingLayouts.clear();
 
 		for (const container of containers) {
 			const surface = this.surfaces.get(container);
-			if (!surface) {
-				continue; // the surface went away between the layout and this turn.
+			if (!surface || this.unavailable) {
+				continue; // the surface went away between the layout and this flush.
 			}
 
 			const startedAt = surface.targetWindow.performance.now();
-			surface.layout();
+			const resized = surface.layout();
 			const cost = surface.targetWindow.performance.now() - startedAt;
 
-			if (cost > LAYOUT_BUDGET_MS && !this.layoutCostLogged) {
+			if (cost > PRIMAL_MOTIF_LAYOUT_BUDGET_MS && !this.layoutCostLogged) {
 				this.layoutCostLogged = true;
-				this.logService.warn(`[primalMotif] '${surface.renderer.id}' spent ${cost.toFixed(2)}ms on the main thread rebuilding for a new size, against a ${LAYOUT_BUDGET_MS}ms budget. The frame budget does not cover this path - see LAYOUT_BUDGET_MS. Logged once per session.`);
+				this.logService.warn(`[primalMotif] '${surface.renderer.id}' spent ${cost.toFixed(2)}ms on the main thread rebuilding for a new size, against a ${PRIMAL_MOTIF_LAYOUT_BUDGET_MS}ms budget. The frame budget does not cover this path - see PRIMAL_MOTIF_LAYOUT_BUDGET_MS. Logged once per session.`);
+			}
+
+			if (resized && !surface.frame.value) {
+				this.paintRestingFrame(surface);
 			}
 		}
+	}
+
+	/**
+	 * One frame at zero intensity and zero delta: the resting image, painted
+	 * outside the loop. Used for a surface that has never painted and for one
+	 * that changed size while at rest; the guard against ladder churn repainting
+	 * is the caller's.
+	 */
+	private paintRestingFrame(surface: MotifSurface): void {
+		surface.lastRenderedAt = surface.targetWindow.performance.now();
+		this.renderFrame(surface, { time: surface.motifTime, delta: 0, intensity: 0, resting: true });
 	}
 
 	/**
@@ -563,9 +619,10 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		// Through the coalesced slot, not straight into the surface: a container
 		// layout arrives in the middle of the workbench's own layout pass, and a
 		// renderer that rebuilds its tables from `resize()` would take a forced
-		// geometry read and several milliseconds of arithmetic there. Deferring by
-		// one turn also collapses the several layouts a single user action can
-		// produce into one re-measure.
+		// geometry read and several milliseconds of arithmetic there. Deferring
+		// also collapses the several layouts a single user action can produce
+		// into one re-measure, and the drag's worth behind them into one per
+		// frame interval (see LAYOUT_THROTTLE_MS).
 		this._register(this.layoutService.onDidLayoutContainer(({ container }) => this.relayout(container)));
 	}
 
@@ -752,8 +809,32 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 			power: this.power,
 			perpetualOnBattery: this.configurationService.getValue<unknown>(PRIMAL_MOTIF_PERPETUAL_ON_BATTERY_SETTING_ID) === true,
 			quietForMs: Date.now() - this.lastInputAt,
-			overBudget: this.overBudget
+			overBudget: this.activeMotifOverBudget(motifId)
 		});
+	}
+
+	/**
+	 * Has the active motif struck out in a role it is mounted in right now?
+	 *
+	 * The roles come from the containers, not from the surfaces: the plan is
+	 * resolved before the surfaces are reconciled with it, so on the pass that
+	 * moves `world` from a stage back to the strip the surface still says
+	 * `stage` while the mount already says `ground`. What is asked is what the
+	 * plan being resolved will paint into.
+	 */
+	private activeMotifOverBudget(motifId: string): boolean {
+		if (this.overBudgetMotifs.size === 0) {
+			return false; // the common case, and it costs no mount resolution
+		}
+
+		for (const container of this.layoutService.containers) {
+			const role = this.resolveMount(container)?.role;
+			if (role && this.overBudgetMotifs.has(motifBudgetKey(motifId, role))) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// --- applying the plan --------------------------------------------------
@@ -831,7 +912,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		container.classList.toggle(PRIMAL_MOTIF_STAGED_CLASS, surface.role === 'stage');
 		container.classList.toggle(PRIMAL_MOTIF_INSTANT_CLASS, this.accessibilityService.isMotionReduced());
 		surface.element.style.setProperty(PRIMAL_MOTIF_FADE_PROPERTY, '1');
-		surface.layout();
+		const resized = surface.layout();
 
 		if (mode === 'run') {
 			this.startLoop(surface, generation, restart);
@@ -843,13 +924,14 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		// same code path for reduced motion, blur, battery, heat and typing.
 		surface.frame.clear();
 
-		if (surface.lastRenderedAt === 0) {
+		if (surface.lastRenderedAt === 0 || resized) {
 			// Except on a surface that has never painted, which would otherwise be
-			// a transparent canvas. One frame, at zero intensity, so the resting
-			// image is the art rather than an empty rectangle. The guard keeps it
-			// to one frame per surface: ladder churn repaints nothing.
-			surface.lastRenderedAt = surface.targetWindow.performance.now();
-			this.renderFrame(surface, { time: surface.motifTime, delta: 0, intensity: 0, resting: true });
+			// a transparent canvas, and on one whose box just changed, which would
+			// otherwise show its last frame stretched (see {@link flushLayouts}).
+			// One frame, at zero intensity, so the resting image is the art rather
+			// than an empty rectangle. The guard keeps it to one frame per surface
+			// per size: ladder churn repaints nothing.
+			this.paintRestingFrame(surface);
 		}
 	}
 
@@ -959,7 +1041,8 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 			return false;
 		}
 
-		if (this.overBudget) {
+		const key = motifBudgetKey(surface.renderer.id, surface.role);
+		if (this.overBudgetMotifs.has(key)) {
 			return true; // already throttled; stop paying for the bookkeeping
 		}
 
@@ -967,13 +1050,13 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		if (cost > PRIMAL_MOTIF_FRAME_BUDGET_MS * BUDGET_STRIKE_FACTOR) {
 			surface.budgetStrikes++;
 			if (surface.budgetStrikes >= BUDGET_STRIKES) {
-				this.overBudget = true;
-				this.logService.warn(`[primalMotif] '${surface.renderer.id}' spent ${cost.toFixed(2)}ms on the main thread for ${BUDGET_STRIKES} frames in a row, against a ${PRIMAL_MOTIF_FRAME_BUDGET_MS}ms budget. Halving its frame rate for the rest of this session`);
+				this.overBudgetMotifs.add(key);
+				this.logService.warn(`[primalMotif] '${surface.renderer.id}' spent ${cost.toFixed(2)}ms on the main thread for ${BUDGET_STRIKES} frames in a row in the '${surface.role}' role, against a ${PRIMAL_MOTIF_FRAME_BUDGET_MS}ms budget. Halving the frame rate while '${surface.renderer.id}' is painting in that role, for the rest of this session`);
 
 				// Deferred, because this runs with a frame on the stack: re-resolving
 				// here would re-arm the loop under a new generation and then let the
 				// frame we are inside schedule a stale one over it, which would stop
-				// the loop entirely. Guarded to run once by `overBudget` above.
+				// the loop entirely. Guarded to run once per key by the set above.
 				this.scheduleResolve();
 			}
 		} else {
@@ -1020,15 +1103,23 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	 * still uses. `undefined` means there is nowhere to paint at all, which is
 	 * ordinary during startup - the wallpaper contribution may not have run yet.
 	 *
-	 * RESTRICTED TO `world`, FOR NOW. `starfield` puts `tone: 'accent'` on its
-	 * brightest star layer and paints its nebula pools in `--vscode-focusBorder`
-	 * (`media/primalMotifStarfield.css`). At the wallpaper's 0.12 layer opacity,
-	 * across the title strip, that is negligible. At stage scale, across most of
-	 * a pane, it is a dominant hue field - and hue is precisely what this
-	 * product's rules say may never carry meaning, because it is the one thing
-	 * some users cannot see. Until `starfield` is reworked to one ink at varying
-	 * alpha the way `globe` already is, it does not get a stage; it falls back to
-	 * the wallpaper layer here, silently and correctly.
+	 * OPEN TO EVERY MOTIF. This used to read `&& this.activeMotifId === 'world'`,
+	 * because `starfield` painted its brightest layer and two of its three nebula
+	 * pools in `focusBorder` - negligible across a 35px strip at the wallpaper's
+	 * 0.12 ceiling, a dominant hue field across most of a pane. That was a fact
+	 * about one motif's palette, not about stages, and it is now fixed where it
+	 * belonged: `starfield` is one ink at a varying alpha like everything else in
+	 * `motifs/`, so there is nothing left for an id test here to protect.
+	 *
+	 * The rule that replaced it is structural rather than a list. A motif reads
+	 * its ink through `readMotifInk` in `motifs/motifPaint.ts`, which offers
+	 * `foreground` and `descriptionForeground` and nothing else, and a motif that
+	 * cannot get ink from those declines in `create()`. So a motif that would
+	 * bring a hue to a stage cannot be written without deleting that function's
+	 * doctrine first, and `motifRegistry.test.ts` asserts the refusal for every
+	 * registered motif. An id list here would have had to be maintained by hand
+	 * against exactly that property, and would have been wrong the first time
+	 * somebody forgot.
 	 */
 	private resolveMount(container: HTMLElement): { readonly host: HTMLElement; readonly role: PrimalMotifRole } | undefined {
 		// The newest live offer. See {@link stages} for why every offer is kept
@@ -1036,7 +1127,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 		// back to whichever pane offered before it, not to the wallpaper layer.
 		const offers = this.stages.get(container);
 		const stage = offers?.[offers.length - 1];
-		if (stage && this.activeMotifId === PRIMAL_MOTIF_WORLD_ID) {
+		if (stage) {
 			return { host: stage, role: 'stage' };
 		}
 
@@ -1242,13 +1333,16 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 			return { state: 'resting', motifId, reason: undefined, fps: 0 };
 		}
 
+		// `plan.reason` and not `undefined`: a running plan carries a reason only
+		// when the budget guard halved its rate, and that is exactly the case in
+		// which the status bar must not show a number with nothing behind it.
 		if (plan.perpetual) {
-			return { state: 'moving', motifId, reason: undefined, fps: plan.fps };
+			return { state: 'moving', motifId, reason: plan.reason, fps: plan.fps };
 		}
 
 		const elapsed = surface.targetWindow.performance.now() - surface.burstStartedAt;
 		const state: PrimalMotifState = settleIntensity(elapsed) < 1 ? 'settling' : 'moving';
-		return { state, motifId, reason: undefined, fps: plan.fps };
+		return { state, motifId, reason: plan.reason, fps: plan.fps };
 	}
 
 	/** Any surface will do: there is one per window and they share one plan. */

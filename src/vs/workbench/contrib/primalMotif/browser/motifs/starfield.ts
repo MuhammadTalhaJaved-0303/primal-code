@@ -10,11 +10,11 @@ import {
 	IMotifHost,
 	IMotifPalette,
 	IMotifRenderer,
-	isMotifCanvas,
 	PRIMAL_MOTIF_BURST_SECONDS,
 	PrimalMotifKind,
 	registerMotif,
 } from '../primalMotif.js';
+import { acquireMotifContext, clampMotif, readMotifInk, wrapMotif } from './motifPaint.js';
 
 /**
  * Primal Code - the `galaxy` motif: a drifting starfield.
@@ -55,17 +55,54 @@ import {
  * `frame.time` because `frame.time` is the scheduler's burst clock and restarts
  * on every trigger; see the field's own comment.
  *
- * NO COLOR LITERALS. Every star color comes from {@link IMotifPalette}, i.e. from
- * active-theme tokens, and every nebula color comes from a `--vscode-*` custom
- * property. A light theme therefore gets dark specks on a light ground -
- * `foreground` always contrasts the theme's own background - rather than white
- * stars on white.
+ * ONE INK, AT A VARYING ALPHA. Every star and every nebula pool in this motif is
+ * the theme's `foreground` - `descriptionForeground` where a layer wants the
+ * same ink weaker - and nothing else. That is `globe.ts`'s doctrine, stated in
+ * its header and now obeyed here: the picture is carried entirely by luminance,
+ * so it reads identically for a colour blind user. A light theme gets dark
+ * specks on a light ground, because `foreground` always contrasts the theme's
+ * own background.
+ *
+ * IT USED TO CARRY A HUE, AND THAT COST IT THE STAGE. The nearest layer was
+ * painted in `palette.accent` and the nebula's two upper pools in
+ * `--vscode-focusBorder`, which is a saturated hue in four of the six shipping
+ * vibes. Across a 35px title strip at the wallpaper's 0.12 ceiling that was
+ * negligible; at stage scale, across most of a code-free pane, it was a
+ * dominant hue field - so `primalMotifScheduler.ts` barred this motif from the
+ * stage outright. The depth that hue was carrying is now carried by the two
+ * things that were always doing most of the work anyway: {@link STAR_LAYERS} is
+ * a strictly increasing ladder of alpha and a non-decreasing ladder of size, so
+ * a nearer layer is brighter AND bigger, and neither cue depends on being able
+ * to tell two hues apart.
+ *
+ * NO COLOR LITERALS. Every star color comes from {@link IMotifPalette}, i.e.
+ * from active-theme tokens, and every nebula color comes from a `--vscode-*`
+ * custom property.
  */
 
 // --- identity --------------------------------------------------------------
 
 /** The `primalCode.motif.id` value. */
 export const STARFIELD_MOTIF_ID = 'galaxy';
+
+/**
+ * The measured median cost of one `render()`, in milliseconds, at the role and
+ * host size that cost the most.
+ *
+ * Measured in the workbench's own Electron renderer, as the median of five
+ * batches of a hundred and fifty frames; `test/browser/motifBudget.test.ts` is
+ * the harness and re-measures it on every run:
+ *
+ *     ground  1920x1080 window   0.0147ms   2.9% of the 0.5ms budget
+ *     stage   1428x1025 pane     0.0147ms   2.9%
+ *
+ * The two roles agree to the tick, and that is a fact about the design rather
+ * than a coincidence: the same 253 stars go into the same fixed 640x360 buffer
+ * whatever the host is, and the only thing the host decides is how far that
+ * buffer is stretched afterwards - which is the compositor's work and not this
+ * file's. See `IMotifDescriptor.frameCostMs`.
+ */
+export const STARFIELD_FRAME_COST_MS = 0.0147;
 
 /** Written on the canvas so `primalMotifStarfield.css` can give it the nebula. */
 export const STARFIELD_SURFACE_CLASS = 'primal-motif-starfield';
@@ -82,8 +119,14 @@ export const STARFIELD_SURFACE_CLASS = 'primal-motif-starfield';
  */
 const BRIGHTNESS_BUCKETS = 4;
 
-/** Which palette token a layer paints with. A kind discriminator, not an index. */
-type StarTone = 'ink' | 'dim' | 'accent';
+/**
+ * Which palette token a layer paints with. A kind discriminator, not an index.
+ *
+ * Two members, and there is deliberately no third: `accent` was one until it
+ * cost this motif the stage (see the header). Both of these are the same ink at
+ * two strengths.
+ */
+export type StarTone = 'ink' | 'dim';
 
 /**
  * One parallax layer, as authored.
@@ -126,11 +169,25 @@ interface IStarLayerSpec {
 	readonly tone: StarTone;
 }
 
-const STAR_LAYERS: readonly IStarLayerSpec[] = Object.freeze([
-	{ columns: 16, rows: 9, size: 1, driftX: 0.9, driftY: -0.16, alphaMin: 0.16, alphaMax: 0.46, twinkle: 0, tone: 'dim' },
-	{ columns: 11, rows: 6, size: 1, driftX: 2.1, driftY: -0.38, alphaMin: 0.32, alphaMax: 0.74, twinkle: 0.14, tone: 'ink' },
-	{ columns: 7, rows: 4, size: 2, driftX: 4.4, driftY: -0.80, alphaMin: 0.50, alphaMax: 1.00, twinkle: 0.18, tone: 'ink' },
-	{ columns: 4, rows: 2, size: 2, driftX: 5.6, driftY: -1.02, alphaMin: 0.55, alphaMax: 1.00, twinkle: 0.20, tone: 'accent' }
+/**
+ * The four layers, nearest last.
+ *
+ * THE TWO LADDERS ARE THE DEPTH. `alphaMin`/`alphaMax` never overlap between
+ * layers and `size` never decreases, so every layer is separated from its
+ * neighbours twice over - by brightness and by how big a star is - and a reader
+ * who cannot distinguish two hues loses nothing, because there are not two hues.
+ * `motifRegistry.test.ts` asserts both ladders, so a future tweak cannot quietly
+ * flatten one of them and leave the depth resting on the other.
+ *
+ * The deepest layer is the only one in `dim`, which is the same ink weaker: the
+ * layer that is furthest away is the one a theme is most entitled to render as
+ * secondary ink.
+ */
+export const STAR_LAYERS: readonly IStarLayerSpec[] = Object.freeze([
+	{ columns: 16, rows: 9, size: 1, driftX: 0.9, driftY: -0.16, alphaMin: 0.10, alphaMax: 0.26, twinkle: 0, tone: 'dim' },
+	{ columns: 11, rows: 6, size: 1, driftX: 2.1, driftY: -0.38, alphaMin: 0.30, alphaMax: 0.52, twinkle: 0.12, tone: 'ink' },
+	{ columns: 7, rows: 4, size: 2, driftX: 4.4, driftY: -0.80, alphaMin: 0.56, alphaMax: 0.78, twinkle: 0.16, tone: 'ink' },
+	{ columns: 5, rows: 3, size: 3, driftX: 5.6, driftY: -1.02, alphaMin: 0.82, alphaMax: 1.00, twinkle: 0.20, tone: 'ink' }
 ] as const);
 
 /**
@@ -279,16 +336,6 @@ function buildLayer(spec: IStarLayerSpec, color: string, seed: number, width: nu
 	return { spec, color, x, y, brightness, phase, rate };
 }
 
-/** A positive remainder, so the wrap works for the upward (negative) drift too. */
-function wrapOffset(value: number, span: number): number {
-	const wrapped = value % span;
-	return wrapped < 0 ? wrapped + span : wrapped;
-}
-
-function clamp(value: number, low: number, high: number): number {
-	return value < low ? low : value > high ? high : value;
-}
-
 /** Appends one point to a bucket and returns the new count. */
 function writePoint(points: Float32Array, slot: number, x: number, y: number): number {
 	points[slot * 2] = x;
@@ -323,18 +370,20 @@ function isPaintable(context: CanvasRenderingContext2D, value: string): boolean 
 }
 
 /**
- * Ordered fallbacks for a tone, all of them tokens: a layer would rather be the
- * wrong shade of the theme's own ink than not be there at all.
+ * Ordered fallbacks for a tone: a layer would rather be the wrong strength of
+ * the theme's own ink than not be there at all.
+ *
+ * Both chains end at the other ink token and nowhere else. `palette.accent` is
+ * deliberately absent from both and must not be added back - it resolves to
+ * `focusBorder`, and a hue in the ground is the one thing here that some readers
+ * could not see. `create()` has already refused a palette that offers neither
+ * ink, so a chain that falls off its end cannot happen in practice; if it ever
+ * did, the layer is dropped rather than painted in something else.
  */
 function tonePreference(palette: IMotifPalette, tone: StarTone): readonly string[] {
-	switch (tone) {
-		case 'accent':
-			return [palette.accent, palette.ink, palette.dim];
-		case 'dim':
-			return [palette.dim, palette.ink, palette.accent];
-		default:
-			return [palette.ink, palette.dim, palette.accent];
-	}
+	return tone === 'dim'
+		? [palette.dim, palette.ink]
+		: [palette.ink, palette.dim];
 }
 
 // --- the renderer ----------------------------------------------------------
@@ -390,23 +439,24 @@ class StarfieldMotifRenderer implements IMotifRenderer {
 	private elapsedMs = 0;
 
 	create(host: IMotifHost): boolean {
-		const element = host.element;
-		if (!isMotifCanvas(element)) {
-			return false; // the scheduler gives a `canvas2d` motif a canvas; something is very wrong
-		}
-
-		// `alpha: true` is the default and is stated because the whole composition
-		// depends on it: the nebula is the element's own CSS background and shows
-		// through everywhere a star is not.
-		const context = element.getContext('2d', { alpha: true });
+		// No 2D context at all is a refusal rather than `host.fail`: the scheduler
+		// records it against this motif and does not ask again until the palette
+		// changes, which is as permanent as it needs to be without declaring the
+		// whole layer lost for the session.
+		const context = acquireMotifContext(host);
 		if (!context) {
-			// No 2D context at all. A refusal rather than `host.fail`: the scheduler
-			// records it against this motif and does not ask again until the palette
-			// changes, which is as permanent as it needs to be without declaring the
-			// whole layer lost for the session.
 			return false;
 		}
 
+		if (!readMotifInk(host.palette)) {
+			// A theme that supplies neither `foreground` nor `descriptionForeground`
+			// is a theme this cannot be drawn from. The accent is not a third
+			// chance - see `motifPaint.ts` - so the sky declines, the scheduler
+			// records the refusal, and the ground keeps the wallpaper's own wash.
+			return false;
+		}
+
+		const element = context.canvas;
 		this.context = context;
 		this.width = host.bufferWidth;
 		this.height = host.bufferHeight;
@@ -473,7 +523,7 @@ class StarfieldMotifRenderer implements IMotifRenderer {
 
 		const stretchX = width / this.width;
 		const stretchY = height / this.height;
-		this.pixelAspect = clamp(stretchX / stretchY, ASPECT_MIN, ASPECT_MAX);
+		this.pixelAspect = clampMotif(stretchX / stretchY, ASPECT_MIN, ASPECT_MAX);
 	}
 
 	/**
@@ -530,8 +580,8 @@ class StarfieldMotifRenderer implements IMotifRenderer {
 		// One modulo for the whole layer instead of one per star. Both offsets land
 		// in [0, span), and every base position is in [0, span) too, so the sum is
 		// under twice the span and a single conditional subtract wraps it.
-		const offsetX = wrapOffset(spec.driftX * seconds, width);
-		const offsetY = wrapOffset(spec.driftY * seconds, height);
+		const offsetX = wrapMotif(spec.driftX * seconds, width);
+		const offsetY = wrapMotif(spec.driftY * seconds, height);
 
 		const seamX = width - starWidth;
 		const seamY = height - starHeight;
@@ -554,7 +604,7 @@ class StarfieldMotifRenderer implements IMotifRenderer {
 				? brightness[index]
 				: brightness[index] + spec.twinkle * Math.sin(phase[index] + rate[index] * timeMs);
 
-			const bucket = clamp((level * BRIGHTNESS_BUCKETS) | 0, 0, BRIGHTNESS_BUCKETS - 1);
+			const bucket = clampMotif((level * BRIGHTNESS_BUCKETS) | 0, 0, BRIGHTNESS_BUCKETS - 1);
 			const points = this.bucketPoints[bucket];
 			let slot = counts[bucket];
 
@@ -617,6 +667,7 @@ registerMotif({
 	label: localize('primalCode.motif.galaxy', "Galaxy"),
 	description: localize('primalCode.motif.galaxy.description', "A starfield drifting behind the workbench in four parallax layers, painted in the active theme's own ink so it suits a light theme as readily as a dark one. Under the default 'settle' motion it drifts for about {0} seconds after a trigger and then rests.", PRIMAL_MOTIF_BURST_SECONDS),
 	kind: 'canvas2d',
+	frameCostMs: STARFIELD_FRAME_COST_MS,
 	// A slow, even, characterless drift is the one kind of motion that is
 	// tolerable indefinitely: there is no event in it to wait for and no phase to
 	// notice. It is still an opt-in, and the status bar still offers the pause.

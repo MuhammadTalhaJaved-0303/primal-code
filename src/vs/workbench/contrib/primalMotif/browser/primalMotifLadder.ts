@@ -11,6 +11,7 @@ import {
 	PRIMAL_MOTIF_MAX_FPS,
 	PRIMAL_MOTIF_STATIC_ID,
 	PrimalMotifMotion,
+	PrimalMotifRole,
 	PrimalMotifState
 } from './primalMotif.js';
 
@@ -41,7 +42,11 @@ export interface IMotifPlan {
 	/** Frames per second to schedule. 0 unless `mode` is `run`. */
 	readonly fps: number;
 	readonly state: PrimalMotifState;
-	/** Localized sentence for the status bar tooltip; `undefined` while motion runs. */
+	/**
+	 * Localized sentence for the status bar tooltip: why motion is not running,
+	 * or - on the one `run` rung that is a degradation, the budget guard - why
+	 * it runs at half the rate. `undefined` while motion runs unthrottled.
+	 */
 	readonly reason: string | undefined;
 	/** True when the burst has no end: perpetual mode, on a motif that allows it. */
 	readonly perpetual: boolean;
@@ -98,8 +103,26 @@ export interface IMotifLadderInputs {
 	readonly perpetualOnBattery: boolean;
 	/** Rule 6: milliseconds since the last keystroke or wheel event. */
 	readonly quietForMs: number;
-	/** The self-imposed rung: a renderer that could not hold the frame budget. */
+	/**
+	 * The self-imposed rung: THIS motif, in a role it is mounted in now, could
+	 * not hold the frame budget. Keyed by {@link motifBudgetKey} in the
+	 * scheduler, so a strike earned by one motif on a stage is not paid by
+	 * another motif, or by the same motif in a strip.
+	 */
 	readonly overBudget: boolean;
+}
+
+/**
+ * What a budget strike is recorded against: a motif in a role.
+ *
+ * A role and not only a motif, because the same renderer is a different
+ * workload in each: `world` measures 0.019ms in the 35px strip and 0.360ms on
+ * a Start stage, twenty times more, and a strike on the stage says nothing
+ * about the strip. Pure, so the scheduler's bookkeeping can be tested without
+ * the scheduler.
+ */
+export function motifBudgetKey(motifId: string, role: PrimalMotifRole): string {
+	return `${motifId}@${role}`;
 }
 
 export const resolveMotifPlan = (inputs: IMotifLadderInputs): IMotifPlan => {
@@ -194,9 +217,14 @@ export const resolveMotifPlan = (inputs: IMotifLadderInputs): IMotifPlan => {
 	}
 
 	// The self-imposed rung: a motif that cannot hold the main-thread budget gets
-	// half the frames rather than the benefit of the doubt.
+	// half the frames rather than the benefit of the doubt. It is the one rung
+	// that runs and still owes the status bar a reason, because a reader who
+	// sees 15 rather than 30 has to be able to find out why.
 	const ceiling = onBattery ? PRIMAL_MOTIF_BATTERY_FPS : PRIMAL_MOTIF_MAX_FPS;
-	const fps = inputs.overBudget ? Math.min(ceiling, PRIMAL_MOTIF_BATTERY_FPS) : ceiling;
+	if (inputs.overBudget) {
+		const fps = Math.min(ceiling, PRIMAL_MOTIF_BATTERY_FPS);
+		return { mode: 'run', fps, state: 'moving', perpetual, reason: localize('primalCode.motif.reason.overBudget', "'{0}' could not hold its frame budget where it is painting, so it runs at {1} frames per second there for the rest of this session. Another motif, or this one elsewhere, is not affected.", inputs.motifId, fps) };
+	}
 
-	return { mode: 'run', fps, state: 'moving', perpetual, reason: undefined };
+	return { mode: 'run', fps: ceiling, state: 'moving', perpetual, reason: undefined };
 };

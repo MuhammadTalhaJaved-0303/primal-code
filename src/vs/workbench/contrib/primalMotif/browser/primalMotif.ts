@@ -94,6 +94,22 @@ export const PRIMAL_MOTIF_BUFFER_HEIGHT = 360;
 /** Main-thread work one `render()` call is allowed, in milliseconds. */
 export const PRIMAL_MOTIF_FRAME_BUDGET_MS = 0.5;
 
+/**
+ * Main-thread work one `resize()` call is allowed, in milliseconds.
+ *
+ * A resize is not a frame and is not policed like one: it happens once per
+ * layout rather than thirty times a second, and the frame budget's remedy -
+ * halving the frame rate - would not make a rebuild any cheaper. But a
+ * renderer that rebuilds its tables from `resize()` can cost far more than a
+ * frame does, and the scheduler's strike counter brackets only `render()`, so
+ * without this the most expensive thing this contrib does would be the one
+ * thing nothing ever measured. Eight frame budgets: generous for a one-off,
+ * still well inside a 60Hz frame. The scheduler reports an overrun once per
+ * session rather than throttling on it, and `test/browser/motifBudget.test.ts`
+ * measures every motif's `resize()` against it in both roles.
+ */
+export const PRIMAL_MOTIF_LAYOUT_BUDGET_MS = PRIMAL_MOTIF_FRAME_BUDGET_MS * 8;
+
 /** How long after a keystroke or a wheel event motion stays suppressed. */
 export const PRIMAL_MOTIF_INPUT_QUIET_MS = 250;
 
@@ -319,7 +335,13 @@ export interface IMotifRenderer extends IDisposable {
 	/** Paints one frame. Must stay inside {@link PRIMAL_MOTIF_FRAME_BUDGET_MS} of main-thread work. */
 	render(frame: IMotifFrame): void;
 
-	/** The surface's size in CSS pixels changed. The backing store never does; this is for aspect. */
+	/**
+	 * The surface's size in CSS pixels changed. The backing store never does;
+	 * this is for aspect. Must stay inside {@link PRIMAL_MOTIF_LAYOUT_BUDGET_MS}
+	 * of main-thread work, and must not paint: the scheduler paints the frame
+	 * that follows a resize, whether the loop is running or the surface is at
+	 * rest, so a renderer that repainted here would upload twice.
+	 */
 	resize(width: number, height: number): void;
 
 	dispose(): void;
@@ -338,6 +360,26 @@ export interface IMotifDescriptor {
 	 * says `false` here always settles, whatever the setting says.
 	 */
 	readonly allowsPerpetual: boolean;
+
+	/**
+	 * The MEASURED main-thread cost of one {@link IMotifRenderer.render} call, in
+	 * milliseconds, at whichever role and host size costs this motif the most.
+	 *
+	 * A declaration, not a target, and it has to be a number somebody took off a
+	 * clock: `test/browser/motifBudget.test.ts` runs every registered motif for a
+	 * few hundred frames and holds its median against this figure, so a motif
+	 * whose cost drifted upwards fails a test rather than quietly eating a
+	 * thirtieth of a second somewhere in the field. The reason it lives on the
+	 * descriptor rather than only in each motif's header is that the test is
+	 * written over {@link getMotifDescriptors}, so a motif that ships without
+	 * measuring itself cannot exist.
+	 *
+	 * It must be at or under {@link PRIMAL_MOTIF_FRAME_BUDGET_MS}, which is the
+	 * budget itself and is never relaxed to fit a renderer. `0` is the honest
+	 * answer for a motif the scheduler never calls `render` on - `static` is the
+	 * only one.
+	 */
+	readonly frameCostMs: number;
 
 	/** Builds a fresh renderer. Called once per surface, and again after a theme change. */
 	create(): IMotifRenderer;
@@ -418,6 +460,8 @@ registerMotif({
 	description: localize('primalCode.motif.static.description', "No motion at all. The ground keeps the wallpaper's own wash, and nothing in this window runs per frame."),
 	kind: 'css',
 	allowsPerpetual: false,
+	// Nothing is scheduled and `render` is never called: see the class above.
+	frameCostMs: 0,
 	create: () => new StaticMotifRenderer()
 });
 
@@ -464,7 +508,11 @@ export interface IPrimalMotifStatus {
 	readonly state: PrimalMotifState;
 	/** The motif that is (or would be) painting. */
 	readonly motifId: string;
-	/** Why motion is not running, as a localized sentence, or `undefined` while it is. */
+	/**
+	 * Why motion is not running, as a localized sentence - or why it runs at
+	 * half the rate, on the budget guard's rung. `undefined` while motion runs
+	 * unthrottled.
+	 */
 	readonly reason: string | undefined;
 	/** The frame rate currently being scheduled, or 0 when nothing is scheduled. */
 	readonly fps: number;
@@ -535,9 +583,14 @@ export interface IPrimalMotifService {
 	 * the surface re-measured and the picture repainted at the new shape, which
 	 * is what this does and all it does.
 	 *
-	 * Coalesced, so a burst of layouts in one turn costs one re-measure, and
-	 * deferred out of the caller's layout pass, so the forced geometry read is
-	 * not interleaved with the workbench's own layout writes.
+	 * Coalesced and throttled: the first layout after a quiet spell is
+	 * re-measured on the next turn, and the ones behind it no more often than
+	 * the ceiling frame interval, so a sash drag costs one re-measure per frame
+	 * and not one per mouse move. Deferred out of the caller's layout pass in
+	 * either case, so the forced geometry read is not interleaved with the
+	 * workbench's own layout writes. A surface that changed size while at rest
+	 * is repainted by the same flush; one with a frame coming is repainted by
+	 * that frame.
 	 *
 	 * @param container the workbench container, exactly as for {@link registerStage}.
 	 */
