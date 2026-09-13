@@ -5,9 +5,10 @@
 
 import { Color } from '../../../../../base/common/color.js';
 import { localize } from '../../../../../nls.js';
-import { IMotifFrame, IMotifHost, IMotifPalette, IMotifRenderer, PrimalMotifKind, PrimalMotifRole, registerMotif } from '../primalMotif.js';
+import { IMotifFrame, IMotifHost, IMotifRenderer, PRIMAL_MOTIF_LAYOUT_BUDGET_MS, PrimalMotifKind, PrimalMotifRole, registerMotif } from '../primalMotif.js';
 import { getWashMap } from './globeGround.js';
 import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip } from './globeMask.js';
+import { acquireMotifContext, readMotifInk } from './motifPaint.js';
 
 /**
  * Primal Code - the `world` motif: a slowly turning globe in the ground.
@@ -67,8 +68,10 @@ import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip }
  * is the same ink at a lower strength. `palette.accent` is not read anywhere in
  * this file, and must not become one: it resolves to `focusBorder`, a saturated
  * hue in four of the six vibes, and a second hue in the ground would be the one
- * thing here that some users could not see. See {@link readGlobeInk}, which is
- * where that used to be got wrong.
+ * thing here that some users could not see. The ink is read through
+ * `readMotifInk` in `motifPaint.ts`, the one function every motif in this folder
+ * reads it through - this file used to keep a private copy of that rule, which
+ * is where the accent fallback crept in and which is why there is no copy now.
  *
  * WHERE THIS PAINTS. Two roles, and the composition differs between them
  * because the amount of visible ground differs by two orders of magnitude - see
@@ -113,6 +116,35 @@ export const PRIMAL_MOTIF_WORLD_ID = 'world';
  * radius has to be measured rather than reasoned about.
  */
 export const GLOBE_FRAME_COST_MS = 0.360;
+
+/**
+ * The measured median cost of one `resize()` that actually rebuilds, in
+ * milliseconds, at the stage - the role and size where it costs the most.
+ *
+ * NOT A FRAME, AND NOT POLICED LIKE ONE. This is the "most expensive thing this
+ * contrib does" that `primalMotifScheduler.ts` reports against
+ * {@link PRIMAL_MOTIF_LAYOUT_BUDGET_MS}: the mask mip, the seven geometry tables
+ * and the halo, all rebuilt because the pane changed shape. It runs from a
+ * layout and never from a frame, so `frameCostMs` does not cover it and the
+ * strike counter never sees it - which is exactly why it is declared and
+ * measured on its own (`test/browser/motifBudget.test.ts`, the resize suite):
+ *
+ *     stage   1428x1025 pane, 70,507 disc pixels   3.3ms    83% of the 4ms layout budget
+ *     ground  1920x1080 window                     0.3ms     8%
+ *
+ * Three things keep a sash drag from paying this at the display's cadence, and
+ * all three are needed. The scheduler flushes layouts no more often than the
+ * ceiling frame interval; {@link STAGE_RADIUS_STEP_PIXELS} holds the radius
+ * still across small changes so most flushes rebuild nothing; and the
+ * transcendentals in {@link GlobeMotifRenderer.buildGeometry} that could be
+ * tabled are (`asin`, `pow`) or approximated (`atan2`), and the halo pass
+ * solves the ring's extent per row instead of scanning the disc - which is
+ * what brought the stage figure down from 6ms to under the budget in the
+ * first place. It is still the least margin any number in this contrib has,
+ * and anything that raises the stage radius has to be measured, not reasoned
+ * about.
+ */
+export const GLOBE_STAGE_REBUILD_COST_MS = 3.3;
 
 // --- the sphere ------------------------------------------------------------
 
@@ -220,6 +252,19 @@ const STAGE_RADIUS_MAX_PIXELS = 560;
 const STAGE_CENTRE_X_RATIO = 0.86;
 const STAGE_CENTRE_Y_RATIO = 0.88;
 
+/**
+ * The stage radius is held to steps of this many screen pixels.
+ *
+ * A sash drag lays the pane out once per mouse move, and at the stage every
+ * three pixels of width moved the disc's buffer radius past
+ * {@link REBUILD_EPSILON} - one full rebuild ({@link GLOBE_STAGE_REBUILD_COST_MS})
+ * per three pixels of drag. Ten screen pixels of radius is two percent of a
+ * stage disc, invisible as a step while the pane itself is moving, and it means
+ * a drag rebuilds once per eighteen pixels rather than once per three. The
+ * clamp is applied after the rounding, so its ends stay exact.
+ */
+const STAGE_RADIUS_STEP_PIXELS = 10;
+
 /** How far the globe's buffer size must move before the tables are worth rebuilding. */
 const REBUILD_EPSILON = 0.5;
 
@@ -303,6 +348,85 @@ const clamp = (value: number, low: number, high: number): number => value < low 
 
 const smoothstep = (t: number): number => t * t * (3 - 2 * t);
 
+// --- the transcendentals, once ----------------------------------------------
+//
+// `buildGeometry` evaluates an `asin`, a `pow` and an `atan2` for every pixel
+// of the disc, seventy thousand of them at the stage, and those three were
+// most of a 6ms rebuild. Two are functions of one bounded argument and are
+// tabled; the third is not, and is approximated instead. None of the three is
+// on a per-frame path.
+
+/** Entries per unit of the argument in the two tables below. */
+const TABLE_STEPS = 4096;
+
+/**
+ * `asin` over [-1, 1], linearly interpolated.
+ *
+ * The result only has to land on one of `GLOBE_MASK_HEIGHT` rows, and the
+ * interpolation is there for the poles, where `asin` runs vertical and a plain
+ * lookup would be a row out.
+ */
+const ASIN_TABLE = (() => {
+	const table = new Float32Array(TABLE_STEPS + 1);
+	for (let index = 0; index <= TABLE_STEPS; index++) {
+		table[index] = Math.asin(index / TABLE_STEPS * 2 - 1);
+	}
+	return table;
+})();
+
+const asinOf = (value: number): number => {
+	const scaled = (clamp(value, -1, 1) + 1) * (TABLE_STEPS / 2);
+	const index = Math.min(TABLE_STEPS - 1, Math.floor(scaled));
+	const fraction = scaled - index;
+	return ASIN_TABLE[index] + (ASIN_TABLE[index + 1] - ASIN_TABLE[index]) * fraction;
+};
+
+/**
+ * `pow(nz, LIMB_DARKENING)` over [0, 1]. A plain lookup: the quantity feeds a
+ * 128-level shade table, and `nz` is only near zero at the limb, where the
+ * geometric fade has already taken the pixel to nothing.
+ */
+const LIMB_TABLE = (() => {
+	const table = new Float32Array(TABLE_STEPS + 1);
+	for (let index = 0; index <= TABLE_STEPS; index++) {
+		table[index] = Math.pow(index / TABLE_STEPS, LIMB_DARKENING);
+	}
+	return table;
+})();
+
+const limbOf = (nz: number): number => LIMB_TABLE[Math.floor(clamp(nz, 0, 1) * TABLE_STEPS)];
+
+/**
+ * `atan` over [0, 1], as an odd minimax polynomial. Worst error 1.7e-6 radians
+ * over the whole plane once folded through {@link atan2Of}, which is under a
+ * hundredth of one fixed-point longitude unit - and half the cost of the
+ * intrinsic, which was a fifth of the rebuild on its own.
+ */
+const atanOf = (t: number): number => {
+	const t2 = t * t;
+	return t * (0.99997726 + t2 * (-0.33262347 + t2 * (0.19354346 + t2 * (-0.11643287 + t2 * (0.05265332 + t2 * -0.01172120)))));
+};
+
+/** `Math.atan2`, through {@link atanOf} and the usual octant folding. */
+const atan2Of = (y: number, x: number): number => {
+	const ax = Math.abs(x);
+	const ay = Math.abs(y);
+	if (ax === 0 && ay === 0) {
+		return 0;
+	}
+
+	const swap = ay > ax;
+	let angle = atanOf(swap ? ax / ay : ay / ax);
+	if (swap) {
+		angle = Math.PI / 2 - angle;
+	}
+	if (x < 0) {
+		angle = Math.PI - angle;
+	}
+
+	return y < 0 ? -angle : angle;
+};
+
 /** Where the globe goes, in buffer coordinates. */
 export interface IGlobePlacement {
 	readonly centreX: number;
@@ -332,7 +456,9 @@ export interface IGlobePlacement {
  */
 export function computeGlobePlacement(role: PrimalMotifRole, cssWidth: number, cssHeight: number, bufferWidth: number, bufferHeight: number): IGlobePlacement {
 	if (role === 'stage') {
-		const radius = clamp(STAGE_RADIUS_RATIO * Math.min(cssWidth, cssHeight), STAGE_RADIUS_MIN_PIXELS, STAGE_RADIUS_MAX_PIXELS);
+		const wanted = STAGE_RADIUS_RATIO * Math.min(cssWidth, cssHeight);
+		const stepped = Math.round(wanted / STAGE_RADIUS_STEP_PIXELS) * STAGE_RADIUS_STEP_PIXELS;
+		const radius = clamp(stepped, STAGE_RADIUS_MIN_PIXELS, STAGE_RADIUS_MAX_PIXELS);
 
 		return {
 			centreX: STAGE_CENTRE_X_RATIO * bufferWidth,
@@ -374,44 +500,17 @@ const haloAlpha = (rho: number, nx: number, up: number): number => {
 };
 
 /**
- * Parses one resolved theme token.
+ * The globe's ink, which is every motif's ink: `readMotifInk` in
+ * `motifPaint.ts`, re-exported under the name `globePlacement.test.ts` has
+ * always held this motif to.
  *
- * `Color.Format.CSS.parse` throws on malformed input rather than returning
- * null. A palette's strings come from `Color.toString()` and are always either
- * a hex triple or an `rgba()`, but this is the boundary, so it is guarded.
+ * Not a wrapper and not a copy. This file used to carry its own `parseToken`
+ * and `readGlobeInk`, byte for byte the same logic as `motifPaint.ts` - and a
+ * second copy of the ink rule is exactly how the accent fallback got into one
+ * motif without getting into the others. The doctrine lives in one function
+ * and this is that function.
  */
-const parseToken = (value: string): Color | undefined => {
-	if (!value) {
-		return undefined;
-	}
-
-	try {
-		return Color.Format.CSS.parse(value) ?? undefined;
-	} catch {
-		return undefined;
-	}
-};
-
-/**
- * The globe's ink: `foreground`, or `descriptionForeground` under a theme that
- * defines no foreground at all. Both are the same ink by another name.
- *
- * `palette.accent` is deliberately NOT a third fallback, and must not be added
- * back. It resolves to `focusBorder`, which is a saturated hue in four of the
- * six vibes, and the header of this file states in as many words that a second
- * hue in the ground "would be the one thing here that some users could not
- * see". The code used to contradict its own comment: negligible at the title
- * strip's opacity, a dominant hue field at stage scale, and in both cases the
- * one reading of this picture that is not identical for a colour blind user.
- *
- * If neither token parses this returns `undefined` and the renderer declines to
- * paint. Declining is a supported answer - the scheduler records the refusal
- * against this motif and this palette and asks again when either changes - and
- * it is a better one than inventing a colour.
- */
-export function readGlobeInk(palette: IMotifPalette): Color | undefined {
-	return parseToken(palette.ink) ?? parseToken(palette.dim);
-}
+export const readGlobeInk = readMotifInk;
 
 // --- the renderer ----------------------------------------------------------
 
@@ -457,34 +556,42 @@ class GlobeMotifRenderer implements IMotifRenderer {
 	/** Eased milliseconds of motion this renderer has been handed, wrapped to one turn. */
 	private spinMs = 0;
 
+	/**
+	 * The next `paint` must upload the whole buffer, not the disc's rectangle.
+	 *
+	 * Set by {@link rebuild}, which rewrites the wash where the previous globe
+	 * was and the halo where the new one is - two rectangles, of which a frame's
+	 * own upload covers only the second. Cleared by the paint that honours it.
+	 */
+	private uploadAll = false;
+
 	create(host: IMotifHost): boolean {
+		// Both refusals come before the `try`, deliberately. A context that would
+		// not initialise and a palette with no ink in it are facts about this
+		// surface and this theme, and the scheduler has a recoverable path for
+		// each (`markRefused`); the `catch` below is the terminal path, and a
+		// missing token must never be able to reach it. `motifRegistry.test.ts`
+		// holds every motif to that distinction.
+		const context = acquireMotifContext(host);
+		if (!context) {
+			return false;
+		}
+
+		const ink = readMotifInk(host.palette);
+		if (!ink) {
+			// A theme that defines no foreground at all is a theme this cannot be
+			// drawn from. Reporting it rather than guessing a colour is the same
+			// call primalWallpaperPaint.ts makes when its tokens are missing.
+			//
+			// A refusal, not a failure: `host.fail` is deliberately not called,
+			// because nothing is wrong with the graphics stack and the next theme
+			// may well define the token. The scheduler records the refusal against
+			// this motif and this palette and asks again when either changes (see
+			// `markRefused` in primalMotifScheduler.ts).
+			return false;
+		}
+
 		try {
-			const canvas = host.element as HTMLCanvasElement;
-			if (canvas.tagName !== 'CANVAS' || typeof canvas.getContext !== 'function') {
-				return false;
-			}
-
-			// `alpha: true` because the ground below is the workbench's own, and
-			// this motif paints ink onto it rather than replacing it.
-			const context = canvas.getContext('2d', { alpha: true });
-			if (!context) {
-				return false;
-			}
-
-			const ink = readGlobeInk(host.palette);
-			if (!ink) {
-				// A theme that defines no foreground at all is a theme this cannot
-				// be drawn from. Reporting it rather than guessing a colour is the
-				// same call primalWallpaperPaint.ts makes when its tokens are missing.
-				//
-				// A refusal, not a failure: `host.fail` is deliberately not called,
-				// because nothing is wrong with the graphics stack and the next
-				// theme may well define the token. The scheduler records the refusal
-				// against this motif and this palette and asks again when either
-				// changes (see `markRefused` in primalMotifScheduler.ts).
-				return false;
-			}
-
 			this.context = context;
 			this.role = host.role;
 			this.bufferWidth = host.bufferWidth;
@@ -510,10 +617,13 @@ class GlobeMotifRenderer implements IMotifRenderer {
 	 * *buffer* size: the fixed 640x360 buffer is stretched to the window, and
 	 * these tables carry the correction that keeps a circle circular.
 	 *
-	 * Repainting from here is what keeps a resize honest while the motif is at
-	 * rest, which is most of the time: the scheduler lays surfaces out on every
-	 * container layout but only runs frames during a burst, so a resize with no
-	 * repaint would leave a stretched picture on screen until the next trigger.
+	 * Nothing is painted here. The scheduler owns when a frame happens, and it
+	 * paints one resting frame after any layout that changed a surface's size
+	 * while no frame chain is armed (`flushLayouts` in primalMotifScheduler.ts),
+	 * so a resize at rest never leaves a stretched picture on screen and no
+	 * motif has to repaint itself to prevent it. This used to end in a full
+	 * `putImageData`, which was one upload for the rebuild and a second for the
+	 * frame that followed.
 	 */
 	resize(width: number, height: number): void {
 		if (!(width > 0) || !(height > 0) || !this.context) {
@@ -547,7 +657,8 @@ class GlobeMotifRenderer implements IMotifRenderer {
 			this.spinMs -= ROTATION_PERIOD_MS;
 		}
 
-		this.paint(false);
+		this.paint(this.uploadAll);
+		this.uploadAll = false;
 	}
 
 	dispose(): void {
@@ -608,13 +719,15 @@ class GlobeMotifRenderer implements IMotifRenderer {
 	}
 
 	/**
-	 * Rebuilds the mask mip and the per-pixel tables, then repaints everything.
+	 * Rebuilds the mask mip and the per-pixel tables, and lays the wash and the
+	 * halo back into the buffer, ready for the next paint to upload.
 	 *
 	 * This is the only expensive path in the file - one filtered pass over the
-	 * 32K mask, one trigonometric pass over the few thousand pixels of the disc,
-	 * and one pass over the buffer to lay the wash down. It runs on `create` and
-	 * on a resize that moved the globe by more than half a buffer pixel, and
-	 * never from a frame.
+	 * 32K mask, one trigonometric pass over the pixels of the disc, and one pass
+	 * over the previous disc's rectangle to lay the wash down. It runs on
+	 * `create` and on a resize that moved the globe by more than half a buffer
+	 * pixel, and never from a frame; {@link GLOBE_STAGE_REBUILD_COST_MS} is what
+	 * it costs, and the resize suite in `motifBudget.test.ts` holds it there.
 	 */
 	private rebuild(): void {
 		const context = this.context;
@@ -639,7 +752,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 		// expensive thing in the file by an order of magnitude.
 		this.restoreWash(previous);
 		this.paintHalo();
-		this.paint(true);
+		this.uploadAll = true;
 	}
 
 	/**
@@ -696,26 +809,43 @@ class GlobeMotifRenderer implements IMotifRenderer {
 		const { centreX, centreY, radiusX, radiusY, boxX, boxY, boxWidth, boxHeight } = geometry;
 		const outer = 1 + HALO_WIDTH;
 		const ink = this.ink;
+		const boxRight = boxX + boxWidth;
 
 		for (let y = boxY; y < boxY + boxHeight; y++) {
 			const ny = (y + 0.5 - centreY) / radiusY;
-
-			for (let x = boxX; x < boxX + boxWidth; x++) {
-				const nx = (x + 0.5 - centreX) / radiusX;
-				const rho = Math.sqrt(nx * nx + ny * ny);
-				if (rho < 1 || rho > outer) {
-					continue;
-				}
-
-				const halo = Math.round(255 * haloAlpha(rho, nx, -ny) * this.inkAlpha);
-				if (halo <= 0) {
-					continue;
-				}
-
-				const index = y * this.bufferWidth + x;
-				const under = washTone[wash[index]];
-				pixels[index] = ink | ((halo + (((255 - halo) * under) >> 8)) << ALPHA_SHIFT);
+			const ny2 = ny * ny;
+			if (ny2 >= outer * outer) {
+				continue;
 			}
+
+			// The ring's extent along this row, solved rather than searched: the
+			// disc inside it is seventy thousand pixels at the stage, and walking
+			// them only to `continue` was most of this pass.
+			const spanOuter = Math.sqrt(outer * outer - ny2) * radiusX;
+			const spanInner = ny2 < 1 ? Math.sqrt(1 - ny2) * radiusX : 0;
+
+			this.paintHaloRun(y, ny, Math.max(boxX, Math.floor(centreX - spanOuter)), Math.min(boxRight, Math.ceil(centreX - spanInner) + 1), outer, ink, pixels, wash, washTone, centreX, radiusX);
+			this.paintHaloRun(y, ny, Math.max(boxX, Math.floor(centreX + spanInner) - 1), Math.min(boxRight, Math.ceil(centreX + spanOuter) + 1), outer, ink, pixels, wash, washTone, centreX, radiusX);
+		}
+	}
+
+	/** One horizontal run of the ring: `[from, to)` on row `y`, with the exact test still applied per pixel. */
+	private paintHaloRun(y: number, ny: number, from: number, to: number, outer: number, ink: number, pixels: Uint32Array, wash: Uint8Array, washTone: Uint8Array, centreX: number, radiusX: number): void {
+		for (let x = from; x < to; x++) {
+			const nx = (x + 0.5 - centreX) / radiusX;
+			const rho = Math.sqrt(nx * nx + ny * ny);
+			if (rho < 1 || rho > outer) {
+				continue;
+			}
+
+			const halo = Math.round(255 * haloAlpha(rho, nx, -ny) * this.inkAlpha);
+			if (halo <= 0) {
+				continue;
+			}
+
+			const index = y * this.bufferWidth + x;
+			const under = washTone[wash[index]];
+			pixels[index] = ink | ((halo + (((255 - halo) * under) >> 8)) << ALPHA_SHIFT);
 		}
 	}
 
@@ -793,8 +923,8 @@ class GlobeMotifRenderer implements IMotifRenderer {
 				// oriented so that east runs to the right of the screen.
 				const sinLatitude = up * COS_TILT + nz * SIN_TILT;
 				const across = -up * SIN_TILT + nz * COS_TILT;
-				const longitude = Math.atan2(nx, across);
-				const latitude = Math.asin(clamp(sinLatitude, -1, 1));
+				const longitude = atan2Of(nx, across);
+				const latitude = asinOf(sinLatitude);
 
 				let row = Math.floor((0.5 - latitude / Math.PI) * GLOBE_MASK_HEIGHT);
 				row = clamp(row, 0, GLOBE_MASK_HEIGHT - 1);
@@ -813,7 +943,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 
 				const diffuse = Math.max(0, nx * LIGHT_X + up * LIGHT_Y + nz * LIGHT_Z);
 				const fade = smoothstep(clamp((1 - rho) / (1 - fadeFrom), 0, 1));
-				const lit = (AMBIENT + (1 - AMBIENT) * diffuse) * Math.pow(nz, LIMB_DARKENING) * fade;
+				const lit = (AMBIENT + (1 - AMBIENT) * diffuse) * limbOf(nz) * fade;
 
 				const index = y * width + x;
 				dest[count] = index;

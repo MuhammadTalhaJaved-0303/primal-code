@@ -8,7 +8,7 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/tes
 import { PRIMAL_MOTIF_BUFFER_HEIGHT, PRIMAL_MOTIF_BUFFER_WIDTH } from '../../browser/primalMotif.js';
 import { BREATH_AMPLITUDE, computeContourComposition, computeContourRings } from '../../browser/motifs/contours.js';
 import { computeOrbitSystem, orbitPeriodMs } from '../../browser/motifs/orbit.js';
-import { computeHorizonCamera } from '../../browser/motifs/horizon.js';
+import { HORIZON_GROUND_STRIP_PIXELS, computeHorizonCamera, horizonDepthLinePositions } from '../../browser/motifs/horizon.js';
 
 /**
  * The three new motifs' compositions.
@@ -237,14 +237,73 @@ suite('Primal Motif - horizon composition', () => {
 		assert.ok(stage.spread > ground.spread, 'the stage is a wider field of view, not the same one enlarged');
 	});
 
-	test('the nearest line leaves the frame before the treadmill recycles it', () => {
+	test('the nearest line leaves the visible frame before the treadmill recycles it', () => {
 		// The recycle is only invisible if the line being recycled has already
-		// gone. `reach` is what puts it past the bottom edge.
-		for (const role of ['ground', 'stage'] as const) {
-			for (const [cssWidth, cssHeight] of SHAPES) {
-				const camera = computeHorizonCamera(role, cssWidth, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
-				const nearest = camera.vanishingY + camera.reach;
-				assert.ok(nearest > BUFFER_HEIGHT, `'${role}' would recycle a line inside the frame at ${cssWidth}x${cssHeight}`);
+		// gone. `reach` is what puts it past the edge - the pane's bottom edge on
+		// a stage, and the strip's bottom edge in the ground role, where the slab
+		// below the strip is the only edge anybody can see.
+		for (const [cssWidth, cssHeight] of SHAPES) {
+			const stage = computeHorizonCamera('stage', cssWidth, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
+			assert.ok(stage.vanishingY + stage.reach > BUFFER_HEIGHT, `'stage' would recycle a line inside the pane at ${cssWidth}x${cssHeight}`);
+
+			const ground = computeHorizonCamera('ground', cssWidth, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
+			const nearestInCssPixels = (ground.vanishingY + ground.reach) / BUFFER_HEIGHT * cssHeight;
+			assert.ok(nearestInCssPixels > HORIZON_GROUND_STRIP_PIXELS, `'ground' would recycle a line inside the strip at ${cssWidth}x${cssHeight}`);
+		}
+	});
+
+	test('the ground plane is a fixed screen size, so the strip holds the same picture at every window size', () => {
+		// The same argument `globe.ts` makes for its radius: the strip is a fixed
+		// screen size, so a plane that grew with the window would only put its
+		// lines further behind the slab. Both axes, because the fan's shape is
+		// part of the picture.
+		const reference = computeHorizonCamera('ground', 1280, 720, BUFFER_WIDTH, BUFFER_HEIGHT);
+		const referenceReach = reference.reach / BUFFER_HEIGHT * 720;
+		const referenceSpread = reference.spread / BUFFER_WIDTH * 1280;
+
+		for (const [cssWidth, cssHeight] of SHAPES) {
+			const camera = computeHorizonCamera('ground', cssWidth, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
+			assert.ok(Math.abs(camera.reach / BUFFER_HEIGHT * cssHeight - referenceReach) < 1e-9, `the plane grew with the window at ${cssWidth}x${cssHeight}`);
+			assert.ok(Math.abs(camera.spread / BUFFER_WIDTH * cssWidth - referenceSpread) < 1e-9, `the fan changed shape at ${cssWidth}x${cssHeight}`);
+		}
+	});
+
+	test('in the ground role every carried line but the nearest is inside the strip, at every phase of the cycle', () => {
+		// This is what the ground role exists to show, and it is what the
+		// previous camera never did: composed for the whole window, its farthest
+		// line sat eighty screen pixels below a strip that ends at thirty-five,
+		// so the only thing the strip ever held was the static horizon rule.
+		// Checked at the two ends of the treadmill's cycle, which bound every
+		// position in between, and at every window height.
+		for (const cssHeight of [600, 720, 1080, 1440, 2160]) {
+			const camera = computeHorizonCamera('ground', 1920, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
+
+			for (const frac of [0, 0.5, 1]) {
+				const positions = horizonDepthLinePositions(camera, frac);
+				const inside = positions.filter(y => y / BUFFER_HEIGHT * cssHeight < HORIZON_GROUND_STRIP_PIXELS);
+				assert.ok(inside.length >= positions.length - 1, `only ${inside.length} of ${positions.length} lines are in the strip at ${cssHeight}px, frac ${frac}`);
+
+				// And they are below the horizon, not on it: the strip is a picture
+				// of a plane, not a thicker horizon rule.
+				const farthestInCssPixels = (positions[positions.length - 1] - camera.vanishingY) / BUFFER_HEIGHT * cssHeight;
+				assert.ok(farthestInCssPixels > 1, `the far field collapsed onto the horizon at ${cssHeight}px`);
+			}
+		}
+	});
+
+	test('in the ground role the two nearest carried lines never come within five screen pixels of each other', () => {
+		// Lines that are closer than that are a band, not lines. The near field
+		// is where the alpha is, so it is the near field that has to resolve;
+		// the far field is allowed to dissolve into the horizon, exactly as it
+		// does on a stage. In screen pixels, because a 4K window has six of them
+		// to a buffer pixel and the buffer is not the unit that matters.
+		for (const cssHeight of [600, 720, 1080, 1440, 2160]) {
+			const camera = computeHorizonCamera('ground', 1920, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT);
+
+			for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
+				const [nearest, next] = horizonDepthLinePositions(camera, frac);
+				const gapInCssPixels = (nearest - next) / BUFFER_HEIGHT * cssHeight;
+				assert.ok(gapInCssPixels >= 5, `the two nearest lines are ${gapInCssPixels}px apart at ${cssHeight}px, frac ${frac}`);
 			}
 		}
 	});

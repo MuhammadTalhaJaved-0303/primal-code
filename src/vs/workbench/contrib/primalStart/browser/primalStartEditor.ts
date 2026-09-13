@@ -504,8 +504,11 @@ export class PrimalStartEditor extends EditorPane {
 
 		// The motif's own `onDidLayoutContainer` hook fires on *container* layout,
 		// and an editor resize is not one of those, so the surface would keep the
-		// size it was built at and draw the globe as an ellipse. Only a size that
-		// actually changed is forwarded: a sash drag is a great many layouts.
+		// size it was built at and draw the active motif stretched - a globe or
+		// an orrery as an ellipse. Any registered motif may be on this stage (see
+		// `resolveMount` in primalMotifScheduler.ts), and every one of them
+		// corrects for the box it is told. Only a size that actually changed is
+		// forwarded: a sash drag is a great many layouts.
 		if (dimension.width === this.stageWidth && dimension.height === this.stageHeight) {
 			return;
 		}
@@ -517,7 +520,7 @@ export class PrimalStartEditor extends EditorPane {
 		// for: it re-resolves the whole ladder and re-arms the frame chain at
 		// `now`, which throws away the plan's frame-rate ceiling until the next
 		// pass. `EditorGroupView` calls this once per mouse-move of a sash drag,
-		// so triggering here would render the globe at the display's cadence
+		// so triggering here would render the motif at the display's cadence
 		// rather than at the 30fps the ladder chose, synchronously inside the
 		// workbench's own layout pass, for as long as the drag lasted. A resize
 		// asks for none of that; it asks to be re-measured.

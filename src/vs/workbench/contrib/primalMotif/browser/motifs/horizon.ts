@@ -42,34 +42,49 @@ import { acquireMotifContext, clampMotif, readMotifInk, wrapMotif } from './moti
  * arrives at an alpha of about two percent, so neither event is visible and the
  * flow has no repeat in it that the eye can find.
  *
- * MEASURED COST, on the shipped code, as the median of 400 frames in the
- * workbench's own Electron renderer (`test/browser/motifBudget.test.ts` is the
- * harness, and it asserts the number below against a fresh measurement):
+ * MEASURED COST, on the shipped code, as the median of five batches sized to
+ * span at least twenty milliseconds each, in the workbench's own Electron
+ * renderer (`test/browser/motifBudget.test.ts` is the harness, and it asserts
+ * the number below against a fresh measurement):
  *
- *     ground  18 depth lines, 15 rays, 1920x1080 window   0.0060ms   1.2% of the 0.5ms budget
- *     stage   18 depth lines, 15 rays, 1428x1025 pane     0.0047ms   0.9%
+ *     stage   18 depth lines, 15 rays, 1428x1025 pane     0.0046ms   0.9% of the 0.5ms budget
+ *     ground  18 depth lines, 15 rays, 1920x1080 window   0.0046ms   0.9%
  *
- * The GROUND role is the dearer of the two here, which is the opposite of every
- * other motif in this folder and is worth knowing why: its vanishing point is
- * ten screen pixels down rather than two fifths of the way, so nearly the whole
- * plane is inside the frame and nearly every line it carries is actually
- * rasterised. Either way it is the cheapest motif in the folder.
+ * The two roles cost the same to within the clock's noise - a frame is the
+ * same ten strokes whichever camera is in front of it - and it is the cheapest
+ * motif in the folder. An earlier table here put the ground role at 0.0060ms
+ * and explained the difference; the difference was two ticks of a 0.1ms clock
+ * over a batch that was only eight ticks long, which is why the harness now
+ * sizes its batches by wall time.
  *
- * BOTH ROLES, AND THE CAMERA IS WHAT MOVES BETWEEN THEM. `ground` puts the
- * vanishing point INSIDE the ~35px title strip, ten screen pixels down, which is
- * the one placement that gives both visible strips something to hold: the title
- * strip gets the horizon itself and the dense far lines converging on it, and the
- * status strip - which is the near field, most of a window away - gets the fast
- * ones. It is a screen-pixel offset for the same reason `globe.ts` uses one: the
- * strip is a fixed screen size. `stage` raises the vanishing point to two fifths
- * down a whole pane and widens the field of view, so the upper part of the frame
- * is empty sky where a Start page's text column sits, and the grid holds the
- * lower three fifths. See {@link computeHorizonCamera}.
+ * BOTH ROLES, AND THE CAMERA IS WHAT MOVES BETWEEN THEM. `stage` puts the
+ * vanishing point two fifths down a whole pane and widens the field of view,
+ * so the upper part of the frame is empty sky where a Start page's text column
+ * sits and the grid holds the lower three fifths, running off the bottom edge.
  *
- * IT IS A FIELD, SO IT MAY STRETCH. Unlike `world` and `orbit`, nothing here is
- * an object with a shape to preserve, and a wider window is honestly a wider
- * field of view: the composition is expressed in fractions of the frame and the
- * fixed 640x360 buffer is allowed to carry it to whatever shape the host is.
+ * `ground` IS A SMALL PLANE, THE SIZE OF THE STRIP. The only ground a workbench
+ * shows is the ~35px title strip and the status strip (see `globe.ts`), and a
+ * plane composed for the whole window puts nothing that moves in either: a
+ * `1/z` projection cannot hold resolvable lines in the 25 screen pixels under a
+ * horizon while also reaching the bottom of a window, so the far field is
+ * always further down than the strip and the near field passes the status strip
+ * for three percent of a cycle. The ground camera therefore keeps the horizon
+ * ten screen pixels down, as before, but gives the plane a reach of
+ * {@link NEAR_OVERSHOOT} times the strip below it: the nearest line leaves
+ * through the strip's bottom edge, behind the slab, every other carried line is
+ * inside the strip at every phase of the cycle, and the two nearest are never
+ * closer than five screen pixels. Everything is a screen-pixel size for the
+ * reason `globe.ts` gives - the strip is a fixed screen size - and the ray fan
+ * is sized in screen pixels too, so the picture is the same shape whatever the
+ * window does. `test/browser/motifComposition.test.ts` holds all of that. The
+ * status strip gets nothing in this role; neither does it from `contours` or
+ * `orbit`, which anchor their ground compositions in the same strip.
+ *
+ * THE STAGE IS A FIELD, SO IT MAY STRETCH. Unlike `world` and `orbit`, nothing
+ * there is an object with a shape to preserve, and a wider pane is honestly a
+ * wider field of view: the stage composition is expressed in fractions of the
+ * frame and the fixed 640x360 buffer is allowed to carry it to whatever shape
+ * the host is. See {@link computeHorizonCamera}.
  *
  * ONE INK. Horizon, depth lines and rays are all `foreground` at their own
  * alpha, and distance is carried by that alpha alone - which is the correct
@@ -88,7 +103,7 @@ export const PRIMAL_MOTIF_HORIZON_ID = 'horizon';
  * for the table it comes from, and `IMotifDescriptor.frameCostMs` for what the
  * number is for.
  */
-export const HORIZON_FRAME_COST_MS = 0.0060;
+export const HORIZON_FRAME_COST_MS = 0.0046;
 
 // --- the plane -------------------------------------------------------------
 
@@ -160,7 +175,21 @@ const HORIZON_LINE_WIDTH = 1.4;
 
 /** The ground role: the vanishing point, in screen pixels below the top edge. */
 const GROUND_VANISHING_Y_PIXELS = 10;
-const GROUND_SPREAD_RATIO = 0.62;
+
+/**
+ * The ground role: the strip the plane lives in, in screen pixels - the default
+ * title bar, which is the same 35px `globe.ts` and `contours.ts` compose for.
+ * Exported for the composition suite, which asks whether the plane fits it.
+ */
+export const HORIZON_GROUND_STRIP_PIXELS = 35;
+
+/**
+ * The ground role: one lateral step of the ray fan at unit depth, in screen
+ * pixels. Forty puts the outermost ray about two hundred pixels out at the
+ * strip's bottom edge and the innermost at forty degrees to the horizon, which
+ * is a fan and not a stack of near-horizontal rules.
+ */
+const GROUND_SPREAD_PIXELS = 40;
 
 /** The stage role: the vanishing point as a fraction of the pane, and a wider field of view. */
 const STAGE_VANISHING_Y_RATIO = 0.40;
@@ -204,16 +233,37 @@ export function computeHorizonCamera(role: PrimalMotifRole, cssWidth: number, cs
 		};
 	}
 
-	// Screen pixels, not a ratio: the strip this has to land in is a fixed screen
-	// size whatever the window does. `cssHeight` is guarded by the caller.
-	const vanishingY = GROUND_VANISHING_Y_PIXELS * bufferHeight / cssHeight;
+	// Screen pixels throughout, not ratios: the strip this has to land in is a
+	// fixed screen size whatever the window does, so the plane is composed in
+	// that unit and each axis is then divided by its own stretch. The reach
+	// runs from the horizon to `NEAR_OVERSHOOT` times the strip below it: the
+	// nearest line leaves through the strip's bottom edge, behind the slab, and
+	// every other carried line is inside the strip. `cssWidth` and `cssHeight`
+	// are guarded by the caller.
+	const scaleY = bufferHeight / cssHeight;
 
 	return {
 		vanishingX: VANISHING_X_RATIO * bufferWidth,
-		vanishingY,
-		reach: (bufferHeight - vanishingY) * NEAR_OVERSHOOT,
-		spread: GROUND_SPREAD_RATIO * bufferWidth / RAY_SPREAD_COUNT
+		vanishingY: GROUND_VANISHING_Y_PIXELS * scaleY,
+		reach: (HORIZON_GROUND_STRIP_PIXELS - GROUND_VANISHING_Y_PIXELS) * NEAR_OVERSHOOT * scaleY,
+		spread: GROUND_SPREAD_PIXELS * bufferWidth / cssWidth
 	};
+}
+
+/**
+ * Where each carried line is, in buffer pixels down the frame, nearest first,
+ * for one phase of the treadmill - `frac` counts down from 1 to 0, as in
+ * {@link HorizonMotifRenderer.advance}, which is the same arithmetic written
+ * over a preallocated array. Pure, and exported so the composition suite can
+ * ask the question the ground role exists to answer: are the lines in the
+ * strip. Allocates, so it is not what a frame calls.
+ */
+export function horizonDepthLinePositions(camera: IHorizonCamera, frac: number): number[] {
+	const positions: number[] = [];
+	for (let line = 0; line < DEPTH_LINES; line++) {
+		positions.push(camera.vanishingY + camera.reach / (line + 1 + frac));
+	}
+	return positions;
 }
 
 // --- the renderer ----------------------------------------------------------
@@ -272,10 +322,13 @@ class HorizonMotifRenderer implements IMotifRenderer {
 	}
 
 	/**
-	 * In the `ground` role the vanishing point is a fixed screen offset, so a
-	 * layout moves it within the buffer; in `stage` the camera is expressed in
-	 * fractions of the frame and does not move at all, which the epsilon test
-	 * discovers for itself rather than being told.
+	 * In the `ground` role the whole plane is a fixed screen size, so a layout
+	 * moves it within the buffer on both axes; in `stage` the camera is
+	 * expressed in fractions of the frame and does not move at all, which the
+	 * epsilon test discovers for itself rather than being told.
+	 *
+	 * Nothing is painted here. The scheduler paints the frame that follows a
+	 * resize, whether the loop is running or the surface is at rest.
 	 */
 	resize(width: number, height: number): void {
 		if (!(width > 0) || !(height > 0) || !this.context) {
@@ -286,7 +339,11 @@ class HorizonMotifRenderer implements IMotifRenderer {
 		this.cssHeight = height;
 
 		const next = computeHorizonCamera(this.role, width, height, this.bufferWidth, this.bufferHeight);
-		if (this.camera && Math.abs(next.vanishingY - this.camera.vanishingY) < REBUILD_EPSILON) {
+		const camera = this.camera;
+		if (camera
+			&& Math.abs(next.vanishingY - camera.vanishingY) < REBUILD_EPSILON
+			&& Math.abs(next.reach - camera.reach) < REBUILD_EPSILON
+			&& Math.abs(next.spread - camera.spread) < REBUILD_EPSILON) {
 			return;
 		}
 
@@ -328,7 +385,8 @@ class HorizonMotifRenderer implements IMotifRenderer {
 	 *
 	 * `frac` counts DOWN from 1 to 0, so `z` falls and the plane comes towards
 	 * the viewer. See the header for why the wrap at the end of that count is
-	 * not visible.
+	 * not visible. {@link horizonDepthLinePositions} is this, in buffer pixels,
+	 * for the tests.
 	 */
 	private advance(): void {
 		const frac = 1 - wrapMotif(this.elapsedMs / SCROLL_PERIOD_MS, 1);
@@ -427,7 +485,7 @@ class HorizonMotifRenderer implements IMotifRenderer {
 registerMotif({
 	id: PRIMAL_MOTIF_HORIZON_ID,
 	label: localize('primalCode.motif.horizon', "Horizon"),
-	description: localize('primalCode.motif.horizon.description', "A wireframe ground plane running under the window towards a vanishing point, its lines drawn in the active theme's own ink and fading with distance. No second colour. Under the default 'settle' motion it travels for about {0} seconds after a trigger and then rests.", PRIMAL_MOTIF_BURST_SECONDS),
+	description: localize('primalCode.motif.horizon.description', "A wireframe ground plane running towards a vanishing point - the size of the title strip behind the chrome, most of a pane on a Start page - its lines drawn in the active theme's own ink and fading with distance. No second colour. Under the default 'settle' motion it travels for about {0} seconds after a trigger and then rests.", PRIMAL_MOTIF_BURST_SECONDS),
 	kind: 'canvas2d',
 	// An even flow towards the viewer with no event in it and no phase to notice
 	// passes the test `starfield.ts` sets for perpetual motion. It is still an

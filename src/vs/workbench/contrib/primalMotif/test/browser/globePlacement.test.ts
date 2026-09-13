@@ -124,9 +124,32 @@ suite('Primal Motif - globe placement', () => {
 	test('the stage radius is taken from the shorter side, so a wide short pane is not banded', () => {
 		// A pane split horizontally is wide and short. Sizing off the long side
 		// would put a disc taller than the pane into it, and all that would show is
-		// a band with no curvature in it at all.
+		// a band with no curvature in it at all. 0.55 of 500 is 275, held to the
+		// ten-pixel step: 280 - and nowhere near the 560 the long side would ask for.
 		const wide = screenRadii(computeGlobePlacement('stage', 2000, 500, BUFFER_WIDTH, BUFFER_HEIGHT), 2000, 500);
-		assert.ok(Math.abs(wide.x - 0.55 * 500) < 1e-9, 'the shorter side is the one that decides');
+		assert.ok(Math.abs(wide.x - 280) < 1e-9, 'the shorter side is the one that decides');
+	});
+
+	test('the stage radius is held to ten-pixel steps, so a sash drag does not rebuild the globe per mouse move', () => {
+		// Every three pixels of drag used to move the buffer radius past the
+		// rebuild epsilon, and a stage rebuild is the most expensive thing this
+		// contrib does. Inside the clamp the radius is always a multiple of the
+		// step, and a pane one pixel wider asks for the same globe.
+		const radiusOf = (cssWidth: number, cssHeight: number) =>
+			screenRadii(computeGlobePlacement('stage', cssWidth, cssHeight, BUFFER_WIDTH, BUFFER_HEIGHT), cssWidth, cssHeight).x;
+
+		for (let side = 500; side <= 1000; side += 7) {
+			const radius = radiusOf(2000, side);
+			assert.ok(Math.abs(radius / 10 - Math.round(radius / 10)) < 1e-9, `radius ${radius} at ${side}px is not on the step`);
+			assert.ok(Math.abs(radius - 0.55 * side) <= 5 + 1e-9, `radius ${radius} at ${side}px is more than half a step from the ratio`);
+		}
+
+		assert.strictEqual(radiusOf(2000, 800), radiusOf(2000, 801), 'one pixel of drag must not move the radius');
+		assert.notStrictEqual(radiusOf(2000, 800), radiusOf(2000, 820), 'but the radius still follows the pane');
+
+		// The clamp's ends are exact: rounding happens before it, never after.
+		assert.ok(Math.abs(radiusOf(320, 300) - 220) < 1e-9);
+		assert.ok(Math.abs(radiusOf(5120, 2880) - 560) < 1e-9);
 	});
 
 	// --- the invariant that made the stage possible at all -------------------

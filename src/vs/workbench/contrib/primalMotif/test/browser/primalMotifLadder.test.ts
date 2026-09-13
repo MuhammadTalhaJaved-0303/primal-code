@@ -11,7 +11,7 @@ import {
 	PRIMAL_MOTIF_MAX_FPS,
 	PRIMAL_MOTIF_STATIC_ID
 } from '../../browser/primalMotif.js';
-import { IMotifLadderInputs, SPEED_LIMIT_NOMINAL, resolveMotifPlan } from '../../browser/primalMotifLadder.js';
+import { IMotifLadderInputs, SPEED_LIMIT_NOMINAL, motifBudgetKey, resolveMotifPlan } from '../../browser/primalMotifLadder.js';
 
 /**
  * The degradation ladder is the whole power guarantee of the motif layer, it is
@@ -233,6 +233,32 @@ suite('Primal Motif - degradation ladder', () => {
 			plan({ overBudget: true, power: 'battery', perpetualOnBattery: true }).fps, PRIMAL_MOTIF_BATTERY_FPS,
 			'the guard is a minimum against the ceiling, so it can only ever lower the rate'
 		);
+	});
+
+	test('the budget guard is the one running rung that still explains itself', () => {
+		// The status bar shows a frame rate, and 15 rather than 30 with nothing
+		// behind it is a number the reader cannot act on. Every other running
+		// answer has no reason because there is nothing to explain.
+		const throttled = plan({ overBudget: true });
+		assert.strictEqual(throttled.mode, 'run');
+		assert.ok(throttled.reason, 'a halved rate owes the status bar a sentence');
+		assert.ok(throttled.reason.includes(running.motifId), 'and the sentence names the motif that earned it');
+		assert.strictEqual(plan({}).reason, undefined);
+	});
+
+	test('a budget strike is keyed to the motif and the role that earned it', () => {
+		// The scheduler records strikes under this key and consults it against
+		// the motif and roles mounted now, so a strike by `world` on a stage is
+		// not paid by `horizon`, nor by `world` back in the strip. Two motifs, two
+		// roles, four keys.
+		const keys = new Set([
+			motifBudgetKey('world', 'stage'),
+			motifBudgetKey('world', 'ground'),
+			motifBudgetKey('horizon', 'stage'),
+			motifBudgetKey('horizon', 'ground')
+		]);
+		assert.strictEqual(keys.size, 4, 'a key that collapsed either axis would throttle the wrong thing');
+		assert.strictEqual(motifBudgetKey('world', 'stage'), motifBudgetKey('world', 'stage'), 'and the same pair is the same key');
 	});
 
 	// --- perpetual is a per-motif opt-in, not a global switch ----------------

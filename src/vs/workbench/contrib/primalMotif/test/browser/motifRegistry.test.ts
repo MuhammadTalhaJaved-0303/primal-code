@@ -37,6 +37,17 @@ const ROLES: readonly PrimalMotifRole[] = Object.freeze(['ground', 'stage'] as c
 /** Ink pixels the buffer has to carry before a role counts as painted. */
 const MINIMUM_PAINTED_PIXELS = 100;
 
+/** The buffer's bytes, copied, so two moments can be compared. */
+function snapshot(element: HTMLElement): Uint8ClampedArray {
+	if (!isMotifCanvas(element)) {
+		assert.fail('a canvas motif must have been handed a canvas');
+	}
+
+	const context = element.getContext('2d');
+	assert.ok(context, 'the canvas must still have its 2D context');
+	return new Uint8ClampedArray(context.getImageData(0, 0, element.width, element.height).data);
+}
+
 /** How many ink pixels a renderer laid down, out of the whole buffer. */
 function countPaintedPixels(element: HTMLElement): number {
 	if (!isMotifCanvas(element)) {
@@ -56,6 +67,54 @@ function countPaintedPixels(element: HTMLElement): number {
 	}
 
 	return painted;
+}
+
+/**
+ * The widest spread between a painted pixel's channels before it counts as a
+ * hue. The test palettes' inks are grey to within 10 (`#e8e4de` is 232/228/222),
+ * their accents are not (`#7fb4e8` spreads 105), and un-premultiplying a faint
+ * pixel out of `getImageData` adds rounding noise, so faint pixels are skipped
+ * and the tolerance sits well clear of the ink and well under the accent.
+ */
+const MAX_CHROMA_SPREAD = 32;
+const CHROMA_MIN_ALPHA = 64;
+
+/**
+ * The widest channel spread among the buffer's solid pixels, and where it was.
+ *
+ * This is the doctrine in `motifs/motifPaint.ts` held at the pixel: the ground
+ * is one ink at varying alpha, so nothing a motif paints may carry a hue the
+ * ink does not. Reading the source can miss a tone that resolves to the
+ * accent two files away; the pixels cannot.
+ */
+function widestChromaSpread(element: HTMLElement): { readonly spread: number; readonly at: string } {
+	if (!isMotifCanvas(element)) {
+		assert.fail('a canvas motif must have been handed a canvas');
+	}
+
+	const context = element.getContext('2d');
+	assert.ok(context, 'the canvas must still have its 2D context');
+
+	const pixels = context.getImageData(0, 0, element.width, element.height).data;
+	let spread = 0;
+	let at = 'nowhere';
+	for (let index = 0; index < pixels.length; index += 4) {
+		if (pixels[index + 3] < CHROMA_MIN_ALPHA) {
+			continue;
+		}
+
+		const r = pixels[index];
+		const g = pixels[index + 1];
+		const b = pixels[index + 2];
+		const here = Math.max(r, g, b) - Math.min(r, g, b);
+		if (here > spread) {
+			spread = here;
+			const pixel = index / 4;
+			at = `(${pixel % element.width}, ${Math.floor(pixel / element.width)}) rgb(${r}, ${g}, ${b})`;
+		}
+	}
+
+	return { spread, at };
 }
 
 /**
@@ -153,7 +212,69 @@ suite('Primal Motif - registry', () => {
 					host.release();
 				}
 			});
+
+			test(`'${descriptor.id}' paints no hue in the '${role}' role`, () => {
+				// The colour-blind doctrine, held at the pixel rather than at the
+				// source. INK_PALETTE's accent is a saturated blue and everything
+				// else in it is grey, so any solid pixel with a real channel
+				// spread came from the accent - or from a colour a motif made up.
+				const host = createTestMotifHost(descriptor.kind, role, INK_PALETTE);
+				const renderer = descriptor.create();
+
+				try {
+					if (renderer.create(host) !== true || descriptor.id === PRIMAL_MOTIF_STATIC_ID || !isMotifCanvas(host.element)) {
+						return; // nothing painted, or not a canvas: nothing to read
+					}
+
+					renderer.resize(1428, 1025);
+					renderer.render(createTestFrame(0, 0));
+					renderer.render(createTestFrame(1000, 33));
+
+					const { spread, at } = widestChromaSpread(host.element);
+					assert.ok(
+						spread <= MAX_CHROMA_SPREAD,
+						`'${descriptor.id}' painted a hue in the '${role}' role: channel spread ${spread} at ${at}, and the ground is one ink at varying alpha`
+					);
+				} finally {
+					renderer.dispose();
+					host.release();
+				}
+			});
 		}
+
+		test(`'${descriptor.id}' paints a different picture after the ground changes shape`, () => {
+			// The stretched-frame regression. No renderer paints from `resize()`;
+			// the scheduler paints the frame that follows one. So what has to
+			// hold here is that the frame it paints is the picture for the NEW
+			// shape - a renderer whose resize did nothing would leave the same
+			// pixels behind, and the scheduler's repaint would then be a repaint
+			// of an ellipse. The ground role, because every motif anchors that
+			// composition in screen pixels and so owes a new picture; a stage is
+			// a field for `contours` and `horizon`, which are allowed to stretch.
+			if (descriptor.kind === 'css') {
+				return; // no pixels to compare: `static` paints nothing at any shape
+			}
+
+			const host = createTestMotifHost(descriptor.kind, 'ground', INK_PALETTE);
+			const renderer = descriptor.create();
+
+			try {
+				assert.strictEqual(renderer.create(host), true);
+				renderer.resize(1920, 1080);
+				renderer.render(createTestFrame(0, 0));
+				const before = snapshot(host.element);
+
+				renderer.resize(1200, 1080);
+				renderer.render(createTestFrame(0, 0));
+				const after = snapshot(host.element);
+
+				assert.deepStrictEqual(host.failures, []);
+				assert.ok(!before.every((byte, index) => byte === after[index]), `'${descriptor.id}' painted the same picture after the window lost a third of its width`);
+			} finally {
+				renderer.dispose();
+				host.release();
+			}
+		});
 
 		test(`'${descriptor.id}' survives a light theme and a resize before its first frame`, () => {
 			const host = createTestMotifHost(descriptor.kind, 'ground', LIGHT_INK_PALETTE);
@@ -193,12 +314,22 @@ suite('Primal Motif - ink', () => {
 
 	const descriptors = getMotifDescriptors();
 
+	/**
+	 * Both halves of the doctrine in `motifPaint.ts`: "decline, never fail". A
+	 * `create()` that returned false because it threw on the empty palette and
+	 * caught its own throw with `host.fail()` would look like a refusal from
+	 * the outside and would take the whole layer down for the session in the
+	 * product (`markUnavailable` is terminal; `markRefused` is not), so the
+	 * failures are asserted empty here and not only in the paint suites.
+	 */
 	const refuses = (descriptor: IMotifDescriptor, role: PrimalMotifRole, palette: IMotifPalette): boolean => {
 		const host = createTestMotifHost(descriptor.kind, role, palette);
 		const renderer = descriptor.create();
 
 		try {
-			return renderer.create(host) === false;
+			const declined = renderer.create(host) === false;
+			assert.deepStrictEqual(host.failures, [], `'${descriptor.id}' called fail() instead of declining, which would mark the layer unavailable for the session`);
+			return declined;
 		} finally {
 			renderer.dispose();
 			host.release();
