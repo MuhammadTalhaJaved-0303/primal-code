@@ -601,7 +601,7 @@ function inkDirection(mode: ThemeMode): number {
  * plane visible; `realisedDepth` reports what was actually achieved, and
  * `--check` fails if it overshoots wildly.
  */
-function planeAt(editorBgHex: string, fraction: number, depth: number, mode: ThemeMode): string {
+export function planeAt(editorBgHex: string, fraction: number, depth: number, mode: ThemeMode): string {
 	const editor = hexToOklch(editorBgHex);
 	const direction = inkDirection(mode);
 	const chroma = editor.C * (1 + (CHROME_CHROMA_RATIO - 1) * fraction);
