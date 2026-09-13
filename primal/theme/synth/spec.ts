@@ -139,13 +139,19 @@ export interface SlackReport {
  * the card's HTML, so a CSS change does not invalidate sixty human decisions.
  */
 export interface Approval {
-	/** The reviewer. `"unreviewed"` until a human has actually looked at the card. */
+	/** The reviewer. `UNREVIEWED` until a human has actually looked at the card. */
 	readonly by: string;
-	/** ISO date of the review, or `null` when there has not been one. */
+	/** ISO date of the review (`YYYY-MM-DD`, optionally with a time). `null` exactly when `by` is `UNREVIEWED`. */
 	readonly on: string | null;
 	/** sha256 of the card payload the reviewer saw. */
 	readonly sheet: string;
 }
+
+/** The `by` a family carries until a human signs it. */
+export const UNREVIEWED = "unreviewed";
+
+/** `YYYY-MM-DD`, optionally followed by an ISO time. `Date.parse` decides whether the digits are a date. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T.*)?$/;
 
 /** One synthesised family: the numbers, the ledger, and nothing else. */
 export interface FamilySpec {
@@ -353,20 +359,36 @@ function requireEnum<T extends string>(raw: Record<string, unknown>, field: stri
 	return value as T;
 }
 
+/**
+ * The approval block, read strictly. There is no `--sign` command: a family is
+ * signed by a human editing `by` and `on`, so this is the one boundary where a
+ * half-filled or mistyped signature can be caught, and it is: a signer needs a
+ * date, an unreviewed family may not carry one, and a date has to be one.
+ */
 function parseApproval(raw: unknown, where: string): Approval {
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
 		throw new SpecError(where, "approval", "must be an object with `by`, `on` and `sheet`");
 	}
 	const record = raw as Record<string, unknown>;
+	const by = requireString(record, "by", `${where}.approval`);
 	const on = record["on"];
 	if (on !== null && typeof on !== "string") {
 		throw new SpecError(where, "approval.on", `must be an ISO date string or null, got ${JSON.stringify(on)}`);
+	}
+	if (on !== null && (!ISO_DATE.test(on) || Number.isNaN(Date.parse(on)))) {
+		throw new SpecError(where, "approval.on", `must be an ISO date such as 2026-09-12, got ${JSON.stringify(on)}`);
+	}
+	if (by === UNREVIEWED && on !== null) {
+		throw new SpecError(where, "approval.on", `must be null while approval.by is "${UNREVIEWED}", got ${JSON.stringify(on)}`);
+	}
+	if (by !== UNREVIEWED && on === null) {
+		throw new SpecError(where, "approval.on", `must state the date ${JSON.stringify(by)} reviewed the card; only "${UNREVIEWED}" carries null`);
 	}
 	const sheet = requireString(record, "sheet", `${where}.approval`);
 	if (!/^[0-9a-f]{64}$/.test(sheet)) {
 		throw new SpecError(where, "approval.sheet", "must be a 64-character lowercase sha256 hex digest");
 	}
-	return { by: requireString(record, "by", `${where}.approval`), on: on ?? null, sheet };
+	return { by, on, sheet };
 }
 
 function parseSlack(raw: unknown, where: string): SlackReport {
@@ -607,7 +629,21 @@ export function runSpecTests(): readonly string[] {
 	rejects(failures, "an empty depths list", { depths: [] }, "depths");
 	rejects(failures, "an unknown depth", { depths: ["deep"] }, "depths");
 	rejects(failures, "a duplicated depth", { depths: ["soft", "soft"] }, "depths");
-	rejects(failures, "an approval with no sheet hash", { approval: { by: "x", on: null, sheet: "short" } }, "sheet");
+	rejects(failures, "an approval with no sheet hash", { approval: { by: "x", on: "2026-09-12", sheet: "short" } }, "sheet");
+
+	// The approval ledger: `on` is a date, and it is coupled to `by`.
+	{
+		const sheet = "0".repeat(64);
+		rejects(failures, "an unreviewed approval carrying a date", { approval: { by: "unreviewed", on: "2026-09-12", sheet } }, "approval.on");
+		rejects(failures, "a signed approval with no date", { approval: { by: "someone", on: null, sheet } }, "approval.on");
+		rejects(failures, "a signed approval with an empty date", { approval: { by: "someone", on: "", sheet } }, "approval.on");
+		rejects(failures, "a signed approval whose date is not a date", { approval: { by: "someone", on: "not a date", sheet } }, "approval.on");
+		rejects(failures, "a signed approval with an impossible date", { approval: { by: "someone", on: "2026-13-45", sheet } }, "approval.on");
+		rejects(failures, "an approval with an empty signer", { approval: { by: "", on: "2026-09-12", sheet } }, "by");
+		accepts(failures, "an unreviewed approval", { approval: { by: "unreviewed", on: null, sheet } });
+		accepts(failures, "a signed approval with a date", { approval: { by: "someone", on: "2026-09-12", sheet } });
+		accepts(failures, "a signed approval with a date and time", { approval: { by: "someone", on: "2026-09-12T10:30:00Z", sheet } });
+	}
 
 	// The per-name ANSI band, which is the whole reason the terminal is not an identity axis.
 	rejects(failures, "yellow rotated past its own band", { ansiHueOffsets: [0, 6.3, 0, 0, 0, 0] }, "yellow");
@@ -687,6 +723,6 @@ if (isEntry) {
 		console.error(`\nspec: ${failures.length} failing assertion(s)`);
 		process.exit(1);
 	}
-	console.log("spec: all assertions pass (bounds by mode and register, boundary values, ANSI hue bands, fKeyword coupling)");
+	console.log("spec: all assertions pass (bounds by mode and register, boundary values, ANSI hue bands, fKeyword coupling, approval date coupling)");
 	process.exit(0);
 }

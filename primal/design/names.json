@@ -1,5 +1,5 @@
 {
-	"$comment": "Original Primal family names for synthesised themes. GENERATED THEMES ARE NAMED FROM THIS LIST IN ORDER, so the list is the naming decision and reordering it renames the catalogue. The register follows the six original vibes - Ink, Basalt, Tide, Dusk, Fern, Ridge: one concrete English noun, a material or a place, never an adjective and never a mood, and never a colour word. Every entry is screened against buildThemes.FORBIDDEN_IDENTITIES at build time, and against the names already in use. A synthesised family derives from no upstream palette, so `excludedBecause` has nothing to say about it and this file is the only place the naming rule is applied.",
+	"$comment": "Original Primal family names for synthesised themes. GENERATED THEMES ARE NAMED FROM THIS LIST IN ORDER, so the list is the naming decision and reordering it renames the catalogue. The register follows the six original vibes - Ink, Basalt, Tide, Dusk, Fern, Ridge: one concrete English noun, a material or a place, never an adjective and never a mood, and never a colour word. Every entry is screened against buildThemes.FORBIDDEN_IDENTITIES, against the names already in use, and against the name and slug of every scheme vendored in primal/design/corpus - at build time and again before --propose spends a search on it. Slate and Chalk were removed from this list for that reason: base24/slate.yaml and base24/chalk.yaml are upstream schemes, and no Primal theme ships under an upstream scheme's name. A synthesised family derives from no upstream palette, so `excludedBecause` has nothing to say about it and this file is the only place the naming rule is applied.",
 	"$note": "There are deliberately more names here than families. The surplus is what a later --propose run draws on, and the report says how many were left so that naming can be told apart from packing as the binding constraint.",
 	"version": 1,
 	"names": [
@@ -20,7 +20,7 @@
 		"Reed",
 		"Sable",
 		"Shale",
-		"Slate",
+		"Talus",
 		"Spruce",
 		"Thorn",
 		"Vellum",
@@ -82,7 +82,6 @@
 		"Stone",
 		"Strand",
 		"Summit",
-		"Talus",
 		"Tarn",
 		"Timber",
 		"Verge",
@@ -94,7 +93,6 @@
 		"Bloom",
 		"Bough",
 		"Brine",
-		"Chalk",
 		"Cliff",
 		"Crag",
 		"Creek",

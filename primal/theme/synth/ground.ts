@@ -213,7 +213,7 @@ export function runGroundTests(): readonly string[] {
 		fConstant: 0.66, fComment: 0.28, constantKick: 26, syntaxEmphasis: "weight" as const,
 		ansiHueOffsets: [0, 0, 0, 0, 0, 0] as readonly [number, number, number, number, number, number],
 		ansiChromaScale: 1, ansiRungSpread: 0, ansiAir: 0.3, selectionStep: 0.11,
-		approval: { by: "test", on: null, sheet: "0".repeat(64) },
+		approval: { by: "unreviewed", on: null, sheet: "0".repeat(64) },
 		slack: { ansiWorstPair: 0, ansiMinContrast: 0, ansiDichromatCollisions: 0, syntaxContrastRatio: 0, syntaxMinSeparation: 0, warnings: 0 }
 	};
 	const cases: readonly FamilySpec[] = [

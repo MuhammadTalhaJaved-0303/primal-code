@@ -18,6 +18,11 @@
  *   node --experimental-strip-types primal/theme/buildThemes.ts           # write
  *   node --experimental-strip-types primal/theme/buildThemes.ts --check   # verify, write nothing
  *   node --experimental-strip-types primal/theme/buildThemes.ts --survey  # corpus statistics
+ *   node --experimental-strip-types primal/theme/buildThemes.ts --propose N --seed S   # offline: draw, pack, write families.json
+ *   node --experimental-strip-types primal/theme/buildThemes.ts --repair            # offline: propose bounded moves for broken families
+ *   node --experimental-strip-types primal/theme/buildThemes.ts --remeasure <id>    # offline: re-measure one family's ledger for re-signing
+ *   node --experimental-strip-types primal/theme/buildThemes.ts --contact-sheet     # the review artefact
+ *   node --experimental-strip-types primal/theme/buildThemes.ts --self-test
  *
  * `--check` regenerates everything in memory and compares it byte for byte with
  * what is on disk. It is the only thing that makes "generated" true rather than
@@ -57,6 +62,8 @@ import type { SyntaxEmphasis, ThemeMode } from "./tokenMap.ts";
 import { perceptualDistanceOfHex, validate, type ColorTheme, type Finding } from "./validateTheme.ts";
 import { renderContactSheet, sheetOrder, type SheetEntry } from "./synth/contactSheet.ts";
 import {
+	FAMILY_DISTANCE_THRESHOLD,
+	PACKING_DISTANCE_THRESHOLD,
 	assertCatalogueDistinct,
 	checkShippedCalibration,
 	closestPairs,
@@ -66,15 +73,19 @@ import {
 } from "./synth/distinct.ts";
 import {
 	FAMILIES_PATH,
+	cardHash,
+	expressibleDepths as synthExpressibleDepths,
 	loadFamilyBook,
+	loadFamilyBookComment,
 	loadNames,
 	propose,
 	repair,
+	unreviewed,
 	writeFamilyBook,
 	runProposeTests,
 	runPropertyTests
 } from "./synth/propose.ts";
-import { REPAIR_LADDER, runSynthesiseTests, synthesise } from "./synth/synthesise.ts";
+import { REPAIR_LADDER, SYNTAX_MIN_SEPARATION, runSynthesiseTests, synthesise } from "./synth/synthesise.ts";
 import {
 	buildSynthesised,
 	isCatalogueError,
@@ -86,7 +97,7 @@ import {
 	type CatalogueError,
 	type SynthBuilt
 } from "./synth/producer.ts";
-import { runSpecTests, type FamilySpec } from "./synth/spec.ts";
+import { UNREVIEWED, runSpecTests, type FamilySpec } from "./synth/spec.ts";
 import { runRampTests } from "./synth/ramp.ts";
 import { runGroundTests } from "./synth/ground.ts";
 import { runDistinctTests } from "./synth/distinct.ts";
@@ -731,13 +742,48 @@ const HAND_AUTHORED_NLS: Readonly<Record<string, string>> = {
 
 /**
  * The names a synthesised family may not take: the six vibes and the corpus
- * families, which already hold them.
+ * families, which already hold them, and the name and slug of EVERY scheme
+ * vendored in `primal/design/corpus`.
+ *
+ * The last class is the one ATTRIBUTION.md promises in bold - "no theme ships
+ * under an upstream scheme's name" - and the first screen never checked it, so
+ * "Primal Slate" shipped beside `base24/slate.yaml` (FredHappyface's "Slate").
+ * MIT covers the sixteen hex values a corpus scheme states; it says nothing
+ * about a name, and a synthesised theme wearing a vendored scheme's name is the
+ * exact confusion that sentence exists to deny. The corpus is read on every
+ * build anyway, so the screen costs nothing.
  */
 function reservedNames(): readonly { readonly id: string; readonly heldBy: string }[] {
-	return [
+	const reserved: { readonly id: string; readonly heldBy: string }[] = [
 		...HAND_AUTHORED.map(entry => ({ id: entry.vibe, heldBy: "an original vibe" })),
 		...CATALOGUE.map(family => ({ id: family.name.toLowerCase(), heldBy: "a corpus family" }))
 	];
+	for (const scheme of loadCorpus()) {
+		reserved.push({ id: scheme.name.toLowerCase(), heldBy: `the name of an upstream scheme in primal/design/corpus (${scheme.source}, by ${scheme.author})` });
+		reserved.push({ id: scheme.slug.toLowerCase(), heldBy: `the slug of an upstream scheme in primal/design/corpus (${scheme.source})` });
+	}
+	return reserved;
+}
+
+/**
+ * Screens a candidate name book the way `loadFamilies` screens the families
+ * that ship, so `--propose` refuses a name before it spends a search on it
+ * rather than writing a `families.json` the next build rejects.
+ */
+function screenNames(names: readonly string[]): void {
+	const taken = new Map(reservedNames().map(entry => [entry.id, entry.heldBy]));
+	for (const name of names) {
+		const id = name.toLowerCase();
+		for (const rule of FORBIDDEN_IDENTITIES) {
+			if (id.includes(rule.match)) {
+				throw new Error(`buildThemes: names.json states "${name}", which the naming rules exclude: ${rule.why} - matched "${rule.match}"`);
+			}
+		}
+		const holder = taken.get(id);
+		if (holder !== undefined) {
+			throw new Error(`buildThemes: names.json states "${name}", which is already ${holder}. Replace it in primal/design/names.json.`);
+		}
+	}
 }
 
 /**
@@ -764,9 +810,31 @@ interface Emitted {
 	readonly synth: SynthBuilt | null;
 	readonly mode: ThemeMode;
 	readonly id: string;
+	/** The theme's name: the picker id, the settings value and the emitted file's `name`. Stable for the life of the theme. */
 	readonly label: string;
+	/** What the picker SHOWS. `label`, or `label` marked as awaiting review; see `reviewLabel`. */
+	readonly pickerLabel: string;
 	readonly nls: string;
 	readonly file: string;
+}
+
+/**
+ * The label a synthesised theme shows in the picker while nobody has signed it.
+ *
+ * UNREVIEWED FAMILIES SHIP, and this is where the decision is made visible
+ * rather than left in `--survey`. The approval ledger is tamper-evident - a
+ * family whose colours move after a human signed it fails the build - but the
+ * build cannot make the human decision itself, and refusing to emit anything
+ * unsigned would mean shipping nothing until the owner has sat through every
+ * card. So the state travels with the theme: the picker shows "(unreviewed)"
+ * after the name until `approval.by` is a person, at which point the suffix
+ * drops. Only the SHOWN label changes; the picker id, the settings value and
+ * the theme file are the plain name throughout, so a user who chose an
+ * unreviewed theme keeps it across the review. Text rather than colour, for
+ * the obvious reason.
+ */
+function reviewLabel(spec: FamilySpec, label: string): string {
+	return spec.approval.by === UNREVIEWED ? `${label} (unreviewed)` : label;
 }
 
 /** package.json, rebuilt around whatever is emitted. Two-space indent, as VS Code's extensions use. */
@@ -794,14 +862,16 @@ function renderPackageNls(emitted: readonly Emitted[]): string {
 	// output".
 	const corpus = emitted.filter(entry => entry.family !== null).length;
 	const synthesised = emitted.length - corpus;
+	const awaiting = emitted.filter(entry => entry.synth !== null && entry.synth.spec.approval.by === UNREVIEWED).length;
 	const nls: Record<string, string> = {
 		displayName: "Primal Vibes Themes",
 		description: synthesised === 0
 			? `The ${HAND_AUTHORED.length} hand-authored Primal Code vibes and ${corpus} generated corpus themes`
-			: `The ${HAND_AUTHORED.length} hand-authored Primal Code vibes, ${corpus} generated corpus themes and ${synthesised} synthesised themes`,
+			: `The ${HAND_AUTHORED.length} hand-authored Primal Code vibes, ${corpus} generated corpus themes and ${synthesised} synthesised themes` +
+				(awaiting > 0 ? ` (${awaiting} awaiting human review, marked "(unreviewed)" in the picker)` : ""),
 		...HAND_AUTHORED_NLS
 	};
-	for (const entry of emitted) nls[entry.nls] = entry.label;
+	for (const entry of emitted) nls[entry.nls] = entry.pickerLabel;
 	return `${JSON.stringify(nls, null, "\t")}\n`;
 }
 
@@ -905,9 +975,11 @@ function renderAttribution(emitted: readonly Emitted[]): string {
 			`${synthFamilies.size === 1 ? "family" : "families"}, are synthesised from the specifications in`
 		);
 		lines.push("`primal/design/families.json` and derive from no upstream palette. A specification");
-		lines.push("contains no colour: it states a lightness, a chroma, a hue and a set of contrast");
-		lines.push("targets, and `primal/theme/synth/` places every colour against a measured floor.");
-		lines.push("There is nothing in them to attribute, and no licence travels with them.");
+		lines.push("contains no palette: it states one ground colour as a lightness, a chroma and a hue,");
+		lines.push("plus a set of contrast targets, and `primal/theme/synth/` derives every other colour");
+		lines.push("from that against a measured floor. There is nothing in them to attribute, and no");
+		lines.push("licence travels with them. Their names are screened against the name and slug of");
+		lines.push("every scheme vendored in `primal/design/corpus/` at build time.");
 		lines.push("");
 	}
 	return `${lines.join("\n")}\n`;
@@ -1134,11 +1206,20 @@ function printSynthesisedSurvey(): void {
 	const collisions = specs.map(spec => spec.slack.ansiDichromatCollisions).sort((a, b) => a - b);
 	const warnings = specs.map(spec => spec.slack.warnings).sort((a, b) => a - b);
 	const spreadRatios = specs.map(spec => spec.slack.syntaxContrastRatio).sort((a, b) => a - b);
+	const separations = specs.map(spec => spec.slack.syntaxMinSeparation).sort((a, b) => a - b);
 	const band = (values: readonly number[]): string => `min ${values[0]}, median ${values[Math.floor(values.length / 2)]}, max ${values[values.length - 1]}`;
 	console.log(`  worst ANSI pair, trichromat (floor 10):    ${band(worst)}`);
 	console.log(`  ANSI pairs a dichromat cannot resolve/120: ${band(collisions)}`);
 	console.log(`  loudest-over-quietest syntax contrast:     ${band(spreadRatios)}`);
+	console.log(`  closest non-aliased syntax pair (floor ${SYNTAX_MIN_SEPARATION}): ${band(separations)}`);
 	console.log(`  validator warnings (the six vibes: 43-60): ${band(warnings)}`);
+	// The syntax floor is the ordinary-viewing JND and the search gives no credit
+	// for margin above it, so families land just over it. Whether 2.3 is enough
+	// for a role pair read side by side is the owner's call; the band above is
+	// what makes that call possible. Neither the floor nor the search bar moves
+	// without him.
+	const nearFloor = specs.filter(spec => spec.slack.syntaxMinSeparation < SYNTAX_MIN_SEPARATION + 0.3).length;
+	console.log(`  ${nearFloor} of ${specs.length} families have a non-aliased syntax pair within 0.3 dE00 of the ${SYNTAX_MIN_SEPARATION} floor - an owner decision, not a gate.`);
 	console.log("  The ANSI ramp is trichromat-safe by construction and best-effort for a dichromat, which is the");
 	console.log("  same claim the product already makes. The semantics you depend on are guaranteed to everyone.");
 
@@ -1152,8 +1233,22 @@ function printSynthesisedSurvey(): void {
 	}
 	const sharedGround = closestPairs(identities).filter(pair => pair.admitted.startsWith("shared ground")).length;
 	console.log(`  ${sharedGround} pair(s) share a ground within a JND and are admitted on what they carry elsewhere.`);
-	const unreviewed = specs.filter(spec => spec.approval.by === "unreviewed").length;
-	console.log(`  ${unreviewed} of ${specs.length} synthesised families carry no human approval.`);
+	// The packer keeps PACKING_DISTANCE_THRESHOLD, not the gate, so a catalogue
+	// drawn by --propose has no synthesised family closer to its neighbour than
+	// that. Said here, and counted, so a catalogue packed at the gate itself -
+	// which the first one was - cannot pass for one packed with the margin.
+	const synthesisedNearest = nearest.filter(row => synthesisedKeys.has(row.key));
+	const insideMargin = synthesisedNearest.filter(row => row.distance < PACKING_DISTANCE_THRESHOLD).length;
+	if (synthesisedNearest.length > 0) {
+		console.log(
+			`  Synthesised families are packed at ${PACKING_DISTANCE_THRESHOLD.toFixed(2)}, above the ${FAMILY_DISTANCE_THRESHOLD.toFixed(2)} gate: ` +
+			`nearest neighbour min ${synthesisedNearest[0].distance.toFixed(2)}, ` +
+			`median ${synthesisedNearest[Math.floor(synthesisedNearest.length / 2)].distance.toFixed(2)}; ` +
+			`${insideMargin} of ${synthesisedNearest.length} sit inside the packing margin${insideMargin > 0 ? " - re-run --propose" : ""}.`
+		);
+	}
+	const awaiting = specs.filter(spec => spec.approval.by === UNREVIEWED).length;
+	console.log(`  ${awaiting} of ${specs.length} synthesised families carry no human approval. They ship, marked "(unreviewed)" in the picker until signed.`);
 	console.log(`  ${synthesisedKeys.size} of them are on the contact sheet as synthesised; the rest of the sheet is what already ships.`);
 }
 
@@ -1173,8 +1268,16 @@ interface BuildOutput {
 	readonly fullSheet: readonly SheetEntry[];
 }
 
-/** Generate everything the catalogue asks for. Throws if a chosen family stopped passing. */
-function buildCatalogue(): BuildOutput {
+/**
+ * Generate everything the catalogue asks for. Throws if a chosen family stopped
+ * passing.
+ *
+ * `specs` defaults to `families.json`. `--propose` passes an empty list so it
+ * can pack against the vibes and corpus families alone: a proposal has to be
+ * able to run when the CURRENT synthesised catalogue no longer passes the gate
+ * - which is exactly when a re-proposal is needed.
+ */
+function buildCatalogue(specs: readonly FamilySpec[] = loadFamilies()): BuildOutput {
 	const corpus = loadCorpus();
 	const emitted: Emitted[] = [];
 	const files = new Map<string, string>();
@@ -1217,7 +1320,7 @@ function buildCatalogue(): BuildOutput {
 			const id = variantId(family, depth);
 			const file = themeFileName(id);
 			files.set(join(THEMES_DIR, file), serialiseTheme(built.theme as Parameters<typeof serialiseTheme>[0]));
-			emitted.push({ family, built, synth: null, mode: built.scheme.mode, id, label, nls: nlsKey(family, depth), file });
+			emitted.push({ family, built, synth: null, mode: built.scheme.mode, id, label, pickerLabel: label, nls: nlsKey(family, depth), file });
 		}
 	}
 
@@ -1226,7 +1329,7 @@ function buildCatalogue(): BuildOutput {
 	// when the catalogue grows is a picker whose muscle memory is worthless.
 	const errors: CatalogueError[] = [];
 	const sheet: SheetEntry[] = [];
-	for (const spec of loadFamilies()) {
+	for (const spec of specs) {
 		const seedsByDepth = new Map<Depth, Seed>();
 		const themesByDepth = new Map<Depth, ColorTheme>();
 		const staged: { readonly built: SynthBuilt; readonly id: string; readonly label: string; readonly file: string }[] = [];
@@ -1266,6 +1369,7 @@ function buildCatalogue(): BuildOutput {
 				mode: spec.mode,
 				id: entry.id,
 				label: entry.label,
+				pickerLabel: reviewLabel(spec, entry.label),
 				nls: synthNlsKey(spec, entry.built.depth),
 				file: entry.file
 			});
@@ -1430,9 +1534,9 @@ function reportSynthesised(sheet: readonly SheetEntry[], identities: readonly Fa
 			`${spec} depth(s)  nearest ${(row?.nearest ?? "-").padEnd(16)} D ${(row?.distance ?? 0).toFixed(2)}`
 		);
 	}
-	const unreviewed = sheet.filter(entry => entry.caption.includes("approval: unreviewed")).length;
-	if (unreviewed > 0) {
-		console.log(`    ${unreviewed} of ${sheet.length} carry no human approval. Run --contact-sheet and review them.`);
+	const awaiting = sheet.filter(entry => entry.caption.includes(`approval: ${UNREVIEWED}`)).length;
+	if (awaiting > 0) {
+		console.log(`    ${awaiting} of ${sheet.length} carry no human approval and ship marked "(unreviewed)". Run --contact-sheet and review them.`);
 	}
 	console.log("");
 }
@@ -1503,13 +1607,14 @@ function drift(files: ReadonlyMap<string, string>): readonly string[] {
  * can be read for what it is rather than blamed on the wrong thing.
  */
 function runPropose(draws: number, rngSeed: number): number {
-	const { vibes, identities, sheet } = buildCatalogue();
-	// Pack against what ships today MINUS the synthesised families, so a re-run
-	// proposes a whole catalogue rather than squeezing new families into the gaps
-	// left by the last one.
-	const synthesisedKeys = new Set(sheet.map(entry => entry.key));
-	const shipped = identities.filter(identity => !synthesisedKeys.has(identity.key));
+	// Pack against what ships WITHOUT a synthesiser - the vibes and the corpus
+	// families - so a re-run proposes a whole catalogue rather than squeezing new
+	// families into the gaps left by the last one. Built with an empty spec list
+	// rather than filtered afterwards, because the current families.json may be
+	// the thing that no longer passes the gate.
+	const { vibes, identities: shipped } = buildCatalogue([]);
 	const names = loadNames();
+	screenNames(names);
 
 	console.log(`propose: ${draws} draws, seed ${rngSeed}, packed against ${shipped.length} shipped families, ${names.length} names available.`);
 	const started = Date.now();
@@ -1557,23 +1662,69 @@ function runPropose(draws: number, rngSeed: number): number {
 }
 
 /**
+ * Every depth a family states, synthesised, and its ledger re-measured. What
+ * `--repair` and `--remeasure` both need to know about one spec.
+ */
+interface FamilyMeasurement {
+	readonly seedsByDepth: ReadonlyMap<Depth, Seed>;
+	/** The medium build, whose report carries the slack the ledger records. */
+	readonly medium: SynthBuilt;
+	readonly ledger: readonly string[];
+}
+
+function isMeasurementError(value: FamilyMeasurement | CatalogueError): value is CatalogueError {
+	return (value as CatalogueError).detail !== undefined;
+}
+
+function measureFamily(spec: FamilySpec): FamilyMeasurement | CatalogueError {
+	const seedsByDepth = new Map<Depth, Seed>();
+	let medium: SynthBuilt | null = null;
+	for (const depth of spec.depths) {
+		const outcome = buildSynthesised(spec, depth, synthVariantLabel(spec, depth));
+		if (isCatalogueError(outcome)) {
+			return outcome;
+		}
+		seedsByDepth.set(depth, outcome.seed);
+		if (depth === "medium") {
+			medium = outcome;
+		}
+	}
+	if (medium === null) {
+		return { family: spec.name, detail: "states no medium depth; every family must be able to express it" };
+	}
+	return { seedsByDepth, medium, ledger: verifyLedger(spec, seedsByDepth, medium.report) };
+}
+
+/**
  * `--repair`: for every family in `families.json` that no longer synthesises,
- * walk its declared repair ladder inside its own box and print the diff.
+ * walk its declared repair ladder inside its own box and print the diff; for
+ * every family that synthesises but whose recorded `slack` or `approval.sheet`
+ * has drifted, say so and name the mode that fixes it.
  *
  * It writes nothing. A repair changes what ships, so it produces a proposal and
- * stops.
+ * stops. The first draft of this mode only looked at families that failed to
+ * synthesise and answered "nothing to do" to a ledger-drifted one - which is
+ * exactly where the build's own error message had sent the reader.
  */
 function runRepair(): number {
 	const specs = loadFamilyBook(FAMILIES_PATH);
 	let broken = 0;
+	let drifted = 0;
 	for (const spec of specs) {
-		const outcome = buildSynthesised(spec, "medium", `Primal ${spec.name}`);
-		if (!isCatalogueError(outcome)) {
+		const measured = measureFamily(spec);
+		if (!isMeasurementError(measured)) {
+			if (measured.ledger.length > 0) {
+				drifted++;
+				console.log(`${spec.name}: synthesises, but its ledger has drifted:`);
+				for (const line of measured.ledger) {
+					console.log(`    ${line}`);
+				}
+			}
 			continue;
 		}
 		broken++;
 		const attempt = repair(spec, REPAIR_LADDER.ramp);
-		console.log(`${spec.name}: ${outcome.detail.split("\n")[0]}`);
+		console.log(`${spec.name}: ${measured.detail.split("\n")[0]}`);
 		if (attempt.repaired === null) {
 			console.log(`    NO REPAIR. ${attempt.why}`);
 			continue;
@@ -1581,9 +1732,68 @@ function runRepair(): number {
 		for (const step of attempt.steps) {
 			console.log(`    ${step.field}: ${step.from} -> ${step.to}`);
 		}
-		console.log("    repaired. Apply the moves above to families.json by hand, then re-run --check.");
+		console.log(`    repaired. Apply the moves above to families.json by hand, then run --remeasure ${spec.id} to re-measure its ledger, then --check.`);
 	}
-	console.log(broken === 0 ? "repair: every family in families.json synthesises; nothing to do." : `repair: ${broken} family(ies) need attention.`);
+	if (broken === 0 && drifted === 0) {
+		console.log("repair: every family in families.json synthesises and its ledger is current; nothing to do.");
+	} else {
+		console.log(`repair: ${broken} family(ies) do not synthesise, ${drifted} carry a stale ledger.`);
+	}
+	return 0;
+}
+
+/**
+ * `--remeasure <id>`: the sanctioned way to re-sign ONE family after a
+ * legitimate change - a bounded `--repair` move applied by hand, or a shared
+ * constant that moved its margins.
+ *
+ * It re-synthesises every depth, rewrites the family's `depths`, `slack` and
+ * `approval.sheet` from what was measured, and RESETS `approval.by` to
+ * unreviewed so a human signs the new card - a re-measure is not a review. Every
+ * other family in the file is written back untouched, signatures included; the
+ * only other writer of the ledger is `--propose`, which regenerates the whole
+ * file and would discard every signature to fix one.
+ */
+function runRemeasure(id: string): number {
+	const specs = loadFamilyBook(FAMILIES_PATH);
+	const index = specs.findIndex(spec => spec.id === id);
+	if (index < 0) {
+		throw new Error(`buildThemes: --remeasure: families.json has no family with id "${id}"`);
+	}
+	const spec = specs[index];
+	const depths = synthExpressibleDepths(spec);
+	if (!depths.includes("medium")) {
+		const outcome = buildSynthesised(spec, "medium", synthVariantLabel(spec, "medium"));
+		throw new Error(
+			`buildThemes: --remeasure: ${spec.name} does not synthesise at medium, so there is nothing to measure` +
+			(isCatalogueError(outcome) ? `:\n  ${outcome.detail}\nRun --repair.` : ".")
+		);
+	}
+	const measured = measureFamily({ ...spec, depths });
+	if (isMeasurementError(measured)) {
+		throw new Error(`buildThemes: --remeasure: ${measured.family}: ${measured.detail}`);
+	}
+	const remeasured: FamilySpec = {
+		...spec,
+		depths,
+		slack: measured.medium.report.slack,
+		approval: unreviewed(cardHash({ ...spec, depths }, measured.seedsByDepth))
+	};
+	const next = specs.map((entry, i) => (i === index ? remeasured : entry));
+	writeFamilyBook(next, loadFamilyBookComment(FAMILIES_PATH), FAMILIES_PATH);
+	console.log(`remeasure: ${spec.name}: depths ${spec.depths.join("/")} -> ${depths.join("/")}`);
+	for (const key of Object.keys(remeasured.slack) as (keyof typeof remeasured.slack)[]) {
+		if (spec.slack[key] !== remeasured.slack[key]) {
+			console.log(`           slack.${key} ${spec.slack[key]} -> ${remeasured.slack[key]}`);
+		}
+	}
+	console.log(`           approval.sheet ${spec.approval.sheet} -> ${remeasured.approval.sheet}`);
+	console.log(
+		spec.approval.by === UNREVIEWED
+			? `           approval.by stays ${UNREVIEWED}.`
+			: `           approval.by ${spec.approval.by} (${spec.approval.on}) -> ${UNREVIEWED}: the card changed, so it needs a new signature.`
+	);
+	console.log(`remeasure: wrote ${FAMILIES_PATH.replace(`${REPO}/`, "")}. Rebuild, review the card on the contact sheet, then sign.`);
 	return 0;
 }
 
@@ -1730,6 +1940,14 @@ function main(argv: readonly string[]): number {
 	}
 	if (argv.includes("--repair")) {
 		return runRepair();
+	}
+	if (argv.includes("--remeasure")) {
+		const index = argv.indexOf("--remeasure");
+		const id = argv[index + 1];
+		if (id === undefined || id.startsWith("--")) {
+			throw new Error("buildThemes: --remeasure needs a family id, e.g. --remeasure harbour");
+		}
+		return runRemeasure(id);
 	}
 	if (argv.includes("--contact-sheet")) {
 		return runContactSheet();

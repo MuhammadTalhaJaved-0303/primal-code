@@ -1464,10 +1464,15 @@ function main(argv: readonly string[]): number {
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+	// `process.exitCode` rather than `process.exit()`: a full run prints some
+	// thirty thousand lines, and when stdout is a pipe Node writes to it
+	// asynchronously, so `process.exit()` drops whatever has not been flushed -
+	// measured, the summary line is the first casualty of `| tail -1`. Setting
+	// the code and returning lets the event loop drain before the process ends.
 	try {
-		process.exit(process.argv.includes("--self-test") ? selfTest() : main(process.argv.slice(2)));
+		process.exitCode = process.argv.includes("--self-test") ? selfTest() : main(process.argv.slice(2));
 	} catch (error) {
 		console.error(`validateTheme: ${(error as Error).message}`);
-		process.exit(2);
+		process.exitCode = 2;
 	}
 }

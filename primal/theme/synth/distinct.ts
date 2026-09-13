@@ -92,11 +92,47 @@ export const JND = 2.3;
 export const FAMILY_DISTANCE_THRESHOLD = 5.0;
 
 /**
+ * The distance the OFFLINE PACKER keeps between families, which is deliberately
+ * wider than the gate.
+ *
+ * The gate above is fitted to two negatives (1.33 and 2.91) and one positive
+ * at 5.02, so all it establishes is that the duplicate boundary lies somewhere
+ * in (2.91, 5.02). A packer that packs AT the gate fills that uncertainty to the
+ * brim: measured on the first catalogue drawn this way, every synthesised family
+ * had its nearest neighbour in [5.00, 6.74] with a median of 5.48, so a later
+ * move of T by half a unit would have failed dozens of families at once.
+ *
+ * 5.99 is `vibe:basalt | vibe:dusk`, pinned below: the closest shipped pair the
+ * design itself puts forward as PLAINLY two themes (achromatic weight-led against
+ * purple keyword-led), rather than one it merely tolerates. The two shipped pairs
+ * closer than that - basalt|fern at 5.02 and tide|fern at 5.19 - are the ones the
+ * comment above says still need the owner's eye. Packing at the basalt|dusk level
+ * means a synthesised family is never closer to its neighbour than a pair the
+ * house has already argued is distinct.
+ *
+ * THIS TIGHTENS THE PROPOSER, NOT THE GATE. The build still gates at 5.0, the
+ * calibration is untouched, and the catalogue is simply smaller and further from
+ * the edge. `runDistinctTests` asserts it equals the pinned basalt|dusk value.
+ */
+export const PACKING_DISTANCE_THRESHOLD = 5.99;
+
+/**
  * How many of the seven identity slots must differ by at least a JND.
  *
  * WHY THE RULE EXISTS. An RMS capped at 20 lets a single slot buy a family:
  * `sqrt(0.16 x 400)` is 8.0, so `editorFg` alone clears T while the other six
- * slots are byte-identical. A floor on how many slots actually moved closes it.
+ * slots are byte-identical. A floor on how many slots actually moved closes
+ * THAT case - the byte-identical one.
+ *
+ * WHAT IT DOES NOT CLOSE, stated so nobody relies on it. The rule counts slots
+ * past a JND, not slots carrying identity: a candidate whose six inks sit 0.3
+ * dE00 past the JND from another family's still counts six differing slots. A
+ * ground 10 dE00 away with two inks nudged just past 2.3 is K = 3 and D 5.9, and
+ * rule (2) admits it. It is rule (3) - the off-ground distance - that closes the
+ * nudged case, and the `ground alone cannot buy a family` self-test is the proof.
+ * Raising the per-slot bar to 2 x JND was measured and rejected: it newly rejects
+ * 24 admitted pairs including the shipped `vibe:basalt | vibe:fern`, which would
+ * need a grandfather entry to keep shipping.
  *
  * WHY IT IS THREE AND NOT FOUR, which is a deliberate departure from the design.
  * The design specifies four, citing `vibe:basalt | vibe:dusk` at 4 of 7. Measured
@@ -227,7 +263,8 @@ export function differingSlots(a: FamilyIdentity, b: FamilyIdentity): number {
 export type Rejection =
 	| { readonly rule: "distance"; readonly measured: number }
 	| { readonly rule: "slots"; readonly measured: number }
-	| { readonly rule: "sharedGround"; readonly measured: number };
+	/** Same register, same emphasis, and the six non-ground slots do not clear the threshold on their own. `measured` is `dOffGround`. */
+	| { readonly rule: "offGround"; readonly measured: number };
 
 /**
  * How different two families are once the GROUND is taken out of the vote:
@@ -253,22 +290,21 @@ export function dOffGround(a: FamilyIdentity, b: FamilyIdentity): number {
 /**
  * The whole acceptance rule, in the order the rules were fitted.
  *
- *   (1) D_owner >= 5.0
- *   (2) at least four of the seven identity slots differ by a JND
- *   (3) when the two grounds are within a JND of each other, the family has to
- *       earn its identity somewhere OTHER than the ground: a different register,
- *       a different emphasis, or `dOffGround` clearing the same threshold.
+ *   (1) D_owner >= `threshold` (the gate's 5.0; the packer passes a wider one)
+ *   (2) at least MIN_DIFFERING_SLOTS (three) of the seven identity slots differ
+ *       by a JND
+ *   (3) when the two families share a register AND an emphasis, the six
+ *       non-ground slots must clear the same threshold ON THEIR OWN - whatever
+ *       the two grounds do.
  *
- * Rule (3) rather than a hard ground floor, because the house already ships a
- * shared ground: `vibe:basalt` and `vibe:dusk` sit 1.55 dE00 apart on the ground
- * for this owner and are plainly different themes - achromatic weight-led
- * against purple keyword-led. A hard floor would reject that pair, and a floor
- * of 4 would reject `ink | ridge`, whose grounds are 2.59 dE00 apart even to a
- * trichromat.
+ * WHY RULE (3) IS NOT A GROUND FLOOR. The house already ships a shared ground:
+ * `vibe:basalt` and `vibe:dusk` sit 1.55 dE00 apart on the ground for this owner
+ * and are plainly different themes - achromatic weight-led against purple
+ * keyword-led. A hard floor would reject that pair, and a floor of 4 would
+ * reject `ink | ridge`, whose grounds are 2.59 dE00 apart even to a trichromat.
  *
- * THE `dOffGround` CLAUSE IS A DELIBERATE DEPARTURE FROM THE DESIGN, and it is
- * here because the design's rule as written - reject a shared ground unless the
- * register or the emphasis differs - rejects three pairs the product ships
+ * WHY RULE (3) IS NOT "a different register or emphasis" EITHER, which is the
+ * design's rule as written. That rule rejects three pairs the product ships
  * today and that nobody has ever called duplicates. Measured over the eleven
  * shipped families:
  *
@@ -277,29 +313,47 @@ export function dOffGround(a: FamilyIdentity, b: FamilyIdentity): number {
  *     ground 2.11  D 13.68   vibe:fern | Trench    both keywordLed/plain
  *
  * A pair 13.68 apart is not one theme however close its grounds sit, and a rule
- * that says otherwise is measuring the ground twice. What rule (3) is really
- * guarding against is the ground's 0.34 weight carrying a family on its own, so
- * the honest test is to remove the ground from the vote and ask the same
- * question of what is left. It costs nothing in calibration: over the 55 shipped
- * pairs this admits exactly the 53 the design's own numbers admit and rejects
- * exactly `tide | dusk` (1.64 off-ground) and `Umber | Cinder` (3.45
- * off-ground), which are the two every prior review flagged independently.
+ * that says otherwise is measuring the ground twice.
+ *
+ * WHY RULE (3) ASKS THE QUESTION WHATEVER THE GROUNDS DO. The first draft of this
+ * rule only asked it when the grounds were within a JND, and that guard made the
+ * rule unreachable: D^2 = 0.34 g^2 + 0.66 off^2, and with g < 2.3 the ground
+ * contributes at most 1.80 to D^2, so D >= 5 already forces off >= 5.93 > T. The
+ * rule fired zero times over 300,000 shared-ground pairs. Worse, the guard
+ * exempted exactly the case rule (3) exists for: a ground 8.58 dE00 away clears
+ * T by itself (`sqrt(0.34 x 8.58^2)` = 5.0) with the other six slots identical,
+ * and the first synthesised catalogue shipped it - `Nettle | Thorn` at D 6.08,
+ * ground 10.02, off-ground 2.06, the same warm ink-led syntax on a grey-brown
+ * and a near-black plane. Sixteen admitted pairs sat below 5.0 off the ground,
+ * eleven of them in the same register and emphasis; the closest were nearer off
+ * the ground than `Umber | Cinder`, which the design calls a duplicate. So the
+ * guard is gone: what rule (3) guards against is the ground's 0.34 weight
+ * carrying a family on its own, and the honest test is to remove the ground from
+ * the vote and ask the same question of what is left, every time.
+ *
+ * It costs nothing in calibration. Over the 55 shipped pairs the rule set admits
+ * exactly the 53 the design's own numbers admit and rejects exactly `tide | dusk`
+ * (1.64 off-ground) and `Umber | Cinder` (3.45 off-ground), both on rule (1)
+ * before rule (3) is consulted. The smallest off-ground distance among the 53
+ * admitted shipped pairs is `vibe:basalt | vibe:fern` at 6.02, so rule (3) as
+ * written here rejects no shipped pair - `runDistinctTests` asserts that it
+ * rejects the ground-carried case, and `buildThemes --self-test` re-measures
+ * the shipped matrix on every run.
  */
-export function rejects(a: FamilyIdentity, b: FamilyIdentity): Rejection | null {
+export function rejects(a: FamilyIdentity, b: FamilyIdentity, threshold: number = FAMILY_DISTANCE_THRESHOLD): Rejection | null {
 	const distance = dOwner(a, b);
-	if (distance < FAMILY_DISTANCE_THRESHOLD) {
+	if (distance < threshold) {
 		return { rule: "distance", measured: distance };
 	}
 	const slots = differingSlots(a, b);
 	if (slots < MIN_DIFFERING_SLOTS) {
 		return { rule: "slots", measured: slots };
 	}
-	const ground = slotDistance(a.colors["editorBg"], b.colors["editorBg"]);
-	if (ground < JND
-		&& a.register === b.register
-		&& a.emphasis === b.emphasis
-		&& dOffGround(a, b) < FAMILY_DISTANCE_THRESHOLD) {
-		return { rule: "sharedGround", measured: ground };
+	if (a.register === b.register && a.emphasis === b.emphasis) {
+		const offGround = dOffGround(a, b);
+		if (offGround < threshold) {
+			return { rule: "offGround", measured: offGround };
+		}
 	}
 	return null;
 }
@@ -334,11 +388,17 @@ export function rejects(a: FamilyIdentity, b: FamilyIdentity): Rejection | null 
  * earlier rounds has already been tested against every family taken then, so
  * testing it against the new one is the whole remaining obligation.
  * `runDistinctTests` asserts the two implementations agree.
+ *
+ * `threshold` is the distance the packer keeps, and it defaults to
+ * `PACKING_DISTANCE_THRESHOLD` rather than the gate: the packer is the one place
+ * a margin above the gate can be applied without touching the gate. Pass
+ * `FAMILY_DISTANCE_THRESHOLD` explicitly to pack at the gate itself.
  */
 export function packFarthestPoint(
 	seeded: readonly FamilyIdentity[],
 	candidates: readonly FamilyIdentity[],
-	limit: number = Number.POSITIVE_INFINITY
+	limit: number = Number.POSITIVE_INFINITY,
+	threshold: number = PACKING_DISTANCE_THRESHOLD
 ): readonly FamilyIdentity[] {
 	const alive: boolean[] = candidates.map(() => true);
 	const nearest: number[] = candidates.map(() => Number.POSITIVE_INFINITY);
@@ -347,7 +407,7 @@ export function packFarthestPoint(
 		if (!alive[index]) {
 			return;
 		}
-		if (rejects(candidates[index], against) !== null) {
+		if (rejects(candidates[index], against, threshold) !== null) {
 			alive[index] = false;
 			return;
 		}
@@ -391,7 +451,8 @@ export function packFarthestPoint(
 export function packFarthestPointNaive(
 	seeded: readonly FamilyIdentity[],
 	candidates: readonly FamilyIdentity[],
-	limit: number = Number.POSITIVE_INFINITY
+	limit: number = Number.POSITIVE_INFINITY,
+	threshold: number = PACKING_DISTANCE_THRESHOLD
 ): readonly FamilyIdentity[] {
 	const taken: FamilyIdentity[] = [...seeded];
 	const chosen: FamilyIdentity[] = [];
@@ -405,7 +466,7 @@ export function packFarthestPointNaive(
 			let nearest = Number.POSITIVE_INFINITY;
 			let admissible = true;
 			for (const other of taken) {
-				if (rejects(candidates[i], other) !== null) {
+				if (rejects(candidates[i], other, threshold) !== null) {
 					admissible = false;
 					break;
 				}
@@ -549,6 +610,28 @@ export function nearestNeighbours(families: readonly FamilyIdentity[]): readonly
 	return out.sort((a, b) => a.distance - b.distance || a.key.localeCompare(b.key));
 }
 
+/**
+ * What let an admitted pair through, for the twins strip: the one column whose
+ * job is to tell the reviewer what to look at.
+ *
+ * Three-way, because rule (3) is three-way: a pair in different registers is
+ * told apart by register, a pair in different emphases by emphasis, and a pair
+ * in the same register and emphasis by nothing but its off-ground distance -
+ * which is then printed, so the reviewer looks at the inks rather than hunting
+ * for a bold/plain difference that does not exist. The first draft of this
+ * label was two-way and called every same-register pair "separated by
+ * emphasis", including 85 pairs whose emphasis was identical.
+ */
+export function admittedBy(a: FamilyIdentity, b: FamilyIdentity): string {
+	if (a.register !== b.register) {
+		return "separated by register";
+	}
+	if (a.emphasis !== b.emphasis) {
+		return "separated by emphasis";
+	}
+	return `same register and emphasis, off-ground distance ${dOffGround(a, b).toFixed(2)}`;
+}
+
 /** Every pair, closest first. The twins strip on the contact sheet reads off the front of this. */
 export function closestPairs(families: readonly FamilyIdentity[]): readonly { readonly a: string; readonly b: string; readonly distance: number; readonly admitted: string }[] {
 	const pairs: { a: string; b: string; distance: number; admitted: string }[] = [];
@@ -563,10 +646,8 @@ export function closestPairs(families: readonly FamilyIdentity[]): readonly { re
 				b: b.key,
 				distance: dOwner(a, b),
 				admitted: rejection !== null
-					? `grandfathered (would fail "${rejection.rule}")`
-					: ground < JND
-						? `shared ground (${ground.toFixed(2)} dE00), separated by ${a.register !== b.register ? "register" : "emphasis"}`
-						: `own ground (${ground.toFixed(2)} dE00)`
+					? `grandfathered (would fail "${rejection.rule}" at ${rejection.measured.toFixed(2)})`
+					: `${ground < JND ? "shared" : "own"} ground (${ground.toFixed(2)} dE00), ${admittedBy(a, b)}`
 			});
 		}
 	}
@@ -720,16 +801,56 @@ export function runDistinctTests(): readonly string[] {
 	check("one slot alone cannot buy a family", rejection !== null && rejection.rule === "slots",
 		rejection === null ? "it was admitted" : `rejected on "${rejection.rule}" instead`);
 
-	// Rule (3): a shared ground needs a different register or emphasis.
+	// Rule (3): the ground alone cannot buy a family. A candidate identical to
+	// `a` in editorFg, comment, keyword and function, with a ground 9 dE00 away
+	// and string and constant nudged just past the JND, clears rule (1) on the
+	// ground's weight alone (D 5.45) and rule (2) with K = 3 - and must still be
+	// rejected, because off the ground it is 1.37 dE00 from `a`. This is the
+	// `Nettle | Thorn` shape the first catalogue shipped.
+	const groundOnly = identity("groundOnly", { ...palette, editorBg: "#332F2C", string: "#A8CDF0", constant: "#86CAE0" });
+	check("the ground-only case is set up as intended: D clears T",
+		dOwner(a, groundOnly) >= FAMILY_DISTANCE_THRESHOLD, `D ${dOwner(a, groundOnly).toFixed(2)}`);
+	check("the ground-only case is set up as intended: K clears the slot floor",
+		differingSlots(a, groundOnly) >= MIN_DIFFERING_SLOTS, `K ${differingSlots(a, groundOnly)}`);
+	check("the ground-only case is set up as intended: the grounds are well past a JND",
+		slotDistance(palette.editorBg, "#332F2C") >= JND, `ground ${slotDistance(palette.editorBg, "#332F2C").toFixed(2)}`);
+	const groundRejection = rejects(a, groundOnly);
+	check("ground alone cannot buy a family", groundRejection !== null && groundRejection.rule === "offGround",
+		groundRejection === null ? "it was admitted" : `rejected on "${groundRejection.rule}" instead`);
+	check("the off-ground rejection reports the off-ground distance",
+		groundRejection !== null && Math.abs(groundRejection.measured - dOffGround(a, groundOnly)) < 1e-12,
+		`measured ${groundRejection?.measured}`);
+	// The design holds register and emphasis to be identity axes, so the same
+	// colours in another register or emphasis are a different theme.
+	check("the same pair passes once the register differs",
+		rejects(a, { ...groundOnly, key: "g2", register: "inkLed" as Register }) === null, "still rejected");
+	check("the same pair passes once the emphasis differs",
+		rejects(a, { ...groundOnly, key: "g3", emphasis: "weight" as SyntaxEmphasis }) === null, "still rejected");
+	// And the shared-ground case - the grounds within a JND - asks the same
+	// question: rule (3) is not conditional on the ground.
 	const sameGroundSameRegister = identity("g1", { ...palette, editorFg: "#DDDDDD", comment: "#666666", keyword: "#66AAFF", string: "#77CCAA", function: "#AACCEE", constant: "#EE9977" });
 	const sharedRejection = rejects(a, sameGroundSameRegister);
-	check("a shared ground with the same register is rejected",
-		sharedRejection === null || sharedRejection.rule === "sharedGround" || sharedRejection.rule === "distance" || sharedRejection.rule === "slots",
+	check("a shared ground with the same register is judged off the ground",
+		sharedRejection === null || sharedRejection.rule === "offGround" || sharedRejection.rule === "distance" || sharedRejection.rule === "slots",
 		`unexpected rule ${sharedRejection?.rule}`);
-	const sameGroundOtherRegister = { ...sameGroundSameRegister, key: "g2", register: "inkLed" as Register };
-	if (sharedRejection !== null && sharedRejection.rule === "sharedGround") {
-		check("the same pair passes once the register differs", rejects(a, sameGroundOtherRegister) === null, "still rejected");
-	}
+
+	// The packing threshold is a margin above the gate, pinned to the closest
+	// shipped pair the design argues is plainly two themes.
+	check("the packer packs wider than the gate", PACKING_DISTANCE_THRESHOLD > FAMILY_DISTANCE_THRESHOLD,
+		`${PACKING_DISTANCE_THRESHOLD} vs ${FAMILY_DISTANCE_THRESHOLD}`);
+	check("the packing threshold is the pinned basalt|dusk distance",
+		PACKING_DISTANCE_THRESHOLD === SHIPPED_CALIBRATION["vibe:basalt|vibe:dusk"],
+		`${PACKING_DISTANCE_THRESHOLD} vs ${SHIPPED_CALIBRATION["vibe:basalt|vibe:dusk"]}`);
+	check("a pair the packer keeps is a pair the gate admits",
+		rejects(a, b, PACKING_DISTANCE_THRESHOLD) !== null || rejects(a, b) === null, "the packer admitted what the gate rejects");
+
+	// The twins-strip label never claims an emphasis difference that is not there.
+	check("admittedBy names the register when it differs",
+		admittedBy(a, { ...a, key: "r", register: "inkLed" as Register }) === "separated by register", admittedBy(a, { ...a, key: "r", register: "inkLed" as Register }));
+	check("admittedBy names the emphasis when only it differs",
+		admittedBy(a, { ...a, key: "e", emphasis: "weight" as SyntaxEmphasis }) === "separated by emphasis", admittedBy(a, { ...a, key: "e", emphasis: "weight" as SyntaxEmphasis }));
+	check("admittedBy never says emphasis for a same-register, same-emphasis pair",
+		!admittedBy(a, b).startsWith("separated by") && admittedBy(a, b).includes(dOffGround(a, b).toFixed(2)), admittedBy(a, b));
 
 	// The packer is deterministic and never emits a pair the rule rejects.
 	{
@@ -791,6 +912,6 @@ if (isEntry) {
 		console.error(`\ndistinct: ${failures.length} failing assertion(s)`);
 		process.exit(1);
 	}
-	console.log("distinct: all assertions pass (metric algebra, the cap, rules 1-3, deterministic packing, register detection)");
+	console.log("distinct: all assertions pass (metric algebra, the cap, rules 1-3, the ground-only hole, packing margin, twins labels, deterministic packing, register detection)");
 	process.exit(0);
 }

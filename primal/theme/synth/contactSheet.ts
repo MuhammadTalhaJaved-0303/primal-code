@@ -16,8 +16,11 @@
  *      first screen is where the duplicates are. A reviewer is not sampling; he
  *      is being shown the worst cases first.
  *   2. A twins strip above the grid shows the closest pairs side by side with
- *      their measured distance and WHICH RULE ADMITTED THEM - for a shared-ground
- *      pair, the register or emphasis difference that let it through.
+ *      their measured distance and WHAT ADMITTED THEM - a register difference,
+ *      an emphasis difference, or, for a pair with neither, the distance the six
+ *      non-ground slots keep on their own. The label is three-way because the
+ *      rule is; a reviewer told "separated by emphasis" for a pair whose
+ *      emphasis is identical goes looking for a bold that is not there.
  *   3. Every card appears twice: once as a trichromat sees it and once as a
  *      deuteranope does, through `cvd.ts`'s own simulation. For this owner the
  *      second grid is the real one, and putting it second rather than instead is
@@ -346,9 +349,10 @@ whole catalogue is <b>${worst === undefined ? "-" : escapeHtml(worst.label)}</b>
 Every card appears twice. The second grid is how a deuteranope sees it, and for this owner that grid is the real one.</p>
 
 <h2>Twins - the ${TWINS} closest pairs, and what admitted each</h2>
-<p class="note">A pair whose grounds are within a just-noticeable difference is admitted only when it earns its identity somewhere
-else: a different syntax register, a different emphasis, or enough distance in the six non-ground slots on its own. That is what
-the last column reports.</p>
+<p class="note">A pair in the same syntax register and the same emphasis is admitted only when the six non-ground slots clear the
+threshold on their own - whatever the two grounds do, so a ground alone can never buy a family. A pair in a different register
+or emphasis is told apart by that. The last column reports which of the three it was, with the off-ground distance where that
+is the whole case; the ground distance is printed for every pair so a shared ground is visible either way.</p>
 ${renderTwins(ordered, null)}
 
 <h2>Trichromat</h2>

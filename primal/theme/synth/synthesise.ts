@@ -13,13 +13,28 @@
  * should move, so `--repair` has somewhere to go and `buildCatalogue` can
  * collect every broken family into one report rather than throwing on the first.
  *
- * READABILITY IS A CONSTRUCTION, NOT A REJECTION SAMPLE.
+ * READABILITY IS A CONSTRUCTION, NOT A REJECTION SAMPLE. SEPARATION OF THE
+ * SYNTAX ROLES IS A REJECTION, AND SAYS SO.
  *
- * Every ink in here starts at its own contrast frontier and only ever moves
- * further from the plane. Every ANSI slot is placed against every slot already
- * placed, measured with `perceptualDistanceOfHex` - the gate's own function, on
- * the emitted hex - so the generator and the gate compute the identical number.
- * The validator at the end is confirming, not deciding.
+ * Constructed: every ink starts at its own contrast frontier and only ever
+ * moves further from the plane, so every contrast floor holds by construction;
+ * every ANSI slot is placed against every slot already placed, measured with
+ * `perceptualDistanceOfHex` - the gate's own function, on the emitted hex - so
+ * the ramp's separation and its SGR order hold by construction too. The
+ * validator at the end is confirming those, not deciding them.
+ *
+ * Rejected, not constructed: the `SYNTAX_MIN_SEPARATION` floor between two
+ * non-aliased syntax roles. `buildSyntax` places each role at the lightness its
+ * contrast fraction asks for and then MEASURES it against the ink and every role
+ * already placed; a collision is an `Infeasible` at stage `syntax`, naming the
+ * pair and the fraction to move. It is a rejection on purpose: walking a
+ * colliding role along the lightness axis until it clears 2.3 dE00 would land
+ * every such pair exactly on the floor - a nominal guarantee, the thing the
+ * `syntaxMinSeparation` slack band in `--survey` exists to expose - and would
+ * emit a palette whose contrasts no longer match the fractions the spec states.
+ * Measured at seed 20260910, about one draw in eleven collides; the search pays
+ * that and the spec that ships is the spec that was measured. `postConditions`
+ * re-checks the same number on the final bytes, as it re-checks everything.
  *
  * SYNTAX HUE IS NOT FREE, AND THAT IS THE MEASUREMENT MOST LIKELY TO SURPRISE.
  *
@@ -237,21 +252,49 @@ export interface SyntaxPalette {
 	readonly chromaRetention: number;
 }
 
+/** The spec field that sets a placed role's contrast: `fComment`, `fString`, ... */
+function fractionAxis(slot: SeedSlotId): string {
+	return `f${slot[0].toUpperCase()}${slot.slice(1)}`;
+}
+
+/** Two non-aliased roles that landed within a JND of each other, in placement order. */
+export interface SyntaxCollision {
+	/** The role placed later, whose fraction a repair should move. */
+	readonly slot: SeedSlotId;
+	/** The role or ink it landed on. */
+	readonly other: string;
+	/** dE00 under the worst observer. */
+	readonly separation: number;
+}
+
 /**
- * Stage 4: place every syntax role at the lightness where it delivers the
- * contrast its role asked for, on one hue locked to the plane.
+ * Placement only: every syntax role at the lightness where it delivers the
+ * contrast its role asked for, on one hue locked to the plane, plus the closest
+ * non-aliased pair that landed under `SYNTAX_MIN_SEPARATION`, if any.
  *
  * `max(floor, inkContrast x f)` rather than `inkContrast x f` alone, because a
  * quiet role on a high-contrast plane would otherwise be placed below the
  * legibility floor - the fractions describe a RELATIONSHIP between roles, and
  * the floor describes the reader's eyes, and where they disagree the eyes win.
+ *
+ * Split from `buildSyntax` so the fidelity test can measure the grammar against
+ * Tide's own colours: Tide ships a non-aliased pair inside the JND (`constant`
+ * against `keyword`, 1.93 dE00 under the worst observer), which the synthesiser
+ * rejects and the validator only warns about.
  */
-export function buildSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<SyntaxPalette, Infeasible> {
+export function placeSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<{ readonly palette: SyntaxPalette; readonly collision: SyntaxCollision | null }, Infeasible> {
 	const baseHue = (spec.planeH + spec.syntaxHueOffset + 360) % 360;
 	const kickedHue = (baseHue + spec.constantKick + 360) % 360;
 	const colors: Record<string, string> = {};
 	const contrasts: Record<string, number> = {};
 	let retention = 1;
+	// Every placed role is a different alias class from every other and from
+	// the ink (which `operator` always aliases), so each one has to keep
+	// SYNTAX_MIN_SEPARATION from all of them. Measured as each role lands, so a
+	// collision names the pair and the later-placed role - whose own fraction is
+	// the knob a bounded repair can actually move to separate them.
+	const placed: { readonly slot: string; readonly hex: string }[] = [{ slot: "editorFg", hex: ink.editorFg }];
+	let collision: SyntaxCollision | null = null;
 
 	for (const role of placedRoles(spec)) {
 		const floor = role.slot === "comment" ? COMMENT_MIN_CONTRAST : SYNTAX_MIN_CONTRAST;
@@ -263,11 +306,18 @@ export function buildSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<
 			return err({
 				stage: "syntax",
 				slot: role.slot,
-				axis: role.slot === "comment" ? "fComment" : `f${role.slot[0].toUpperCase()}${role.slot.slice(1)}`,
+				axis: fractionAxis(role.slot),
 				detail: `no lightness at hue ${h.toFixed(1)} reaches ${target.toFixed(2)}:1 on ${planes.editorBg}`
 			});
 		}
 		const hex = placeAt(C, h, L);
+		for (const other of placed) {
+			const separation = worstObserverDistanceOfHex(hex, other.hex);
+			if (separation < SYNTAX_MIN_SEPARATION && (collision === null || separation < collision.separation)) {
+				collision = { slot: role.slot, other: other.slot, separation };
+			}
+		}
+		placed.push({ slot: role.slot, hex });
 		colors[role.slot] = hex;
 		contrasts[role.slot] = effectiveContrast(hex, planes.editorBg);
 		if (C > 1e-6) {
@@ -283,7 +333,32 @@ export function buildSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<
 			contrasts[slot] = effectiveContrast(colors[slot], planes.editorBg);
 		}
 	}
-	return ok({ colors, contrasts, chromaRetention: retention });
+	return ok({ palette: { colors, contrasts, chromaRetention: retention }, collision });
+}
+
+/**
+ * Stage 4: `placeSyntax`, then reject the spec if two non-aliased roles landed
+ * within a JND of each other. The rejection is at stage `syntax` and names the
+ * later-placed role's fraction, which is where the repair ladder for this stage
+ * starts.
+ */
+export function buildSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<SyntaxPalette, Infeasible> {
+	const placed = placeSyntax(spec, planes, ink);
+	if (!placed.ok) {
+		return err(placed.error);
+	}
+	const collision = placed.value.collision;
+	if (collision !== null) {
+		return err({
+			stage: "syntax",
+			slot: `${collision.slot}/${collision.other}`,
+			axis: fractionAxis(collision.slot),
+			detail:
+				`${collision.slot} ${placed.value.palette.colors[collision.slot]} lands ${collision.separation.toFixed(2)} dE00 from ` +
+				`${collision.other} ${placed.value.palette.colors[collision.other] ?? ink.editorFg} under the worst observer, under the ${SYNTAX_MIN_SEPARATION} JND`
+		});
+	}
+	return ok(placed.value.palette);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,8 +376,16 @@ export function buildSyntax(spec: FamilySpec, planes: Planes, ink: Ink): Result<
  * corpus importer never made - run unreversed, the walk puts `ansiBlack` at the
  * light end and breaks the one part of the convention a program can rely on.
  *
- * The six normals are placed before the six brights so that every bright slot is
- * further from the plane than every normal one, which is what "bright" means.
+ * Brights are LIGHTER than normals in both modes - that is what "bright" means,
+ * and it is the SGR convention every terminal palette follows. On a dark plane
+ * lighter is outward, so the six normals are placed before the six brights and
+ * every bright sits further from the plane than every normal. On a light plane
+ * lighter is INWARD, so the brights are placed first and every bright sits
+ * NEARER the plane than every normal: `ansiBrightWhite` is the lowest-contrast
+ * slot of a light ramp (3.0:1, the floor) and `ansiBrightRed` reads at roughly
+ * 4.6-5.1:1 against `ansiRed` at 7-8:1. That is the geometry Ink and Ridge, the
+ * two hand-authored light vibes, already ship; a light ramp that put the brights
+ * at the dark end would be a ramp where "bright red" is the darker red.
  */
 function ansiOrder(mode: ThemeMode): readonly SeedSlotId[] {
 	const normals: readonly SeedSlotId[] = ["ansiRed", "ansiGreen", "ansiYellow", "ansiBlue", "ansiMagenta", "ansiCyan"];
@@ -527,9 +610,12 @@ function postConditions(spec: FamilySpec, seed: Seed, ansi: AnsiRamp, syntax: Sy
 	if (lightest !== "ansiBrightWhite") {
 		return { stage: "postcondition", slot: "ansiBrightWhite", axis: "ansiRungSpread", detail: `${lightest} is lighter than ansiBrightWhite` };
 	}
+	// Re-checked on the final bytes. `buildSyntax` has already rejected any
+	// colliding pair by name, so this can only fire if the two disagree - which
+	// would be a defect in this file, not in the spec.
 	const separation = syntaxMinSeparation(spec, syntax.colors);
 	if (separation < SYNTAX_MIN_SEPARATION) {
-		return { stage: "postcondition", slot: "syntax palette", axis: "fConstant", detail: `two non-aliased syntax roles are ${separation.toFixed(2)} dE00 apart, under the ${SYNTAX_MIN_SEPARATION} JND` };
+		return { stage: "postcondition", slot: "syntax palette", axis: "fConstant", detail: `two non-aliased syntax roles are ${separation.toFixed(2)} dE00 apart, under the ${SYNTAX_MIN_SEPARATION} JND, and buildSyntax did not reject them` };
 	}
 	return null;
 }
@@ -720,7 +806,7 @@ export const TIDE_PARAMETERS: FamilySpec = specOf({
 	ansiRungSpread: 0,
 	ansiAir: 0,
 	selectionStep: 0.1673,
-	approval: { by: "test", on: null, sheet: "0".repeat(64) },
+	approval: { by: "unreviewed", on: null, sheet: "0".repeat(64) },
 	slack: { ansiWorstPair: 0, ansiMinContrast: 0, ansiDichromatCollisions: 0, syntaxContrastRatio: 0, syntaxMinSeparation: 0, warnings: 0 }
 });
 
@@ -778,9 +864,19 @@ export function runFidelityTest(): { readonly failures: readonly string[]; reado
 	if (!ink.ok) {
 		return { failures: ["synthesise: the fidelity test cannot place Tide's ink"], table };
 	}
-	const syntax = buildSyntax(TIDE_PARAMETERS, planes, ink.value);
-	if (!syntax.ok) {
+	const placed = placeSyntax(TIDE_PARAMETERS, planes, ink.value);
+	if (!placed.ok) {
 		return { failures: ["synthesise: the fidelity test cannot place Tide's syntax"], table };
+	}
+	const syntax = { value: placed.value.palette };
+	// Tide itself ships a non-aliased pair inside the JND - the validator warns
+	// on it, the synthesiser rejects it - so the fidelity test measures
+	// PLACEMENT, and states the collision rather than hiding it. A grammar that
+	// reproduced Tide's colours and then silently passed Tide would be a
+	// synthesiser with a hand-authored exemption.
+	if (placed.value.collision !== null) {
+		const c = placed.value.collision;
+		table.push(`    (Tide's own ${c.slot} and ${c.other} sit ${c.separation.toFixed(2)} dE00 apart under the worst observer; buildSyntax rejects that, the validator warns)`);
 	}
 	const produced: Record<string, string> = { editorBg: planes.editorBg, editorFg: ink.value.editorFg, ...syntax.value.colors };
 	for (const [role, shipped] of Object.entries(TIDE_SHIPPED)) {
@@ -830,7 +926,7 @@ export function sampleSpecs(): readonly FamilySpec[] {
 		depths: ["medium"], inkChromaScale: 1.4, chromeFraction: 0.55, syntaxHueOffset: -8,
 		syntaxEmphasis: "weight", ansiHueOffsets: [0, 0, 0, 0, 0, 0],
 		ansiChromaScale: 1, ansiRungSpread: 0, ansiAir: 0.3, selectionStep: 0.11,
-		approval: { by: "test", on: null, sheet: "0".repeat(64) },
+		approval: { by: "unreviewed", on: null, sheet: "0".repeat(64) },
 		slack: { ansiWorstPair: 0, ansiMinContrast: 0, ansiDichromatCollisions: 0, syntaxContrastRatio: 0, syntaxMinSeparation: 0, warnings: 0 }
 	};
 	const keywordLed = { register: "keywordLed", fFunction: 0.90, fString: 0.72, fKeyword: 0.62, fConstant: 0.70, fComment: 0.33, constantKick: 26 };

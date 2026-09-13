@@ -37,8 +37,16 @@ import { fileURLToPath } from "node:url";
 import type { Seed } from "../generateTheme.ts";
 import { DEPTH_STEPS, type Depth } from "../importPalette.ts";
 import type { SyntaxEmphasis, ThemeMode } from "../tokenMap.ts";
-import { identityOf, packFarthestPoint, type FamilyIdentity } from "./distinct.ts";
-import { REPAIR_LADDER, synthesise, type Infeasible, type Stage } from "./synthesise.ts";
+import { PACKING_DISTANCE_THRESHOLD, identityOf, packFarthestPoint, type FamilyIdentity } from "./distinct.ts";
+import {
+	COMMENT_MIN_CONTRAST,
+	REPAIR_LADDER,
+	SYNTAX_CONTRAST_SPREAD_LIMIT,
+	SYNTAX_MIN_CONTRAST,
+	synthesise,
+	type Infeasible,
+	type Stage
+} from "./synthesise.ts";
 import { validate } from "../validateTheme.ts";
 import {
 	ANSI_AIR,
@@ -62,6 +70,7 @@ import {
 	SELECTION_STEP,
 	SYNTAX_CHROMA,
 	SYNTAX_HUE_OFFSET,
+	UNREVIEWED,
 	parseSpec,
 	type Approval,
 	type Bound,
@@ -114,36 +123,66 @@ function pick<T>(rng: () => number, options: readonly T[]): T {
 // ---------------------------------------------------------------------------
 
 /**
+ * The part of a contrast-fraction band that the spread guard can accept, given
+ * the ink the fraction is a fraction OF.
+ *
+ * `tasteGuards` rejects a palette whose loudest syntax ink (always the ink
+ * itself, which `operator` aliases) is more than `SYNTAX_CONTRAST_SPREAD_LIMIT`
+ * times its quietest. A role placed at `max(floor, ink x f)` therefore needs
+ * `f >= 1 / limit` unless its floor alone already keeps it inside the spread -
+ * `ink <= floor x limit`. Drawing below that line is drawing a spec that will
+ * be thrown away at the taste stage every time: measured at seed 20260910
+ * before this cut, 29% of all draws died there, almost all on `fComment`, whose
+ * band [0.21, 0.35] straddles the 1/3.2 = 0.3125 line while the ink band runs
+ * to 16.5. The guard itself is untouched; this only stops the search drawing
+ * into it.
+ */
+export function spreadFeasible(band: Bound, floor: number, inkContrast: number): Bound {
+	if (inkContrast <= floor * SYNTAX_CONTRAST_SPREAD_LIMIT) {
+		return band;
+	}
+	return { min: Math.max(band.min, 1 / SYNTAX_CONTRAST_SPREAD_LIMIT), max: band.max };
+}
+
+/**
  * One draw from the house box.
  *
- * Every field is uniform inside the band `spec.ts` states for it, rounded to a
- * precision a human can read in a diff - and rounded BEFORE synthesis, so the
- * spec written to `families.json` is exactly the spec that was measured.
+ * Every field is uniform inside the band `spec.ts` states for it - the contrast
+ * fractions inside the part of their band the spread guard can accept for the
+ * ink drawn, see `spreadFeasible` - rounded to a precision a human can read in
+ * a diff, and rounded BEFORE synthesis, so the spec written to `families.json`
+ * is exactly the spec that was measured.
  */
 export function drawSpec(rng: () => number, mode: ThemeMode): FamilySpec {
 	const register: Register = pick(rng, REGISTERS);
 	const emphasis: SyntaxEmphasis = pick(rng, EMPHASES);
 	const kick = rng() < 0.25 ? 0 : (rng() < 0.5 ? -1 : 1) * uniform(rng, CONSTANT_KICK, 1);
 	const hueOffsets = HOUSE_ANSI_BAND.map(band => uniform(rng, { min: -band, max: band }, 1));
+	const planeL = uniform(rng, PLANE_L[mode], 4);
+	const planeC = uniform(rng, PLANE_C[mode], 4);
+	const planeH = Math.round(rng() * 3600) / 10 % 360;
+	const inkContrast = uniform(rng, INK_CONTRAST[mode], 2);
+	const fraction = (band: Bound, floor: number = SYNTAX_MIN_CONTRAST): number =>
+		uniform(rng, spreadFeasible(band, floor, inkContrast), 3);
 	return {
 		id: "draft",
 		name: "Draft",
 		mode,
 		depths: ["medium"],
-		planeL: uniform(rng, PLANE_L[mode], 4),
-		planeC: uniform(rng, PLANE_C[mode], 4),
-		planeH: Math.round(rng() * 3600) / 10 % 360,
-		inkContrast: uniform(rng, INK_CONTRAST[mode], 2),
+		planeL,
+		planeC,
+		planeH,
+		inkContrast,
 		inkChromaScale: uniform(rng, INK_CHROMA_SCALE, 2),
 		chromeFraction: uniform(rng, CHROME_FRACTION, 3),
 		register,
 		syntaxHueOffset: uniform(rng, SYNTAX_HUE_OFFSET, 1),
 		syntaxChroma: uniform(rng, SYNTAX_CHROMA[register][mode], 4),
-		fFunction: uniform(rng, F_FUNCTION[register], 3),
-		fString: uniform(rng, F_STRING[register], 3),
-		...(register === "keywordLed" ? { fKeyword: uniform(rng, F_KEYWORD, 3) } : {}),
-		fConstant: uniform(rng, F_CONSTANT[register], 3),
-		fComment: uniform(rng, F_COMMENT, 3),
+		fFunction: fraction(F_FUNCTION[register]),
+		fString: fraction(F_STRING[register]),
+		...(register === "keywordLed" ? { fKeyword: fraction(F_KEYWORD) } : {}),
+		fConstant: fraction(F_CONSTANT[register]),
+		fComment: fraction(F_COMMENT, COMMENT_MIN_CONTRAST),
 		constantKick: kick,
 		syntaxEmphasis: emphasis,
 		ansiHueOffsets: hueOffsets as unknown as readonly [number, number, number, number, number, number],
@@ -151,7 +190,7 @@ export function drawSpec(rng: () => number, mode: ThemeMode): FamilySpec {
 		ansiRungSpread: pick(rng, ANSI_RUNG_SPREADS),
 		ansiAir: uniform(rng, ANSI_AIR, 2),
 		selectionStep: uniform(rng, SELECTION_STEP, 3),
-		approval: { by: "unreviewed", on: null, sheet: "0".repeat(64) },
+		approval: unreviewed("0".repeat(64)),
 		slack: { ansiWorstPair: 0, ansiMinContrast: 0, ansiDichromatCollisions: 0, syntaxContrastRatio: 0, syntaxMinSeparation: 0, warnings: 0 }
 	};
 }
@@ -184,9 +223,23 @@ function emptyFailures(): Record<Stage, number> {
  * Draws `draws` specs and returns the ones that synthesise clean at the medium
  * depth, plus the failure profile.
  *
+ * MOST DRAWS ARE THROWN AWAY, and the number is measured rather than guessed:
+ * `--propose` prints the clean fraction and the per-stage profile of every run.
+ * At seed 20260910 over 3,000 draws it is 553 clean of 3,000 - an 81.6% reject
+ * rate - with the profile syntax 1746, ramp 533, taste 93, ground 71, ladder 4,
+ * validator 0. Before `spreadFeasible` cut the fraction bands to what the
+ * spread guard accepts it was 191 clean (93.6% rejected), and an earlier
+ * comment here said 45%, which nothing ever measured. The syntax stage
+ * dominates because it now measures its own separation floor first, ahead of
+ * the ramp that used to mask it: `string | function` (589), `constant |
+ * keyword` (428) and `constant | string` (280) are the colliding pairs, i.e.
+ * two fractions drawn close enough that hue and chroma alone have to separate
+ * them - which for this owner they cannot. The house box is wider than the
+ * feasible region and the search pays for that in draws, not in themes.
+ *
  * Medium only, at this stage: a family that cannot express medium is not a
- * family, and measuring all three depths for every draw would triple the cost of
- * the 45% that are going to be thrown away.
+ * family, and measuring all three depths for every draw would multiply the cost
+ * of the four in five that are going to be thrown away.
  */
 export function search(draws: number, seed: number, onProgress?: (done: number, clean: number) => void): SearchReport {
 	const rng = mulberry32(seed);
@@ -292,7 +345,7 @@ export function cardHash(spec: FamilySpec, seedsByDepth: ReadonlyMap<Depth, Seed
 
 /** An unsigned approval, for a family no human has looked at yet. */
 export function unreviewed(sheet: string): Approval {
-	return { by: "unreviewed", on: null, sheet };
+	return { by: UNREVIEWED, on: null, sheet };
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +356,12 @@ export function unreviewed(sheet: string): Approval {
 export interface FamilyBook {
 	readonly version: number;
 	readonly families: readonly FamilySpec[];
+}
+
+/** The `$comment` `families.json` states - the provenance line `--propose` wrote - so a partial rewrite can keep it. */
+export function loadFamilyBookComment(path: string = FAMILIES_PATH): string {
+	const raw = JSON.parse(readFileSync(path, "utf8")) as { readonly $comment?: unknown };
+	return typeof raw.$comment === "string" ? raw.$comment : "";
 }
 
 /** Reads and validates every spec, failing fast with the offending family and field. */
@@ -411,7 +470,10 @@ export function propose(
 ): Proposal {
 	const report = search(draws, rngSeed, onProgress);
 	const byKey = new Map(report.clean.map(candidate => [candidate.identity.key, candidate]));
-	const packed = packFarthestPoint(seeded, report.clean.map(candidate => candidate.identity));
+	// Packed at PACKING_DISTANCE_THRESHOLD, a margin above the gate the build
+	// applies, so the catalogue is not filled to the edge of what the gate's
+	// two-negative calibration can vouch for. See distinct.ts.
+	const packed = packFarthestPoint(seeded, report.clean.map(candidate => candidate.identity), Number.POSITIVE_INFINITY, PACKING_DISTANCE_THRESHOLD);
 
 	const specs: FamilySpec[] = [];
 	let nameIndex = 0;
