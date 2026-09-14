@@ -9,6 +9,7 @@ import { Event } from '../../../../../base/common/event.js';
 import { MarkdownString } from '../../../../../base/common/htmlContent.js';
 import { constObservable, observableValue } from '../../../../../base/common/observable.js';
 import { extUri } from '../../../../../base/common/resources.js';
+import { Disposable } from '../../../../../base/common/lifecycle.js';
 import { mock } from '../../../../../base/test/common/mock.js';
 import { URI } from '../../../../../base/common/uri.js';
 import { Range } from '../../../../../editor/common/core/range.js';
@@ -17,6 +18,7 @@ import { IQuickInputService } from '../../../../../platform/quickinput/common/qu
 import { asCssVariable } from '../../../../../platform/theme/common/colorUtils.js';
 import { IUriIdentityService } from '../../../../../platform/uriIdentity/common/uriIdentity.js';
 import { IChatTipService } from '../../../../../workbench/contrib/chat/browser/chatTipService.js';
+import { IPrimalMotifService } from '../../../../../workbench/contrib/primalMotif/browser/primalMotif.js';
 import { ChatSpeechToTextState, IChatSpeechToTextService } from '../../../../../workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.js';
 import { IMicCaptureService } from '../../../../../workbench/contrib/chat/browser/voiceClient/micCaptureService.js';
 import { ITtsPlaybackService } from '../../../../../workbench/contrib/chat/browser/voiceClient/ttsPlaybackService.js';
@@ -106,6 +108,9 @@ async function renderNewChatWidget(context: ComponentFixtureContext, options: IN
 		colorTheme: context.theme,
 		additionalServices: reg => {
 			registerChatFixtureServices(reg);
+			// The landing offers the window a motif stage (newChatMotifStage.ts);
+			// the fixture has no scheduler, so the offer goes nowhere.
+			reg.definePartialInstance(IPrimalMotifService, { registerStage: () => Disposable.None, relayout: () => { } });
 			reg.defineInstance(IUriIdentityService, new class extends mock<IUriIdentityService>() {
 				override readonly extUri = extUri;
 			}());

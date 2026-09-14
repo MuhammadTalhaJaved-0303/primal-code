@@ -36,10 +36,13 @@
  * background-image, which the contribution composes from the active theme at
  * runtime. There is not a single color literal in this file.
  *
- * The guard is the one primalChrome.css uses, for the same reasons: `hc-black`
- * and `hc-light` are this fork's high-contrast classes, so high contrast opts
- * out entirely, and `agent-sessions-workbench` / `modern-ui` are the other two
- * chrome designs that ship here and already own these selectors.
+ * The guard: `hc-black` and `hc-light` are this fork's high-contrast classes,
+ * so high contrast opts out entirely, and `modern-ui` is the other chrome
+ * design that ships here and already owns these selectors. The Agents window
+ * (`agent-sessions-workbench`) is NOT excluded: its parts are opaque slabs on
+ * their own tokens and its title bar and floating-panel gaps are ground like
+ * any other, so the same layer paints there. primalChrome.css keeps the
+ * sessions class in its guard because the slab chrome is the IDE window's.
  */
 
 /*
@@ -51,7 +54,7 @@
 	display: none;
 }
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) {
 
 	/* --- Intensity constants (no colors here; see the tokens used below) ---
 	 *

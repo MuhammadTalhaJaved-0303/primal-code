@@ -355,18 +355,19 @@
  * drop overlay at 12 and the sashes at 35, and none of them are in this
  * context.
  *
- * THE GUARD. The same four classes primalMotif.css and primalWallpaper.css
- * carry: high contrast opts out of the ground entirely, and
- * `agent-sessions-workbench` / `modern-ui` are the other two chrome designs
- * that ship in this fork and own their own ground selectors.
+ * THE GUARD. The same three classes primalMotif.css and primalWallpaper.css
+ * carry: high contrast opts out of the ground entirely, and `modern-ui` is
+ * the other chrome design that ships in this fork and owns its own ground
+ * selectors. The Agents window paints the same ground and offers its own
+ * stage (vs/sessions/contrib/chat/browser/newChatMotifStage.ts).
  * ========================================================================== */
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .primal-start-pane {
 	position: relative;
 	isolation: isolate;
 }
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane > .primal-motif-stage {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .primal-start-pane > .primal-motif-stage {
 	position: absolute;
 	inset: 0;
 	z-index: 0;
@@ -374,7 +375,7 @@
 	overflow: hidden;
 }
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane > .primal-start-editor {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .primal-start-pane > .primal-start-editor {
 	position: relative;
 	z-index: 1;
 
@@ -431,11 +432,11 @@
  * own stacking context above, so the scrim can never fall behind the stage.
  * ------------------------------------------------------------------------ */
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane .primal-start-page {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .primal-start-pane .primal-start-page {
 	position: relative;
 }
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) .primal-start-pane .primal-start-page::before {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .primal-start-pane .primal-start-page::before {
 	content: '';
 	position: absolute;
 	inset: -96px -48px -32px;

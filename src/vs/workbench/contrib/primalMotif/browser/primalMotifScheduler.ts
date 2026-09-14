@@ -19,7 +19,7 @@ import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchLayoutService, LayoutSettings } from '../../../services/layout/browser/layoutService.js';
 import { IPowerService, ThermalState } from '../../../services/power/common/powerService.js';
 import { IPrimalVibeService } from '../../primalVibes/browser/primalVibes.js';
-import { PRIMAL_WALLPAPER_LAYER_CLASS, PRIMAL_WALLPAPER_ON_CLASS, PRIMAL_WALLPAPER_SETTING_IDS } from '../../primalWallpaper/browser/primalWallpaper.js';
+import { PRIMAL_WALLPAPER_LAYER_CLASS, PRIMAL_WALLPAPER_SETTING_IDS } from '../../primalWallpaper/browser/primalWallpaper.js';
 import {
 	IMotifFrame,
 	IMotifHost,
@@ -28,7 +28,7 @@ import {
 	IPrimalMotifStatus,
 	PRIMAL_MOTIF_BUFFER_HEIGHT,
 	PRIMAL_MOTIF_BUFFER_WIDTH,
-	PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES,
+	groundPaintsIn,
 	PRIMAL_MOTIF_FADE_PROPERTY,
 	PRIMAL_MOTIF_FRAME_BUDGET_MS,
 	PRIMAL_MOTIF_ID_SETTING_ID,
@@ -1081,7 +1081,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	 *   layer to `display: none` - but it leaves the element, and the motif canvas
 	 *   inside it, in the DOM. `requestAnimationFrame` fires per window and not
 	 *   per element, so `display: none` stops nothing on its own.
-	 * - The other chrome designs (see `PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES`) are
+	 * - The chrome designs in `PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES` are
 	 *   excluded by the `:not()` guard both stylesheets carry, and `.modern-ui` is
 	 *   toggled on this very element from a setting while the workbench runs.
 	 *
@@ -1090,9 +1090,7 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	 * costs: nothing. There is one way to turn the ground off, and this is it.
 	 */
 	private groundPaints(container: HTMLElement): boolean {
-		const classes = container.classList;
-		return classes.contains(PRIMAL_WALLPAPER_ON_CLASS)
-			&& !PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES.some(optOut => classes.contains(optOut));
+		return groundPaintsIn(container.classList);
 	}
 
 	/**

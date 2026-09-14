@@ -227,6 +227,17 @@ import '../workbench/contrib/chat/browser/chatSessions/chatSessions.contribution
 import '../workbench/contrib/chat/browser/contextContrib/chatContext.contribution.js';
 import '../workbench/contrib/imageCarousel/browser/imageCarousel.contribution.js';
 
+// Primal ground: the vibes (which own IPrimalVibeService), the wallpaper layer
+// and the motif that paints into it. The IDE window loads these from
+// `contrib/chat/electron-browser/chat.contribution`, which this window does not
+// import, so without these lines the Agents window has no ground at all and
+// the "New session" landing's stage offer (newChatMotifStage.ts) would find no
+// scheduler. A motif chosen once is the motif of every window: the settings
+// are application-scoped and both windows read the same ones.
+import '../workbench/contrib/primalVibes/browser/primalVibes.contribution.js';
+import '../workbench/contrib/primalWallpaper/browser/primalWallpaper.contribution.js';
+import '../workbench/contrib/primalMotif/browser/primalMotif.contribution.js';
+
 // Voice Mode (voice UI actions, settings and context keys)
 import '../workbench/contrib/agentsVoice/browser/agentsVoice.contribution.js';
 import './contrib/chat/browser/voiceBridge.contribution.js';

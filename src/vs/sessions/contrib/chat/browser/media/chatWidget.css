@@ -472,3 +472,72 @@
 .action-widget .monaco-list-row.action.sessions-browse-inline-item.focused:not(.option-disabled) .description {
 	visibility: visible;
 }
+
+/* ==========================================================================
+ * The motif stage on the new-session landing
+ *
+ * See primalMotif/browser/media/primalMotif.css and, for the pattern this
+ * copies, primalStart/browser/media/primalStart.css. The motif layer runs one
+ * surface per window; while the landing is visible it offers itself as that
+ * surface's host (newChatMotifStage.ts), so the active motif is drawn here
+ * rather than into the title bar and the gaps between the floating panels.
+ * Keyed on `.primal-motif-host`, which only the landing that made the offer
+ * carries; the new-chat-in-session widget sits next to code and never does.
+ *
+ * THE STACKING CONTEXT IS LOAD-BEARING. `.sessions-chat-widget` is already
+ * `position: relative`; `isolation: isolate` is what makes the 0/1 pair below a
+ * guarantee rather than an accident of what the sessions part paints around
+ * it. The stage is `inset: 0` at z-index 0, the content container above it at
+ * z-index 1, and nothing else is in this context.
+ *
+ * THE GUARD is the one the ground layer carries: high contrast opts out
+ * entirely, and `modern-ui` owns its own ground selectors.
+ * ========================================================================== */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host {
+	isolation: isolate;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host > .primal-motif-stage {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host > .new-chat-widget-container {
+	z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+ * The scrim. MANDATORY, for the reason primalStart.css gives at length: the
+ * landing's heading and its "New session in ... with ..." row are text on bare
+ * ground, and contrast against something that moves is per-pixel and per-frame
+ * and therefore not checkable at all. The content block gets a plate of its
+ * own, painted in the window's own ground colour so it has no shape - what it
+ * reads as is the motif fading out behind the words. At 0.9 over the stage's
+ * 0.14 ceiling what survives behind the text is under 1.5% ink.
+ *
+ * `.new-chat-widget-container` already establishes a stacking context
+ * (`container-type: size` implies layout containment, and it now carries
+ * z-index 1 as well), so a `z-index: -1` plate inside it can never fall behind
+ * the stage. The negative insets carry the feather outside the text; the
+ * container's own `overflow: hidden` clips it at the pane edge, where the stage
+ * is clipped too, so no seam appears.
+ * ------------------------------------------------------------------------ */
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host .new-chat-widget-content {
+	position: relative;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host .new-chat-widget-content::before {
+	content: '';
+	position: absolute;
+	inset: -64px -48px;
+	z-index: -1;
+	pointer-events: none;
+	background: var(--vscode-agents-background);
+	opacity: 0.9;
+	filter: blur(24px);
+}
