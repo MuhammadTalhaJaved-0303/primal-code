@@ -38,9 +38,10 @@
  * comes from the canvas, and everything the scheduler puts on that canvas is
  * derived from active-theme tokens (see `readPalette` in primalMotifScheduler.ts).
  *
- * The guard is the one primalWallpaper.css and primalChrome.css use, for the
- * same reasons: high contrast opts out entirely, and `agent-sessions-workbench`
- * / `modern-ui` are the other two chrome designs that ship here.
+ * The guard is the one primalWallpaper.css uses, for the same reasons: high
+ * contrast opts out entirely, and `modern-ui` is the other chrome design that
+ * ships here. The Agents window (`agent-sessions-workbench`) paints the same
+ * ground - see PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES in primalMotif.ts.
  */
 
 /*
@@ -51,7 +52,7 @@
 	display: none;
 }
 
-.monaco-workbench:not(.hc-black):not(.hc-light):not(.agent-sessions-workbench):not(.modern-ui) {
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) {
 
 	/* How long the surface takes to cross-fade in over the wallpaper's own wash.
 	 * Short enough that a theme switch does not read as a page load, long enough

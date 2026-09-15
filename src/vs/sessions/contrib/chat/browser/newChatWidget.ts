@@ -31,6 +31,7 @@ import { WorkspacePicker } from './sessionWorkspacePicker.js';
 import { WebWorkspacePicker } from './webWorkspacePicker.js';
 import { IPreferredSessionType } from './sessionTypePicker.js';
 import { NewChatInputWidget } from './newChatInput.js';
+import { NewChatMotifStage } from './newChatMotifStage.js';
 import { NoAgentHostEmptyState } from './noAgentHostEmptyState.js';
 import { IChatRequestVariableEntry } from '../../../../workbench/contrib/chat/common/attachments/chatVariableEntries.js';
 import { IAgentHostFilterService } from '../../../services/agentHostFilter/common/agentHostFilter.js';
@@ -63,6 +64,7 @@ export class NewChatWidget extends Disposable {
 	private readonly _chatTipPresenter = this._register(new MutableDisposable<ChatInputTipPresenter>());
 	private _isChatTipSessionInitialized = false;
 	private _aquariumToggle: IMountedToggleHandle | undefined;
+	private readonly _motifStage = this._register(new MutableDisposable<NewChatMotifStage>());
 
 	/** Recreates the draft once a better/late-registering provider can serve the folder (see {@link _createNewSession}). */
 	private readonly _pendingPreferredUpgrade = new MutableDisposable<IDisposable>();
@@ -330,6 +332,11 @@ export class NewChatWidget extends Disposable {
 
 	render(parent: HTMLElement): void {
 		const element = dom.append(parent, dom.$('.sessions-chat-widget'));
+
+		// The landing shows no code, so it offers itself as the window's motif
+		// stage; see newChatMotifStage.ts. Prepended, so it sits under all of
+		// the below.
+		this._motifStage.value = this.instantiationService.createInstance(NewChatMotifStage, element);
 		const chatWidgetContainer = dom.append(element, dom.$('.new-chat-widget-container'));
 		const chatWidgetContent = dom.append(chatWidgetContainer, dom.$(`.new-chat-widget-content.${chatInputStackClass}`));
 
@@ -911,6 +918,7 @@ export class NewChatWidget extends Disposable {
 
 	layout(_height: number, _width: number): void {
 		this._newChatInput.layout(_height, _width);
+		this._motifStage.value?.layout();
 	}
 
 	focusInput(): void {
@@ -973,6 +981,7 @@ export class NewChatWidget extends Disposable {
 
 	setHostVisible(visible: boolean): void {
 		this._aquariumToggle?.setHostVisible(visible);
+		this._motifStage.value?.setHostVisible(visible);
 	}
 
 	sendQuery(text: string): void {

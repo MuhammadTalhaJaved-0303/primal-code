@@ -8,6 +8,7 @@ import { IDisposable, toDisposable } from '../../../../base/common/lifecycle.js'
 import { localize } from '../../../../nls.js';
 import { getWindow } from '../../../../base/browser/dom.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
+import { PRIMAL_WALLPAPER_ON_CLASS } from '../../primalWallpaper/browser/primalWallpaper.js';
 
 /**
  * Primal Code - motif contracts.
@@ -200,23 +201,50 @@ export const PRIMAL_MOTIF_INSTANT_CLASS = 'primal-motif-instant';
 export const PRIMAL_MOTIF_STAGED_CLASS = 'primal-motif-staged';
 
 /**
- * The other chrome designs that ship in this fork, both of which own the ground
- * selectors themselves and opt out of this layer entirely.
+ * The chrome design that ships in this fork and owns the ground selectors
+ * itself, so it opts out of this layer entirely.
  *
- * `media/primalMotif.css` and `primalWallpaper.css` carry the same two in their
- * `:not()` guard, so under either of them the wallpaper layer *and* the motif
- * surface are `display: none`. That is a stylesheet fact the scheduler has to
- * know as well: a loop running into a surface the stylesheet has made invisible
- * costs exactly as much as a visible one, and the classes are toggled at
- * runtime (`modernUI.contribution.ts` writes `.modern-ui` from a setting), so
- * this cannot be answered once at startup. Read by `groundPaints` in
- * `primalMotifScheduler.ts`, which is the one place that decides whether the
- * ground is actually painting in a given window.
+ * `media/primalMotif.css` and `primalWallpaper.css` carry the same class in
+ * their `:not()` guard, so under it the wallpaper layer *and* the motif surface
+ * are `display: none`. That is a stylesheet fact the scheduler has to know as
+ * well: a loop running into a surface the stylesheet has made invisible costs
+ * exactly as much as a visible one, and the class is toggled at runtime
+ * (`modernUI.contribution.ts` writes `.modern-ui` from a setting), so this
+ * cannot be answered once at startup. Read through {@link groundPaintsIn}, the
+ * one rule that decides whether the ground is actually painting in a window.
+ *
+ * The Agents window (`agent-sessions-workbench`, `vs/sessions`) used to be
+ * listed here as well. It is not a different ground: its entry point
+ * (`sessions.common.main.ts`) loads the vibes, the wallpaper and this
+ * contribution, its parts are opaque slabs on the `--vscode-agents-*` tokens,
+ * and its title bar and the gaps between its floating panels are exactly the
+ * chrome the ground was made for. A motif chosen once is the motif of every window - the setting
+ * is application-scoped for that reason - so the class left this list, and the
+ * window's code-free "New session" landing offers a stage
+ * (`vs/sessions/contrib/chat/browser/newChatMotifStage.ts`) the way Primal
+ * Start does. `primalChrome.css` still excludes it: the slab chrome is the IDE
+ * window's, and the sessions window owns its own parts.
  */
 export const PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES: readonly string[] = Object.freeze([
-	'agent-sessions-workbench',
 	'modern-ui'
 ]);
+
+/**
+ * Is the ground painting in a window whose workbench element carries these
+ * classes? Pure, so the rule is testable without a scheduler. Both halves
+ * change at runtime and neither raises an event of its own, which is why
+ * `groundPaints` in `primalMotifScheduler.ts` re-asks on every pass:
+ *
+ * - the wallpaper has to be on. `PRIMAL_WALLPAPER_ON_CLASS` is toggled by
+ *   `primalWallpaperService.applyTo`, which paints nothing for
+ *   `primalCode.wallpaper.mode: 'off'` and for `opacity: 0`;
+ * - none of the chrome designs in {@link PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES}
+ *   may be active, because the stylesheets hide the layer under them.
+ */
+export function groundPaintsIn(classes: { contains(token: string): boolean }): boolean {
+	return classes.contains(PRIMAL_WALLPAPER_ON_CLASS)
+		&& !PRIMAL_MOTIF_CHROME_OPT_OUT_CLASSES.some(optOut => classes.contains(optOut));
+}
 
 /** Written on the surface element; the cross-fade between the wash and the motif. */
 export const PRIMAL_MOTIF_FADE_PROPERTY = '--primal-motif-fade';
