@@ -61,8 +61,11 @@
 
 	/* The stage's opacity ceiling. A FIXED CONSTANT, and deliberately not a
 	 * setting - see the stage rule below for why the number has to be decided
-	 * here rather than by the reader. */
-	--primal-motif-stage-strength: 0.14;
+	 * here rather than by the reader. Raised from 0.14 on 2026-09-15: at 0.14
+	 * the owner, on a dark vibe, could not see the picture at all, and every
+	 * stage host carries its own scrim plate (primalStart.css, the sessions
+	 * landing), which is what keeps text readable, not this number. */
+	--primal-motif-stage-strength: 0.35;
 
 	/* =====================================================================
 	 * 1. The surface
