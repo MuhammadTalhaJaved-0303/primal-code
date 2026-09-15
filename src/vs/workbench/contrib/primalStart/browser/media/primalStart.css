@@ -535,3 +535,125 @@
 	opacity: 0.9;
 	filter: blur(24px);
 }
+
+/* ---------- First-run guide: three quiet steps between the actions and the vibes
+ *
+ * Shown only while the guide is incomplete; the section carries `.empty` (and so
+ * `display: none`, above) once it is done. Status is stated in a glyph and a word
+ * inside each step; the only visual difference between steps is edge weight, the
+ * same device the active vibe card uses. No colour carries meaning here.
+ * ---------- */
+
+.primal-start-editor .primal-start-firstrun {
+	margin-top: 28px;
+}
+
+.primal-start-editor .primal-start-firstrun-steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.primal-start-editor.narrow .primal-start-firstrun-steps {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.primal-start-editor .primal-start-firstrun-step {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	min-width: 0;
+	padding: 12px 14px;
+	color: var(--vscode-foreground);
+	background: var(--vscode-editorWidget-background, transparent);
+	border: var(--primal-start-edge);
+	border-radius: var(--primal-start-slab-radius);
+}
+
+/* The step to do now: heavier edge, exactly like the current vibe card. */
+.primal-start-editor .primal-start-firstrun-step.current {
+	border-color: var(--vscode-focusBorder);
+	box-shadow: inset 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.primal-start-editor .primal-start-firstrun-glyph {
+	flex: none;
+	margin-top: 2px;
+	font-size: 14px;
+	color: var(--vscode-foreground);
+}
+
+.primal-start-editor .primal-start-firstrun-step.next .primal-start-firstrun-glyph,
+.primal-start-editor .primal-start-firstrun-step.next .primal-start-firstrun-title {
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-start-editor .primal-start-firstrun-body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.primal-start-editor .primal-start-firstrun-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.primal-start-editor .primal-start-firstrun-title {
+	font-weight: 500;
+}
+
+.primal-start-editor .primal-start-firstrun-state {
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-start-editor .primal-start-firstrun-detail {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--vscode-descriptionForeground);
+}
+
+.primal-start-editor button.primal-start-firstrun-button {
+	align-self: flex-start;
+	margin-top: 4px;
+	padding: 3px 10px;
+	font-family: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	color: var(--vscode-foreground);
+	background: transparent;
+	border: var(--primal-start-edge);
+	border-radius: var(--primal-start-control-radius);
+	transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.primal-start-editor button.primal-start-firstrun-button:hover {
+	background: var(--vscode-list-hoverBackground, var(--vscode-toolbar-hoverBackground));
+	border-color: var(--vscode-focusBorder);
+}
+
+.primal-start-editor button.primal-start-firstrun-button:focus {
+	outline: none;
+}
+
+.primal-start-editor button.primal-start-firstrun-button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+/* The one line left once everything is done; gone on the next open. */
+.primal-start-editor .primal-start-firstrun-settled {
+	margin: 0;
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+}
