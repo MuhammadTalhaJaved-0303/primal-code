@@ -31,6 +31,7 @@
 	"linuxIconName": "primal-code",
 	"licenseFileName": "LICENSE.txt",
 	"reportIssueUrl": "https://github.com/MuhammadTalhaJaved-0303/primal-code/issues/new",
+	"documentationUrl": "https://primal-code-site.vercel.app/docs",
 	"nodejsArtifactFeed": "",
 	"electronArtifactFeed": "",
 	"urlProtocol": "primal-code",

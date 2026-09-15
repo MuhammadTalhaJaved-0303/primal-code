@@ -38,6 +38,9 @@ const IDS = {
 
 const REPO = "https://github.com/MuhammadTalhaJaved-0303/primal-code";
 
+/** The marketing site; `/docs` is the user documentation entry point. */
+const SITE = "https://primal-code-site.vercel.app";
+
 /** Fields we set outright. */
 const SET = {
   nameShort: "Primal Code",
@@ -83,6 +86,8 @@ const SET = {
   licenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   serverLicenseUrl: `${REPO}/blob/main/LICENSE.txt`,
   reportIssueUrl: `${REPO}/issues/new`,
+  // Help > Documentation and the Start page docs button open this.
+  documentationUrl: `${SITE}/docs`,
 
   ...IDS,
 };
@@ -117,7 +122,6 @@ const DELETE = [
   "npsSurveyUrl",
   "experimentsUrl", // Microsoft experimentation service
   "updateUrl", // Microsoft update server; we ship our own releases
-  "documentationUrl",
   "requestFeatureUrl",
   "keyboardShortcutsUrlMac",
   "keyboardShortcutsUrlLinux",

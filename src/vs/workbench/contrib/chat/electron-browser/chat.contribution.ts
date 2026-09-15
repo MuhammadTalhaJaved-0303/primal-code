@@ -42,6 +42,7 @@ import '../../primalBoot/browser/primalBoot.contribution.js';
 import '../../primalWallpaper/browser/primalWallpaper.contribution.js';
 import '../../primalMotif/browser/primalMotif.contribution.js';
 import '../../primalUpdate/browser/primalUpdate.contribution.js';
+import '../../primalReport/electron-browser/primalReport.contribution.js';
 import { AgentSessionProviders, getAgentSessionProviderName } from '../browser/agentSessions/agentSessions.js';
 import { IAgentSessionsService } from '../browser/agentSessions/agentSessionsService.js';
 import { ChatViewPaneTarget, IChatWidgetService } from '../browser/chat.js';

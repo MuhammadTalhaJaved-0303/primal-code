@@ -10,6 +10,7 @@ import { Categories } from '../../../../platform/action/common/actionCommonCateg
 import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 import { CommandsRegistry, ICommandMetadata } from '../../../../platform/commands/common/commands.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
@@ -118,7 +119,14 @@ export class BaseIssueContribution extends Disposable implements IWorkbenchContr
 			category: Categories.Help
 		};
 
-		this._register(MenuRegistry.appendMenuItem(MenuId.CommandPalette, { command: reportIssue }));
+		// Primal Code: the user-facing entry points are "Primal Code: Report a
+		// Problem" (primalReport/electron-browser/primalReport.contribution.ts),
+		// which builds a sanitised report and opens `reportIssueUrl`. The upstream
+		// command stays registered for extensions and the troubleshooter, but its
+		// palette and Help menu entries are hidden so users see one way to report.
+		const hiddenForPrimalCode = ContextKeyExpr.false();
+
+		this._register(MenuRegistry.appendMenuItem(MenuId.CommandPalette, { command: reportIssue, when: hiddenForPrimalCode }));
 
 		this._register(MenuRegistry.appendMenuItem(MenuId.MenubarHelpMenu, {
 			group: '3_feedback',
@@ -126,6 +134,7 @@ export class BaseIssueContribution extends Disposable implements IWorkbenchContr
 				id: OpenIssueReporterActionId,
 				title: localize({ key: 'miReportIssue', comment: ['&& denotes a mnemonic', 'Translate this to "Report Issue in English" in all languages please!'] }, "Report &&Issue")
 			},
+			when: hiddenForPrimalCode,
 			order: 3
 		}));
 	}
