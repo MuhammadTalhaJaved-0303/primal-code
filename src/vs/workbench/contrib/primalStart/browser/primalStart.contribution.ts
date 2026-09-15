@@ -27,6 +27,7 @@ import { ILifecycleService, LifecyclePhase, StartupKind } from '../../../service
 import { PrimalRigInput } from '../../primalRig/browser/primalRigInput.js';
 import { PrimalStartEditor } from './primalStartEditor.js';
 import { PrimalStartInput } from './primalStartInput.js';
+import './primalFirstRun.contribution.js';
 
 /** Command that opens Primal Start on demand (also in the command palette). */
 const PRIMAL_OPEN_START_COMMAND_ID = 'primalCode.openStart';

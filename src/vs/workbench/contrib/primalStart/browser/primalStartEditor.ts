@@ -38,7 +38,10 @@ import { composeMotifChoices } from '../../primalMotif/browser/primalMotifChoice
 import { renderMotifRow } from './primalStartMotifRow.js';
 import { PRIMAL_THEME_GALLERY_COMMAND_ID } from '../../primalThemeGallery/common/primalThemeGallery.js';
 import { IPrimalVibe, IPrimalVibeService, PRIMAL_VIBES, PRIMAL_VIBE_CYCLE_COMMAND_ID, PRIMAL_VIBE_PICK_COMMAND_ID } from '../../primalVibes/browser/primalVibes.js';
+import { IPrimalFirstRunService } from './primalFirstRunService.js';
+import { PrimalFirstRunStrip } from './primalFirstRunStrip.js';
 import { PrimalStartInput } from './primalStartInput.js';
+import { shortVibeName } from './primalStartVibeName.js';
 
 const $ = DOM.$;
 
@@ -91,12 +94,6 @@ const VIBE_SWATCH_COLORS: ReadonlyMap<string, IVibeSwatchColors> = new Map([
 	['ridge', { editorBg: '#F8F3EC', chromeBg: '#EFE6D9', accent: '#4A3B2A' }]
 ]);
 
-/** Vibe labels are product names ('Primal Ink'); the cards show the short half. */
-function shortVibeName(vibe: IPrimalVibe): string {
-	const prefix = 'Primal ';
-	return vibe.label.startsWith(prefix) ? vibe.label.substring(prefix.length) : vibe.label;
-}
-
 /**
  * The Primal Start page: wordmark hero, the three primary actions (new agent
  * chat, open project, clone repository), the six-vibe strip, recent projects
@@ -112,6 +109,7 @@ export class PrimalStartEditor extends EditorPane {
 	private readonly vibeCards = new Map<string, HTMLButtonElement>();
 	private scrollContainer: HTMLElement | undefined;
 	private firstActionButton: HTMLButtonElement | undefined;
+	private firstRunStrip: PrimalFirstRunStrip | undefined;
 	private recentsSection: HTMLElement | undefined;
 	private recentsList: HTMLElement | undefined;
 	private recentsRenderToken = 0;
@@ -158,6 +156,7 @@ export class PrimalStartEditor extends EditorPane {
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IProductService private readonly productService: IProductService,
 		@IOpenerService private readonly openerService: IOpenerService,
+		@IPrimalFirstRunService private readonly firstRunService: IPrimalFirstRunService,
 	) {
 		super(PrimalStartEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -197,6 +196,7 @@ export class PrimalStartEditor extends EditorPane {
 
 		this.renderHero(page);
 		this.renderActions(page);
+		this.renderFirstRunStrip(page);
 		this.renderVibeStrip(page);
 		this.renderMotifStrip(page);
 		this.renderRecents(page);
@@ -283,6 +283,19 @@ export class PrimalStartEditor extends EditorPane {
 		}));
 
 		return button;
+	}
+
+	//#endregion
+
+	//#region First-run guide
+
+	/**
+	 * The three-step strip sits between the primary actions and the vibe cards:
+	 * it points at both. It renders nothing once the guide is complete (see
+	 * primalFirstRunStrip.ts), so the page is unchanged for anyone past it.
+	 */
+	private renderFirstRunStrip(page: HTMLElement): void {
+		this.firstRunStrip = this.editorDisposables.add(new PrimalFirstRunStrip(page, this.firstRunService, this.vibeService, this.commandService));
 	}
 
 	//#endregion
@@ -532,6 +545,7 @@ export class PrimalStartEditor extends EditorPane {
 	override async setInput(input: PrimalStartInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
 		await super.setInput(input, options, context, token);
 		this.updateStage();
+		this.firstRunStrip?.onDidOpen();
 
 		// Recents may have changed while the page sat in the background.
 		await this.updateRecents();
