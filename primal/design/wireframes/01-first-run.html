@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Primal Code wireframes — 01 First run</title>
+<style>
+:root{--ink:#111;--g2:#444;--g3:#777;--g4:#aaa;--g5:#d4d4d4;--g6:#ececec;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--paper);padding:24px 32px;max-width:1180px}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--g3);font-size:12px;margin-bottom:14px}.meta b{color:var(--ink)}
+.screen{border:1px solid var(--ink);margin:0 0 28px;break-inside:avoid}
+.screen>h2{font-size:13px;margin:0;padding:6px 10px;border-bottom:1px solid var(--ink);background:var(--g6);display:flex;justify-content:space-between}
+.frame{position:relative;padding:12px}
+.box{border:1px solid var(--g2);padding:8px;background:#fff}
+.dash{border:1px dashed var(--g3)}.fill{background:var(--g6)}.dark{background:var(--ink);color:#fff}
+.btn{display:inline-block;border:1px solid var(--ink);padding:3px 10px;border-radius:3px;margin:2px 4px 2px 0;font-size:12px;background:#fff}
+.btn.primary{background:var(--ink);color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.dim{color:var(--g3)}.small{font-size:11px}
+.row{display:flex;gap:10px}.col{flex:1}
+.n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;vertical-align:middle;margin-right:4px;flex:none}
+.legend{border-top:1px solid var(--ink);padding:8px 10px;font-size:12px}
+.legend table{border-collapse:collapse;width:100%}.legend td{vertical-align:top;padding:3px 6px 3px 0;border-bottom:1px solid var(--g6)}
+.state{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--ink);padding:0 4px;border-radius:2px;white-space:nowrap}
+.hr{border-top:1px solid var(--g5);margin:8px 0}
+.toast{border:1px solid var(--ink);box-shadow:3px 3px 0 var(--g5);padding:8px;background:#fff}
+.strip{display:flex;border:1px solid var(--ink);margin-bottom:24px}
+.strip>div{flex:1;padding:6px 8px;border-right:1px solid var(--ink);font-size:12px}.strip>div:last-child{border-right:0}
+.titlebar{border-bottom:1px solid var(--g2);padding:4px 8px;font-size:11px;background:var(--g6);display:flex;gap:8px}
+.card{border:1px solid var(--g2);padding:6px;font-size:11px;text-align:center;flex:1}
+.card.left{text-align:left}
+ul{margin:4px 0;padding-left:18px}
+@media print{body{padding:0}.screen{page-break-after:always}}
+</style>
+</head>
+<body>
+<h1>01 — First run: DMG open to first agent edit</h1>
+<div class="meta">
+<b>Story 1</b> — "Install and make my first edit" · target ≤ 60 s from DMG open, measured to the first file the agent writes.<br>
+<b>Maps to</b> primal/make-dmg.sh (ad-hoc signature, no Developer ID) · contrib/primalBoot (boot overlay ≤ 1.4 s) · contrib/primalStart/browser/primalStartEditor.ts (Start page; FIRST RUN strip from the parallel first-run branch: <span class="mono">computeFirstRunGuide</span>, <span class="mono">PrimalFirstRunStrip</span>; MOTIF row from PR #23: <span class="mono">primalStartMotifRow.ts</span>, command <span class="mono">primalCode.motif.pick</span>) ·
+contrib/chat/browser/primalSettings/primalSettingsEditor.ts (command <span class="mono">primalCode.manageProviders</span>) · contrib/workspace (Restricted Mode banner, upstream) ·
+contrib/chat/browser/agentSessions/agentHost/agentHostDownloadProgress.ts ("Downloading {0} agent") · product.json <span class="mono">agentSdks</span> (SDK fetched at runtime).<br>
+<b>Monochrome rule</b>: state is written in words; nothing here relies on hue.
+</div>
+
+<div class="strip">
+<div><b>0–10 s</b><br>Open DMG, drag to Applications</div>
+<div><b>10–35 s</b><br>Gatekeeper refusal → System Settings → Open Anyway (unsigned build)</div>
+<div><b>35–40 s</b><br>Boot overlay → Primal Start; strip reads "Looking for an existing setup…"</div>
+<div><b>40–60 s</b><br>Pick a vibe, open a project while the host starts. The model step resolves itself 30–50 s after launch when a Claude Code login exists (60 s cap).</div>
+<div><b>then: unbounded</b><br>First prompt → "Downloading Claude agent" — the SDK is fetched from GitHub on first use. Budget dies here unless bundled.</div>
+</div>
+
+<!-- SCREEN 1 -->
+<div class="screen">
+<h2><span>Screen 1 · DMG window and the unsigned-installer moment</span><span class="dim">macOS, first launch</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box">
+<div class="titlebar"><span class="n">1</span>Primal Code <span class="dim">— mounted volume</span></div>
+<div class="row" style="padding:26px 20px;align-items:center;justify-content:space-around">
+<div class="card dash" style="max-width:120px">▣<br>Primal Code.app</div>
+<div class="mono" style="font-size:20px">→</div>
+<div class="card dash" style="max-width:120px">▤<br>Applications<br><span class="dim">symlink</span></div>
+</div>
+<div class="small dim" style="padding:0 8px 6px">Plain hdiutil window, no background art (make-dmg.sh). No README inside the DMG — decision D1.</div>
+</div>
+<div class="col">
+<div class="toast" style="max-width:360px;margin:0 auto 10px">
+<div><span class="n">2</span><b>"Primal Code" Not Opened</b></div>
+<div class="small" style="margin:6px 0 8px">Apple could not verify "Primal Code" is free of malware that may harm your Mac or compromise your privacy.</div>
+<span class="btn">Move to Trash</span><span class="btn primary">Done</span>
+</div>
+<div class="box dash small">
+<span class="n">3</span><b>The honest path (macOS 15 and later)</b>
+<ul>
+<li>System Settings → Privacy &amp; Security → scroll to "Primal Code was blocked" → <b>Open Anyway</b> → confirm with password.</li>
+<li>Older macOS: right-click the app → Open (this is what the site FAQ says today — verify it still holds on the OS versions we support).</li>
+<li>Terminal alternative printed by make-dmg.sh: <span class="mono">xattr -dr com.apple.quarantine '/Applications/Primal Code.app'</span></li>
+</ul>
+Cost: ~25 s and the scariest moment of the whole flow. Removed entirely by a Developer ID + notarization (decision D2).
+</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">1</span></td><td>Real artefact: primal/make-dmg.sh stages the app + /Applications symlink, ad-hoc signs (identity "-") and verifies. The signature is valid but has no Developer ID, so Gatekeeper warns on first open.</td></tr>
+<tr><td><span class="n">2</span></td><td>OS dialog, not ours. We cannot restyle it; we can only prepare the user for it on the site (05) and in the DMG (D1).</td></tr>
+<tr><td><span class="n">3</span></td><td>Instruction card. Proposal: ship it as a plain-text "READ ME FIRST.txt" inside the DMG and as the first item of the site's install section, with identical wording in both places.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div class="screen">
+<h2><span>Screen 2 · First window: boot overlay, then Primal Start with the FIRST RUN strip and the MOTIF row</span><span class="dim">empty window, no folder</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box dark mono" style="max-width:240px;min-height:170px">
+<div><span class="n" style="background:#fff;color:#111">4</span>PRIMAL CODE</div>
+<div class="hr" style="border-color:#555"></div>
+agent host ready<br>providers 0<br>vibe basalt<br>workspace no folder
+<div class="small" style="color:#aaa;margin-top:10px">≤ 1.4 s total, any key dismisses, never blocks input (primalBoot). Lines are real state or omitted.</div>
+</div>
+<div class="col box" style="min-height:300px;padding:0">
+<div class="titlebar">Primal Start <span class="dim">· no folder open</span><span style="margin-left:auto">CHAT ▸ (auxiliary bar)</span></div>
+<div style="padding:10px 14px">
+<div style="font-size:18px;font-weight:600">Primal Code</div>
+<div class="dim">The agent-native code editor</div>
+<div class="box dash" style="margin:10px 0;padding:6px 8px">
+<span class="n">5</span><b>FIRST RUN</b> <span class="dim small">— shown until the guide completes · "Primal Code: Show First-Run Guide Again" brings it back</span>
+<div class="row" style="margin-top:4px">
+<div class="card left fill"><b>Pick a vibe</b> <span class="state">now</span><br><span class="dim">Basalt is on. Try one below, or</span><br><span class="btn small">Keep Basalt</span></div>
+<div class="card left"><b>Connect a model</b> <span class="state">next</span><br><span class="dim">Looking for an existing setup…</span><br><span class="btn small">Add a provider...</span></div>
+<div class="card left"><b>Start</b> <span class="state">next</span><br><span class="dim">Open a project or start an agent chat</span></div>
+</div>
+<div class="small dim" style="margin-top:4px">Model card, resolved: "Using your Claude Code login — nothing to set up" <span class="state">done</span> · or the configured providers by name · or nothing, with "Add a provider..." throughout. On completion: "You're set." once, gone on the next open.</div>
+</div>
+<div><span class="n">6</span><span class="btn primary">New Agent Chat &nbsp;<span style="opacity:.7">^⌘I</span></span><span class="btn">Open Project… &nbsp;<span class="dim">⌘O</span></span><span class="btn">Clone Repository…</span></div>
+<div class="small dim" style="margin:8px 0 2px">VIBE</div>
+<div class="row">
+<div class="card">Ink <span class="dim">light</span></div><div class="card fill">Basalt <span class="state">current</span></div><div class="card">Tide</div><div class="card">Dusk</div><div class="card">Fern</div><div class="card">Ridge <span class="dim">light</span></div>
+</div>
+<div class="small dim" style="margin:8px 0 2px"><span class="n">7</span>MOTIF <span class="dim">· also "Motif: Choose Motif..." in the palette</span></div>
+<div class="row">
+<div class="card left">Static (no motion)<br><span class="dim">No motion at all.</span></div><div class="card left fill">World <span class="state">current</span><br><span class="dim">A globe in the ground behind the page</span></div><div class="card left">Galaxy<br><span class="dim">A starfield drifting…</span></div><div class="card left">Contours<br><span class="dim">A topographic field…</span></div><div class="card left">Orbit<br><span class="dim">Concentric rings…</span></div><div class="card left">Horizon<br><span class="dim">A wireframe ground…</span></div>
+</div>
+<div class="small dim" style="margin:8px 0 2px">RECENT</div>
+<div class="small dim">No recent projects yet.</div>
+<div class="hr"></div>
+<div class="small dim">⌃⌘. cycle vibes · ⌘K ⌘V pick vibe · ⌘K ⌘G browse themes · ⌃⌘I chat</div>
+</div>
+<div class="titlebar" style="border-bottom:0;border-top:1px solid var(--g2)"><span class="n">8</span><span class="dim">⚠ 0 ⓘ 0</span><span style="margin-left:auto">AI Providers · Primal Basalt · Motif Motion: resting</span></div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">4</span></td><td>Boot overlay per atmosphere-spec: wordmark + truthful status lines. "providers 0" is a real, slightly awkward first-run line — proposal: when providers is 0, print "providers none yet" so the first thing a newcomer reads is not a zero.</td></tr>
+<tr><td><span class="n">5</span></td><td>FIRST RUN strip (parallel branch, strings as shipped there): three cards, each stating done / now / next in a word and a glyph. Vibe is done on a change or "Keep Basalt"; the model card reads reality — it waits for the agent host to publish models (30–50 s measured on the owner's machine, 60 s cap) before it can say "Using your Claude Code login"; Start is done when a session starts or a folder opens. Completion is stored at application scope; nothing is sent anywhere.</td></tr>
+<tr><td><span class="n">6</span></td><td>Shipping action rows with their keybinding hints (^⌘I, ⌘O in the dev capture). "New Agent Chat" with no folder opens the chat view in an empty window — the agent can talk but has nothing to edit. Proposal: with no folder open, "Open Project…" becomes the primary and "New Agent Chat" moves second (decision D3).</td></tr>
+<tr><td><span class="n">7</span></td><td>MOTIF row (PR #23): six cards under VIBE in the same card language, "current" said in words because a motif has no swatch. Default is now World with a 4.5 s settle, and the stage ceiling moved from 14 % to 35 % behind the page's own scrim. In this wireframe the ground is drawn plain; the motif never sits behind text.</td></tr>
+<tr><td><span class="n">8</span></td><td>Status bar items seen in the capture: "AI Providers" (opens the key manager), the vibe name, and "Motif Motion" with its state word. These are the three places a newcomer can recover from a wrong turn; the strip's "Add a provider..." and the status item open the same page.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div class="screen">
+<h2><span>Screen 3 · Connect a model — Primal Code Settings</span><span class="dim">from "Add a provider..." or the AI Providers status item</span></h2>
+<div class="frame">
+<div class="box">
+<div class="titlebar">Primal Code Settings</div>
+<div style="padding:10px 14px">
+<div style="font-size:16px;font-weight:600">Primal Code Settings</div>
+<div class="small dim">Bring your own keys. They are stored encrypted on this machine and only ever sent to the provider itself — never to us.</div>
+<div class="box fill" style="margin:8px 0"><span class="n">9</span><b>Detected: a Claude Code login on this Mac.</b> Claude models already work with no key. <span class="state">done ✓</span></div>
+<div class="row">
+<div class="col">
+<div style="font-weight:600;margin:6px 0 2px">Models</div>
+<div class="small dim">Choose which models appear in the chat's model picker. Greyed models need their provider's API key.</div>
+<div class="mono small" style="margin-top:4px">
+[x] Claude Opus 4 &nbsp;<span class="dim">Anthropic · Coding agent</span><br>
+[x] Claude Sonnet 4 &nbsp;<span class="dim">Anthropic · Coding agent</span><br>
+[ ] GPT-5 &nbsp;<span class="dim">OpenAI — add API key below</span><br>
+[ ] DeepSeek V3 &nbsp;<span class="dim">DeepSeek — add API key below</span>
+</div>
+</div>
+<div class="col">
+<div style="font-weight:600;margin:6px 0 2px">API Keys</div>
+<div class="small dim">Add a key to light up that provider's models in the list above.</div>
+<div class="box small" style="margin-top:4px"><span class="n">10</span><b>Anthropic</b> — Powers the Claude models and the coding agent.<br>
+<span class="dash" style="display:inline-block;padding:2px 6px;width:70%;color:var(--g3)">Enter your Anthropic API key</span> <span class="btn small">Save</span> <span class="btn small">Remove</span><br>
+<span class="dim">Signed in to Claude Code on this Mac? Claude models already work with no key.</span></div>
+<div class="small dim" style="margin-top:4px">OpenAI · Google · DeepSeek · Kimi · GLM · MiniMax · Custom — same row each</div>
+<div class="small" style="margin-top:4px"><span class="n">11</span>Status line after Save: "Key saved — the models above will light up in a few seconds." / "Key saved — restart Primal Code to finish."</div>
+</div>
+</div>
+<div style="font-weight:600;margin:8px 0 2px">Coding Agent</div>
+<div class="small dim">The provider that powers the agent which edits files and runs commands. <span class="mono">[ Anthropic ▾ ]</span> · OpenAI powers the separate Codex agent.</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">9</span></td><td>Proposed banner. The detection exists (keychain probe "Claude Code-credentials" in detectExistingClaudeSetup) and the FIRST RUN strip now reports it on Start; the settings page still surfaces it only as a note under the Anthropic row. Saying it once, at the top, keeps the two surfaces telling the same story.</td></tr>
+<tr><td><span class="n">10</span></td><td>Shipping row, verbatim strings. Keep: the honest "keys usually start with sk-… Saving as entered…" warning.</td></tr>
+<tr><td><span class="n">11</span></td><td>Two different outcomes are written in words. The wireframe keeps both because the code produces both; the restart case is the one that breaks the 60 s budget (decision D4: can the agent host restart in place every time?).</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 4 -->
+<div class="screen">
+<h2><span>Screen 4 · Open a project and make the first agent edit</span><span class="dim">IDE window, chat in the auxiliary bar</span></h2>
+<div class="frame">
+<div class="box">
+<div class="titlebar">acme-api <span class="dim">· Basalt</span></div>
+<div class="box fill small" style="border-style:dashed"><span class="n">12</span>Restricted Mode: this folder's contents are untrusted. <span class="btn small">Manage</span> <span class="btn small">Trust</span> <span class="dim">— upstream trust banner; the agent cannot run commands until Trust is pressed.</span></div>
+<div class="row" style="margin-top:8px">
+<div class="col box mono small" style="min-height:220px;flex:0 0 22%">EXPLORER<br>▸ src<br>&nbsp;&nbsp;app.ts<br>&nbsp;&nbsp;loader.ts<br>▸ test<br>package.json</div>
+<div class="col box mono small" style="min-height:220px"><span class="n">13</span>src/app.ts <span class="dim">(inline diff after the edit)</span>
+<div class="hr"></div>
+<div>&nbsp;12&nbsp; export function load(path: string) {</div>
+<div class="fill">−13&nbsp; &nbsp;return readFileSync(path);</div>
+<div style="border-left:3px solid var(--ink);padding-left:4px">+13&nbsp; &nbsp;if (!path) throw new Error("path required");</div>
+<div style="border-left:3px solid var(--ink);padding-left:4px">+14&nbsp; &nbsp;return readFileSync(path);</div>
+<div class="dim">removed = filled grey row · added = heavy left rule; never hue</div>
+</div>
+<div class="col box small" style="min-height:220px;flex:0 0 32%">
+<div><b>CHAT</b> <span class="dim">· Claude agent · Opus 4</span></div>
+<div class="hr"></div>
+<div class="box dash" style="padding:4px 6px"><span class="n">14</span><b>Delegate to @agent-host-claude</b><br><span class="dim">This chat session will be forwarded to the @agent-host-claude coding agent where work is completed in the background. AI responses may be inaccurate</span></div>
+<div class="mono" style="margin-top:6px">▸ read &nbsp;src/app.ts<br>✎ edit &nbsp;src/app.ts &nbsp;+2 −1<br>✓ done &nbsp;<span class="dim">"Guarded load() against an empty path."</span></div>
+<div class="hr"></div>
+<div class="dash" style="padding:4px 6px"><span class="dim">Add a guard to load() for an empty path</span></div>
+<div class="small"><span class="n">15</span><span class="btn small">Keep</span><span class="btn small">Undo</span> <span class="dim">— first-edit acceptance</span></div>
+</div>
+</div>
+<div class="toast small" style="max-width:340px;margin:8px 0 0 auto"><span class="n">16</span>Downloading Claude agent: 18% <span class="mono">▮▮▯▯▯▯▯▯▯▯</span><br><span class="dim">notification, bottom-right — first use only, fetched from GitHub releases; size not shown to the user today</span></div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">12</span></td><td>Real upstream banner that appears on every new folder in a fresh profile. It silently blocks the agent's shell tools. Proposal: the FIRST RUN "Start" card says "Trust this folder so the agent can run commands" while the banner is visible (decision D5: pre-trust folders the user opened via Open Project…?).</td></tr>
+<tr><td><span class="n">13</span></td><td>Inline diff is upstream chat-editing UI; the monochrome encoding shown (filled row = removed, heavy left rule = added) is a proposal — the shipping vibes still pin hue-based diff colours (theme-engine finding).</td></tr>
+<tr><td><span class="n">14</span></td><td>Upstream empty-state copy leaking through (seen in the capture). "@agent-host-claude" and "AI responses may be inaccurate" are not our voice and name an internal id. Replace with one line: "Claude will edit files in acme-api. Describe the change." — decision D12.</td></tr>
+<tr><td><span class="n">15</span></td><td>Story end-point: the first file written by the agent is visible as a diff and the user can Keep or Undo. Stopwatch stops when the diff renders.</td></tr>
+<tr><td><span class="n">16</span></td><td>Honest blocker, drawn where it really appears (a notification toast, per the dev capture). The Claude/Codex SDK is downloaded on first use (agentHostDownloadProgress.ts, product.json agentSdks); this alone can exceed the 60 s story by minutes. Decision D6: bundle the SDK in the installer, or start the download the moment the strip appears so it overlaps the user's reading time.</td></tr>
+</table></div>
+</div>
+</body>
+</html>

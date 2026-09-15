@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Primal Code wireframes — 02 Agent task</title>
+<style>
+:root{--ink:#111;--g2:#444;--g3:#777;--g4:#aaa;--g5:#d4d4d4;--g6:#ececec;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--paper);padding:24px 32px;max-width:1180px}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--g3);font-size:12px;margin-bottom:14px}.meta b{color:var(--ink)}
+.screen{border:1px solid var(--ink);margin:0 0 28px;break-inside:avoid}
+.screen>h2{font-size:13px;margin:0;padding:6px 10px;border-bottom:1px solid var(--ink);background:var(--g6);display:flex;justify-content:space-between}
+.frame{position:relative;padding:12px}
+.box{border:1px solid var(--g2);padding:8px;background:#fff}
+.dash{border:1px dashed var(--g3)}.fill{background:var(--g6)}.dark{background:var(--ink);color:#fff}
+.btn{display:inline-block;border:1px solid var(--ink);padding:3px 10px;border-radius:3px;margin:2px 4px 2px 0;font-size:12px;background:#fff}
+.btn.primary{background:var(--ink);color:#fff}.btn.off{border-style:dashed;color:var(--g3)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.dim{color:var(--g3)}.small{font-size:11px}
+.row{display:flex;gap:10px}.col{flex:1}
+.n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;vertical-align:middle;margin-right:4px;flex:none}
+.legend{border-top:1px solid var(--ink);padding:8px 10px;font-size:12px}
+.legend table{border-collapse:collapse;width:100%}.legend td{vertical-align:top;padding:3px 6px 3px 0;border-bottom:1px solid var(--g6)}
+.state{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--ink);padding:0 4px;border-radius:2px;white-space:nowrap}
+.hr{border-top:1px solid var(--g5);margin:8px 0}
+.toast{border:1px solid var(--ink);box-shadow:3px 3px 0 var(--g5);padding:8px;background:#fff}
+.titlebar{border-bottom:1px solid var(--g2);padding:4px 8px;font-size:11px;background:var(--g6);display:flex;gap:8px}
+.chip{display:inline-block;border:1px solid var(--g2);border-radius:10px;padding:0 8px;font-size:11px;margin-right:4px;background:#fff}
+.side{flex:0 0 24%;min-height:260px}
+.input{border:1px solid var(--ink);padding:6px 8px;margin-top:6px;background:#fff}
+.del{background:var(--g6)}.add{border-left:3px solid var(--ink);padding-left:4px}
+ul{margin:4px 0;padding-left:18px}
+@media print{body{padding:0}.screen{page-break-after:always}}
+</style>
+</head>
+<body>
+<h1>02 — Start an agent task, watch the stream, review the diff, apply it</h1>
+<div class="meta">
+<b>Story 2</b> — "Start an agent task and review its diff" · success = task started with the right agent and model on the first Enter, every changed file reviewed, changes landed in the project (or deliberately discarded).<br>
+<b>Maps to</b> src/vs/sessions/contrib/chat/browser/newChatWidget.ts ("New session in … with …") · newChatInput.ts (placeholder "What's next on your roadmap?", "Send (Alt-click to start in the background)") ·
+providers/agentHost/browser/agentHostSessionConfigPicker.ts ("New Worktree", Base Branch) · agentHostClaudePermissionModePicker.ts (Approvals: Ask Before Edits / Edit Automatically / Plan Mode / Auto Mode / Bypass Permissions) ·
+contrib/changes/browser (Changes view, "View All Changes", "Mark as Viewed", "Run Code Review", Checks) · contrib/applyCommitsToParentRepo/browser/applyChangesToParentRepo.ts (merge-back outcomes; action is kill-switched today) ·
+workbench chatWidget.ts <span class="mono">_surfaceSendRejection</span> and chatInputPart.ts <span class="mono">checkModelInSessionPool</span> (the silent-Enter debt) · primalDeckStatus.ts status words.
+</div>
+
+<!-- SCREEN 1 -->
+<div class="screen">
+<h2><span>Screen 1 · Start a task — the landing, with the silent no-op designed away</span><span class="dim">Agents window</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box side small mono">SESSIONS<br><span class="dim">acme-api</span><br>&nbsp;fix login redirect <span class="state">done</span><br>&nbsp;add rate limit <span class="state">running</span><br><span class="dim">Chats</span><br>&nbsp;explain loader.ts<br><div class="hr"></div>CUSTOMIZATIONS<br>Agents · Skills · Instructions<br>Hooks · MCP Servers · Plugins</div>
+<div class="col box" style="min-height:260px">
+<div class="titlebar">Agents <span class="dim">· acme-api</span></div>
+<div style="padding:12px 16px">
+<div style="font-size:16px"><span class="n">1</span>New session in <span class="chip">acme-api ▾</span> with <span class="chip">Claude ▾</span></div>
+<div class="input" style="margin-top:14px;min-height:56px"><span class="dim">What's next on your roadmap?</span></div>
+<div style="margin-top:6px"><span class="n">2</span><span class="chip">Model: Claude Sonnet 4 ▾</span><span class="chip">Approvals: Ask Before Edits ▾</span><span class="chip">Isolation: New Worktree ▾</span><span class="chip">Base branch: main ▾</span> <span class="btn primary" style="float:right">Send</span></div>
+<div class="box dash small" style="margin-top:10px"><span class="n">3</span><b>Model picker, session-aware</b>
+<div class="mono" style="margin-top:4px">Claude — runs in this session<br>&nbsp;● Claude Sonnet 4 <span class="state">current</span><br>&nbsp;○ Claude Opus 4<br>&nbsp;○ Claude Haiku 4<br>Other — needs a different session<br>&nbsp;<span class="dim">GPT-5 · start a Codex session to use it →</span><br>&nbsp;<span class="dim">DeepSeek V3 · chat only, no coding agent →</span></div></div>
+<div class="toast small" style="margin-top:10px"><span class="n">4</span><b>Guard rail if a mismatch still happens on Enter</b><br>
+"GPT-5 can't run in a Claude session. Your prompt is kept."<br><span class="btn small">Switch to Claude Sonnet 4 and send</span><span class="btn small">Start a Codex session with GPT-5</span><span class="btn small">Keep editing</span></div>
+</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">1</span></td><td>Shipping header, verbatim (newChatWidget.ts). The project picker and the agent picker are the only two decisions a newcomer must make; everything in row 2 has a default.</td></tr>
+<tr><td><span class="n">2</span></td><td>Shipping option chips: model, Approvals (SDK permission modes; "Bypass Permissions" carries a warning icon in code), Isolation ("New Worktree" label from agentHostSessionConfigPicker.ts; the other value is the local folder), Base Branch. Proposal: default Isolation to New Worktree only when the folder is a git repo; otherwise hide the chip rather than offer a choice that cannot work.</td></tr>
+<tr><td><span class="n">3</span></td><td>The fix for the known debt: the picker is grouped by what the current session can execute. Models that need another agent are listed but not selectable, each with the one action that would make them usable. Grounded in hasByokModelsContribution.ts (BYOK models are known before pickers open) and sessionTypeAvailability.ts.</td></tr>
+<tr><td><span class="n">4</span></td><td>Second line of defence, replaces the silent no-op. The existing dialog ("This chat can't be answered", chatWidget.ts) is a modal; this is an inline notice above the input so the typed prompt is never lost and the two real remedies are one click. Same notice serves the IDE chat panel.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div class="screen">
+<h2><span>Screen 2 · Watch the stream</span><span class="dim">session view, status "running"</span></h2>
+<div class="frame">
+<div class="box">
+<div class="titlebar"><span class="n">5</span>add rate limit <span class="state">running</span> <span class="dim">· acme-api · worktree feat/rate-limit · Claude Sonnet 4 · started 14:02</span> <span style="margin-left:auto" class="btn small">Stop</span></div>
+<div class="row" style="padding:8px">
+<div class="col mono small" style="min-height:200px">
+<div class="dim">14:02:11 ● session started</div>
+<div>14:02:12 ▸ read &nbsp;src/middleware/auth.ts</div>
+<div>14:02:14 ▸ read &nbsp;src/app.ts</div>
+<div>14:02:19 "Adding a token-bucket limiter in front of the auth middleware…"</div>
+<div>14:02:31 ✎ edit &nbsp;src/middleware/rateLimit.ts &nbsp;+48 −0 <span class="dim">(created)</span></div>
+<div>14:02:33 ✎ edit &nbsp;src/app.ts &nbsp;+3 −1</div>
+<div class="toast" style="margin:6px 0;max-width:520px"><span class="n">6</span>⚠ waiting on you — run <span class="mono">npm test</span> in the worktree? <span class="btn small">Allow</span><span class="btn small">Allow once</span><span class="btn small">Deny</span></div>
+<div>14:03:02 ▸ run &nbsp;npm test &nbsp;<span class="dim">12 passed</span></div>
+<div>14:03:05 ✓ done &nbsp;"Rate limiting added; 2 files changed, tests pass."</div>
+<div class="dim" style="margin-top:6px">auto-follows; scrolling up pauses it and shows [jump to live]</div>
+</div>
+<div class="box small" style="flex:0 0 30%"><span class="n">7</span><b>Changes so far</b><br><span class="mono">2 files · +51 −1</span><br><span class="btn small">View All Changes (2)</span><div class="hr"></div><b>Status words used</b><br>● running · ⚠ waiting on you · ✓ done · ✕ failed<div class="hr"></div><span class="dim">A status nobody can report truthfully gets no chip at all (primalRigSessions.ts).</span></div>
+</div>
+<div class="input small"><span class="dim">Follow-up… (Enter sends into this session)</span> <span class="chip" style="float:right">Claude Sonnet 4 ▾</span></div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">5</span></td><td>Session header: name, status word, project, worktree branch, model, start time. Today the sessions window shows an activity pill and hover details; the worktree branch and model are the two facts the review step needs, so they are promoted into the header.</td></tr>
+<tr><td><span class="n">6</span></td><td>Approval prompt with the shipping verbs "Allow" / "Allow once" (sessionsView.ts). Drawn inline in the stream at the moment it happened, so the log reads as one timeline. "Deny" wording to be confirmed against the SDK's own labels.</td></tr>
+<tr><td><span class="n">7</span></td><td>Running tally from the Changes view model ("{0} files", "+{1}, -{2}"). The line-per-event log borrows The Deck's vocabulary (▸ tool, ✎ edit, ✓ done) so the IDE, the Deck and the Agents window describe the same moment the same way.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div class="screen">
+<h2><span>Screen 3 · Review the diff</span><span class="dim">Changes view + multi-file diff editor</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box side small"><span class="n">8</span><b>CHANGES</b> <span class="dim">2 files</span> <span class="btn small">Tree</span><span class="btn small">List</span>
+<div class="mono" style="margin-top:4px">▾ src<br>&nbsp;▾ middleware<br>&nbsp;&nbsp;rateLimit.ts <span class="dim">Created +48</span> <span class="state">viewed ✓</span><br>&nbsp;app.ts <span class="dim">Modified +3 −1</span> <span class="state">not viewed</span></div>
+<div class="hr"></div><b>OTHER FILES</b> <span class="dim">0</span><br><span class="dim">Files changed outside the workspace during this session.</span>
+<div class="hr"></div><b>CHECKS</b> <span class="dim">no pull request yet</span>
+<div class="hr"></div><span class="btn small">Run Code Review</span></div>
+<div class="col box mono small">
+<div><span class="n">9</span>src/app.ts <span class="dim">· side by side ⇄ inline</span> <span class="btn small" style="float:right">Mark as Viewed</span></div>
+<div class="hr"></div>
+<div>&nbsp;4&nbsp; import { auth } from "./middleware/auth";</div>
+<div class="add">+5&nbsp; import { rateLimit } from "./middleware/rateLimit";</div>
+<div>&nbsp;…</div>
+<div class="del">−21 app.use(auth);</div>
+<div class="add">+22 app.use(rateLimit({ perMinute: 60 }));</div>
+<div class="add">+23 app.use(auth);</div>
+<div class="dim" style="margin-top:8px">removed = filled row · added = heavy left rule · both labelled with − / + so the encoding survives grayscale and print</div>
+<div class="hr"></div>
+<div><span class="n">10</span>Review progress: <b>1 of 2 files viewed</b> · <span class="btn small off">Apply to project</span> <span class="dim">enabled when every file is viewed, or on explicit override</span></div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">8</span></td><td>Shipping Changes view (changesView.ts): tree/list toggle, Created/Modified/Deleted words, Other Files and Checks sections, "Run Code Review". Viewed state is per-file and persisted ("Mark as Viewed" / "Mark as Not Viewed").</td></tr>
+<tr><td><span class="n">9</span></td><td>Diff editor is upstream; only the monochrome encoding is proposed. Owner finding from the theme engine: the six shipping vibes pin hue-based diff colours, so this row treatment is what makes the diff readable for the owner.</td></tr>
+<tr><td><span class="n">10</span></td><td>Proposal: the review progress line and the gated apply button. "All viewed" is derivable today from the per-file viewed state; the gate is a product choice (decision D7: hard gate, soft gate, or none).</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 4 -->
+<div class="screen">
+<h2><span>Screen 4 · Apply / merge back — every outcome in words</span><span class="dim">worktree session vs local session</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box small">
+<div><span class="n">11</span><b>Worktree session</b> · feat/rate-limit → main</div>
+<div class="hr"></div>
+<span class="btn primary">Apply to project</span><span class="btn">Open in Primal Code</span><span class="btn">Create pull request</span><span class="btn">Discard worktree…</span>
+<div class="hr"></div>
+<b>Outcomes (verbatim, applyChangesToParentRepo.ts):</b>
+<ul>
+<li>"Applied changes to parent repository." <span class="state">done ✓</span></li>
+<li>"Parent repository is up to date with worktree." <span class="state">nothing to do</span></li>
+<li>"Failed to apply changes to parent repo. The parent repo may have diverged — resolve conflicts manually." <span class="state">conflict</span> → buttons: Open in Primal Code · Keep worktree</li>
+<li>"Could not determine worktree branch name." <span class="state">failed</span></li>
+</ul>
+</div>
+<div class="col box small">
+<div><span class="n">12</span><b>Local session</b> · edits are already in the working tree</div>
+<div class="hr"></div>
+<span class="btn primary">Keep all</span><span class="btn">Undo all</span><span class="btn">Commit…</span>
+<div class="hr"></div>
+<div>Nothing to merge: the files on disk are the result. "Keep" closes the review; "Undo" restores every file the session touched; "Commit…" hands off to source control.</div>
+<div class="hr"></div>
+<div class="toast"><span class="n">13</span>After apply, the session header changes to <span class="state">applied ✓</span> and the Changes view reads "Applied to main at 14:07 · 2 files". The worktree stays until "Discard worktree…" — decision D8.</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">11</span></td><td>The merge-back path exists (worktree + parent repo context key, merge changeset operation) but the visible action is behind a deliberate kill-switch and the flow is untested. The wireframe assumes the memory-noted plan: reuse the shipping merge operation, add the button on the empty changes toolbar. Wording of the button is decision D9 ("Apply to project" vs "Merge into main").</td></tr>
+<tr><td><span class="n">12</span></td><td>Local sessions have no merge step; showing the same button there would be a lie. The two panels make the difference between the session kinds legible where it matters, instead of asking the user to remember which kind they started.</td></tr>
+<tr><td><span class="n">13</span></td><td>Post-apply state. Everything here is derivable from the merge result plus a timestamp; nothing is invented.</td></tr>
+</table></div>
+</div>
+</body>
+</html>
