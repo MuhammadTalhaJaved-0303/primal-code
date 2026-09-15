@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Primal Code wireframes — 05 Marketing site</title>
+<style>
+:root{--ink:#111;--g2:#444;--g3:#777;--g4:#aaa;--g5:#d4d4d4;--g6:#ececec;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--paper);padding:24px 32px;max-width:1180px}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--g3);font-size:12px;margin-bottom:14px}.meta b{color:var(--ink)}
+.screen{border:1px solid var(--ink);margin:0 0 28px;break-inside:avoid}
+.screen>h2{font-size:13px;margin:0;padding:6px 10px;border-bottom:1px solid var(--ink);background:var(--g6);display:flex;justify-content:space-between}
+.frame{position:relative;padding:12px}
+.box{border:1px solid var(--g2);padding:8px;background:#fff}
+.dash{border:1px dashed var(--g3)}.fill{background:var(--g6)}.dark{background:var(--ink);color:#fff}
+.btn{display:inline-block;border:1px solid var(--ink);padding:3px 10px;border-radius:3px;margin:2px 4px 2px 0;font-size:12px;background:#fff}
+.btn.primary{background:var(--ink);color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.dim{color:var(--g3)}.small{font-size:11px}
+.row{display:flex;gap:10px}.col{flex:1}
+.n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;vertical-align:middle;margin-right:4px;flex:none}
+.legend{border-top:1px solid var(--ink);padding:8px 10px;font-size:12px}
+.legend table{border-collapse:collapse;width:100%}.legend td{vertical-align:top;padding:3px 6px 3px 0;border-bottom:1px solid var(--g6)}
+.state{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--ink);padding:0 4px;border-radius:2px;white-space:nowrap}
+.hr{border-top:1px solid var(--g5);margin:8px 0}
+.nav{display:flex;gap:14px;padding:8px 12px;border-bottom:1px solid var(--g2);font-size:12px}
+.hero{padding:34px 12px 26px;text-align:center}
+.hero h3{font-size:28px;line-height:1.15;margin:0 auto 12px;max-width:640px;font-weight:600}
+.hero p{max-width:560px;margin:0 auto 14px;color:var(--g2)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.card{border:1px solid var(--g2);padding:8px;font-size:12px;background:#fff}
+.card b{display:block;margin-bottom:2px}
+.shot{border:1px dashed var(--g3);padding:10px;text-align:center;color:var(--g3);font-size:11px;margin-top:6px}
+ol{margin:4px 0;padding-left:20px}ul{margin:4px 0;padding-left:18px}
+@media print{body{padding:0}.screen{page-break-after:always}}
+</style>
+</head>
+<body>
+<h1>05 — Marketing site: hero, proof, install, docs</h1>
+<div class="meta">
+<b>Serves stories 1 and 2</b> — the page that sends a developer to the DMG knowing what the OS will say and what they will see first.<br>
+<b>Maps to</b> primal-code-site (Next.js: app/sections/hero.tsx, features.tsx, receipts.tsx, deck.tsx, vibes.tsx, faq.tsx; app/lib/links.ts download URL contract <span class="mono">PrimalCode-macos-arm64.dmg</span> / <span class="mono">PrimalCode-Setup-Windows-x64.exe</span>) ·
+primal/make-dmg.sh (ad-hoc signature) · contrib/primalUpdate (update check wording) · primalSettingsEditor.ts (provider list, key storage sentence) · sessions window (sessions, worktrees, Changes, customizations) · primalDeck (real telemetry) · primalThemeGallery (⌘K ⌘G) · primalMotif (six motifs).<br>
+<b>Rule for the proof section</b>: every claim names the feature that backs it; nothing on this page describes a feature that is not on main today.
+</div>
+
+<!-- SCREEN 1 -->
+<div class="screen">
+<h2><span>Screen 1 · Nav and hero</span><span class="dim">desktop width; stacks to one column on phones</span></h2>
+<div class="frame">
+<div class="box" style="padding:0">
+<div class="nav"><b>▣ Primal Code</b><span class="dim">Features</span><span class="dim">Install</span><span class="dim">Docs</span><span class="dim">Releases</span><span class="dim">Source</span><span style="margin-left:auto"><span class="btn small primary">Download</span></span></div>
+<div class="hero">
+<div class="small dim" style="margin-bottom:10px"><span class="n">1</span>Positioning line under test</div>
+<h3>The VS Code you know, with the agents you already pay for.<br>No new subscription, no sign-in, your keys.</h3>
+<p><span class="n">2</span>A full build of the VS Code open-source core with Claude and Codex agents inside. Your Claude Code login or your API keys, from your machine straight to the provider. Nothing to sign up for.</p>
+<div><span class="btn primary">Download for macOS (Apple Silicon)</span><span class="btn">Download for Windows (x64)</span></div>
+<div class="small dim" style="margin-top:6px"><span class="n">3</span>v1.135.2 beta · free in beta · builds are not yet notarized — <u>read the two-step install</u></div>
+<div class="shot" style="max-width:720px;margin:16px auto 0;height:150px"><span class="n">4</span>Screenshot: Primal Start (Basalt) with the FIRST RUN strip, VIBE and MOTIF rows — a real capture, replaced on every release</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">1</span></td><td>The line as given. A/B candidate for the usability test (06, task 0): read it aloud, then ask "what would you have to pay for?" and "do you need an account?". Pass = both answered correctly by 5/5.</td></tr>
+<tr><td><span class="n">2</span></td><td>Sub-line stays inside what ships: VS Code OSS core, Claude + Codex agents, Claude Code login detection, BYOK keys, no account (owner decision 2026-09-10).</td></tr>
+<tr><td><span class="n">3</span></td><td>The unsigned truth sits under the buttons, not in an FAQ six screens down. Links to Screen 3. Version string comes from links.ts / latest.json — one source (decision D13).</td></tr>
+<tr><td><span class="n">4</span></td><td>Only real captures. The memory notes the site once showed the old look for weeks; the release recipe must include re-shooting this frame.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div class="screen">
+<h2><span>Screen 2 · Proof — built from real features only</span><span class="dim">each card names its backing feature</span></h2>
+<div class="frame">
+<div class="grid">
+<div class="card"><span class="n">5</span><b>The agents you already pay for</b>Claude via your existing Claude Code login (detected from the keychain, no key to paste) or an Anthropic key; Codex via your OpenAI key. Chat models from Google, DeepSeek, Kimi, GLM, MiniMax or a custom endpoint.<div class="small dim">primalSettingsEditor.ts · detectExistingClaudeSetup · agentSdks</div></div>
+<div class="card"><b>Your keys stay yours</b>"Stored encrypted on this machine and only ever sent to the provider itself — never to us." No Primal server in the path. The update check is one HTTPS GET for a small JSON file with no identifier.<div class="small dim">ISecretStorageService · primalUpdate setting text</div></div>
+<div class="card"><b>An Agents window, not a chat box</b>Sessions grouped by project, worktree isolation per task, a Changes view with per-file "viewed" state, checks, and customizations: agents, skills, instructions, hooks, MCP servers, plugins.<div class="small dim">src/vs/sessions</div></div>
+<div class="card"><b>Six vibes, 161 generated themes</b>One shortcut cycles whole-IDE looks (⌃⌘.). A theme gallery (⌘K ⌘G) previews every theme as you arrow through it. Six motifs move in the window ground and settle within 5 s.<div class="small dim">primalVibes · primalThemeGallery · primalMotif</div></div>
+<div class="card"><b>The Deck</b>A full-window console: the live agent stream in the middle, real CPU, memory and load on the right, what is playing on the left (macOS). Every moving thing is driven by a real signal.<div class="small dim">primalDeck · IPrimalTelemetryService</div></div>
+<div class="card"><b>Still VS Code underneath</b>Settings and keybindings carry over. Extensions install from Open VSX; Microsoft-only extensions (Pylance, C/C++, Remote-SSH) are the exception.<div class="small dim">product.json extensionsGallery</div></div>
+</div>
+<div class="box dash small" style="margin-top:10px"><span class="n">6</span><b>Not yet</b> — said on the page, in this order: builds are unsigned (see Install) · macOS Apple Silicon and Windows x64 only, no Linux build · no automatic updates (the app tells you, you download) · no account and no sync, by design · the agent SDK downloads on first use.</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">5</span></td><td>Each card ends with the code that backs it. Copy that cannot name a file does not go on the page. Numbers ("161") come from the theme build output at release time, not from prose.</td></tr>
+<tr><td><span class="n">6</span></td><td>The honest "not yet" block replaces the current site's compare table for launch. A newcomer who reads it and still downloads is a newcomer who will not bounce at the Gatekeeper dialog.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div class="screen">
+<h2><span>Screen 3 · Install — the unsigned warning explained before it happens</span><span class="dim">two columns, macOS and Windows</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box small">
+<div><span class="n">7</span><b>macOS (Apple Silicon)</b> <span class="mono dim">PrimalCode-macos-arm64.dmg · SHA-256 ▸</span></div>
+<ol>
+<li>Open the DMG, drag <b>Primal Code</b> to Applications.</li>
+<li>First open shows <i>"Primal Code" Not Opened — Apple could not verify…</i>. Press <b>Done</b>.</li>
+<li>System Settings → Privacy &amp; Security → <b>Open Anyway</b> next to "Primal Code was blocked", then confirm.</li>
+<li>Older macOS: right-click the app → Open. Terminal alternative: <span class="mono">xattr -dr com.apple.quarantine "/Applications/Primal Code.app"</span></li>
+</ol>
+<div class="dim">Why: the build is signed with a valid ad-hoc signature but no Apple Developer ID, so Gatekeeper cannot check it. The checksum lets you verify what you downloaded is what we published.</div>
+</div>
+<div class="col box small">
+<div><span class="n">8</span><b>Windows (x64)</b> <span class="mono dim">PrimalCode-Setup-Windows-x64.exe · SHA-256 ▸</span></div>
+<ol>
+<li>Run the installer.</li>
+<li>SmartScreen shows <i>Windows protected your PC</i>. Click <b>More info → Run anyway</b>.</li>
+<li>Install as usual; Primal Code opens on Primal Start.</li>
+</ol>
+<div class="dim">Why: no code-signing certificate yet. Same fix as macOS — a certificate — and the same decision (D2).</div>
+</div>
+</div>
+<div class="box fill small" style="margin-top:10px"><span class="n">9</span><b>What happens on first launch</b> — a short boot readout (agent host, providers, vibe, workspace) · Primal Start with a three-card FIRST RUN strip: Pick a vibe → Connect a model → Start · the model card finds an existing Claude Code login by itself · your first agent prompt downloads the Claude agent once (progress shown as a notification).</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">7</span></td><td>Steps mirror 01 · Screen 1 word for word. The right-click path is kept for older macOS only; verifying which OS versions still honour it is an open item. SHA-256 files already exist per release (the .sha256 next to the DMG) — link them.</td></tr>
+<tr><td><span class="n">8</span></td><td>SmartScreen wording matches the current FAQ ("More info → Run anyway"). The Windows build's exact dialog text was not verified from this worktree — screenshot it on the next Windows CI build.</td></tr>
+<tr><td><span class="n">9</span></td><td>Sets expectations for the two waits the wireframes found: the model card's "Looking for an existing setup…" (up to 60 s) and the one-time SDK download. Saying it here is cheaper than a support issue.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 4 -->
+<div class="screen">
+<h2><span>Screen 4 · Docs entry and footer</span><span class="dim">first four pages, then links</span></h2>
+<div class="frame">
+<div class="grid" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><span class="n">10</span><b>Install &amp; first run</b>The two-step install per OS, the first-run strip, where the boot lines come from.</div>
+<div class="card"><b>Providers &amp; keys</b>Claude Code login detection, one section per provider, what "coding agent provider" means, custom endpoints.</div>
+<div class="card"><b>Agent sessions &amp; worktrees</b>Chat vs agent session vs worktree, approvals, the Changes view, applying a worktree back.</div>
+<div class="card"><b>Vibes, themes, motifs</b>Shortcuts, the gallery, importing a palette, motif motion and battery rules.</div>
+</div>
+<div class="box small" style="margin-top:10px"><span class="n">11</span><b>Footer</b> · Releases (release notes per build) · Downloads repo · Source (public "for now") · Report a problem · Privacy: one paragraph — keys in the keychain, no telemetry, the update check described exactly as the setting describes it.</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">10</span></td><td>Four pages, ordered by the three stories. In-app "Learn more" links still point at code.visualstudio.com (own-voice finding); these four pages are what those links should target — decision D14.</td></tr>
+<tr><td><span class="n">11</span></td><td>Footer claims are quotations of shipping text (setting descriptions), so the page and the app cannot drift apart.</td></tr>
+</table></div>
+</div>
+</body>
+</html>

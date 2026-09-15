@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Primal Code wireframes — 03 Resume</title>
+<style>
+:root{--ink:#111;--g2:#444;--g3:#777;--g4:#aaa;--g5:#d4d4d4;--g6:#ececec;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--paper);padding:24px 32px;max-width:1180px}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--g3);font-size:12px;margin-bottom:14px}.meta b{color:var(--ink)}
+.screen{border:1px solid var(--ink);margin:0 0 28px;break-inside:avoid}
+.screen>h2{font-size:13px;margin:0;padding:6px 10px;border-bottom:1px solid var(--ink);background:var(--g6);display:flex;justify-content:space-between}
+.frame{position:relative;padding:12px}
+.box{border:1px solid var(--g2);padding:8px;background:#fff}
+.dash{border:1px dashed var(--g3)}.fill{background:var(--g6)}.dark{background:var(--ink);color:#fff}
+.btn{display:inline-block;border:1px solid var(--ink);padding:3px 10px;border-radius:3px;margin:2px 4px 2px 0;font-size:12px;background:#fff}
+.btn.primary{background:var(--ink);color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.dim{color:var(--g3)}.small{font-size:11px}
+.row{display:flex;gap:10px}.col{flex:1}
+.n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;vertical-align:middle;margin-right:4px;flex:none}
+.legend{border-top:1px solid var(--ink);padding:8px 10px;font-size:12px}
+.legend table{border-collapse:collapse;width:100%}.legend td{vertical-align:top;padding:3px 6px 3px 0;border-bottom:1px solid var(--g6)}
+.state{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--ink);padding:0 4px;border-radius:2px;white-space:nowrap}
+.hr{border-top:1px solid var(--g5);margin:8px 0}
+.toast{border:1px solid var(--ink);box-shadow:3px 3px 0 var(--g5);padding:8px;background:#fff}
+.titlebar{border-bottom:1px solid var(--g2);padding:4px 8px;font-size:11px;background:var(--g6);display:flex;gap:8px}
+.chip{display:inline-block;border:1px solid var(--g2);border-radius:10px;padding:0 8px;font-size:11px;margin-right:4px;background:#fff}
+.side{flex:0 0 26%;min-height:240px}
+.input{border:1px solid var(--ink);padding:6px 8px;margin-top:6px;background:#fff}
+.rowline{display:flex;justify-content:space-between;border-bottom:1px solid var(--g6);padding:3px 0}
+ul{margin:4px 0;padding-left:18px}
+@media print{body{padding:0}.screen{page-break-after:always}}
+</style>
+</head>
+<body>
+<h1>03 — Come back tomorrow and pick up where I left off</h1>
+<div class="meta">
+<b>Story 3</b> — "Come back tomorrow" · success = within 30 s of launch the user can name the session they were in, see what it changed, and continue it or apply it, without opening a file by hand.<br>
+<b>Maps to</b> contrib/primalBoot (boot lines) · contrib/primalRig/browser/primalRigEditor.ts + primalRigSessions.ts (Projects, Agent activity, Today; setting <span class="mono">primalCode.startPage.surface</span>) ·
+contrib/primalUpdate ("Primal Code {0} is available — {1}", Download / Release Notes / Skip This Build) · src/vs/sessions/contrib/sessions/browser/views/sessionsView.ts (sessions grouped by workspace, "Chats", "Completed in {0}.", "Input needed in {0}.", "Restore Session") ·
+sessions/contrib/changes (Changes view) · workbench chat panel agentSessions (session list, "Local", "Show {0} more sessions").
+</div>
+
+<!-- SCREEN 1 -->
+<div class="screen">
+<h2><span>Screen 1 · Launch: boot lines, then The Rig as the return surface</span><span class="dim">IDE window restored with acme-api</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box dark mono" style="flex:0 0 200px">
+<span class="n" style="background:#fff;color:#111">1</span>PRIMAL CODE<div class="hr" style="border-color:#555"></div>agent host ready<br>providers 2<br>vibe basalt<br>workspace acme-api</div>
+<div class="col box">
+<div class="titlebar">Primal Code · The Rig <span class="dim">· Basalt</span> <span class="btn small" style="margin-left:auto">New Agent Chat</span></div>
+<div style="padding:8px 12px" class="small">
+<div><span class="n">2</span><b>PROJECTS</b></div>
+<div class="rowline"><span><b>acme-api</b> <span class="dim">~/code/acme-api</span></span><span class="dim">yesterday 18:40</span></div>
+<div class="rowline"><span><b>docs-site</b> <span class="dim">~/code/docs-site</span></span><span class="dim">3 days ago</span></div>
+<div class="dim" style="margin:2px 0 8px">branch not shown — no cheap API records it (primalRigEditor.ts note); omitted rather than guessed</div>
+<div><span class="n">3</span><b>AGENT ACTIVITY</b></div>
+<div class="rowline"><span>add rate limit <span class="dim">· acme-api · worktree feat/rate-limit</span></span><span><span class="state">done ✓</span> <span class="dim">yesterday 18:38</span></span></div>
+<div class="rowline"><span>fix login redirect <span class="dim">· acme-api</span></span><span><span class="state">waiting on you</span> <span class="dim">yesterday 17:02</span></span></div>
+<div class="rowline"><span>explain loader.ts <span class="dim">· chat</span></span><span><span class="dim">no status</span> <span class="dim">2 days ago</span></span></div>
+<div style="margin-top:8px"><span class="n">4</span><b>TODAY</b> &nbsp;<span style="font-size:18px">0</span> <span class="dim">Chat sessions active today in this workspace</span></div>
+<div class="hr"></div><div class="dim">⌃⌘. cycle vibes · ⌘K ⌘V pick vibe · ⌃⌘I chat</div>
+</div>
+</div>
+</div>
+<div class="toast small" style="max-width:520px;margin:10px 0 0 auto"><span class="n">5</span><b>Primal Code 1.136.0 is available — Worktree apply</b> &nbsp;<span class="btn small">Download</span><span class="btn small">Release Notes</span><span class="btn small">Skip This Build</span></div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">1</span></td><td>Boot overlay lines on a return visit; "workspace acme-api" is the reassurance that the right project is restoring. ≤ 1.4 s, any key dismisses.</td></tr>
+<tr><td><span class="n">2</span></td><td>Shipping Rig rows: name, dimmed path, last-opened relative time (IWorkspacesService recents). The branch column is deliberately absent — the recents pipeline records none.</td></tr>
+<tr><td><span class="n">3</span></td><td>Shipping Rig rows with the four status words (Running / Waiting on You / Done / Failed) and "no status" when nothing truthful is recorded. Proposal: append the worktree branch when the session has one, so "what did it change" and "where" are answered on the landing surface. Clicking a row opens the session.</td></tr>
+<tr><td><span class="n">4</span></td><td>Shipping stat with its honest caption. "0" at 09:00 is correct and a little deflating; proposal: also show "yesterday: 2" from the same index (countSessionsToday with a shifted window) — decision D10.</td></tr>
+<tr><td><span class="n">5</span></td><td>Update notifier, verbatim strings, ≥ 20 s after restore. It never downloads by itself; it says so in the setting description. Kept as a toast, not a banner, so it never competes with the return surface.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div class="screen">
+<h2><span>Screen 2 · The sessions sidebar the next morning</span><span class="dim">Agents window</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box side small">
+<div><span class="n">6</span><b>SESSIONS</b> <span class="dim">search sessions by name or folder</span></div>
+<div class="box fill dash" style="margin:4px 0;padding:3px 6px"><span class="n">7</span>1 session requires input <span class="btn small">Open</span></div>
+<div class="mono">
+<div class="dim">acme-api</div>
+<div>&nbsp;fix login redirect &nbsp;<span class="state">input needed</span></div>
+<div>&nbsp;add rate limit &nbsp;<span class="state">completed</span> <span class="dim">unread</span></div>
+<div class="dim">docs-site</div>
+<div>&nbsp;rewrite install page &nbsp;<span class="state">failed</span></div>
+<div class="dim">Chats</div>
+<div>&nbsp;explain loader.ts</div>
+</div>
+<div class="hr"></div><b>CUSTOMIZATIONS</b> <span class="dim">Agents · Skills · Instructions · Hooks · MCP Servers · Plugins</span>
+</div>
+<div class="col box small">
+<div><span class="n">8</span><b>Hover / details for "add rate limit"</b></div>
+<div class="hr"></div>
+<div class="mono">Completed in 3m 41s.<br>acme-api · worktree feat/rate-limit · Claude Sonnet 4<br>2 files changed · not applied to main<br>last: "Rate limiting added; 2 files changed, tests pass."</div>
+<div class="hr"></div>
+<span class="btn small">Open Session</span><span class="btn small">Session Details</span><span class="btn small">Mark as done</span><span class="btn small">Archive</span>
+<div class="hr"></div>
+<div class="dim">Every line above is recorded state: the sessions view already formats "Completed in {0}." and "Input needed in {0}."; files changed comes from the session changes service; "not applied" is the absence of a recorded merge.</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">6</span></td><td>Shipping sidebar: sessions grouped by workspace, a "Chats" group, search by name or folder. Unread is rendered as the word "unread", not a dot whose colour carries the meaning.</td></tr>
+<tr><td><span class="n">7</span></td><td>Shipping blocked-sessions indicator ("1 session requires input", "1 session has a question", "1 session is failing CI"). Proposal: pin it to the top of the list on return, with the one-click "Open" that jumps to the session.</td></tr>
+<tr><td><span class="n">8</span></td><td>Session hover content (sessionHoverContent.ts) extended with the two facts the return story needs: the worktree branch and whether the changes were applied. "Mark as done" / "Archive" are shipping actions.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div class="screen">
+<h2><span>Screen 3 · Pick up a finished worktree session — what changed while I was away</span><span class="dim">session view</span></h2>
+<div class="frame">
+<div class="box">
+<div class="titlebar">add rate limit <span class="state">completed</span> <span class="dim">· acme-api · worktree feat/rate-limit · Claude Sonnet 4 · yesterday 18:38</span></div>
+<div class="row" style="padding:8px">
+<div class="col small">
+<div class="box fill"><span class="n">9</span><b>Since you left</b><br>
+<div class="mono">✓ done 18:38 — "Rate limiting added; 2 files changed, tests pass."<br>✎ src/middleware/rateLimit.ts &nbsp;Created +48<br>✎ src/app.ts &nbsp;Modified +3 −1<br>▸ npm test &nbsp;12 passed<br>main moved: 3 new commits on main since this worktree branched <span class="state">may conflict</span></div></div>
+<div class="dim" style="margin:6px 0">Older stream collapsed: <span class="btn small">Show full session (41 events)</span></div>
+<div class="input"><span class="dim">Continue this session…</span> <span class="chip" style="float:right">Claude Sonnet 4 ▾</span></div>
+</div>
+<div class="box small" style="flex:0 0 30%"><span class="n">10</span><b>Next step</b><br><span class="btn primary">Review 2 files</span><br><span class="btn">Apply to project</span><br><span class="btn">Open in Primal Code</span><br><span class="btn">Discard worktree…</span><div class="hr"></div><span class="dim">Buttons are the same four as 02 · Screen 4; the order changes because "review" is the honest first step when 0 of 2 files are viewed.</span></div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">9</span></td><td>"Since you left" is a filter over recorded events, not a generated summary: the last completed response, the per-file change list, and the last command result. The "main moved" line needs a git ahead/behind read of the parent repo — cheap but not implemented; if unavailable the line is omitted, never guessed.</td></tr>
+<tr><td><span class="n">10</span></td><td>Ordering rule: the primary action is whichever step is incomplete first (review → apply → discard). Same button set as the task story so nothing new is learned on day two.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 4 -->
+<div class="screen">
+<h2><span>Screen 4 · Resume inside the IDE chat panel</span><span class="dim">auxiliary bar, session restored</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box mono small" style="min-height:180px">src/middleware/auth.ts <span class="dim">— editor</span><br><br>export const auth = …</div>
+<div class="box small" style="flex:0 0 38%">
+<div><span class="n">11</span><b>CHAT</b> &nbsp;<span class="chip">fix login redirect ▾</span> <span class="btn small">New</span></div>
+<div class="box fill dash" style="margin:4px 0;padding:3px 6px"><span class="n">12</span>Restored from yesterday · <b>Claude agent · local folder</b> · last: waiting on you</div>
+<div class="mono">⚠ waiting on you — "Should the redirect preserve the query string?"</div>
+<div class="input"><span class="dim">Reply…</span></div>
+<div style="margin-top:4px"><span class="n">13</span><span class="chip">Claude agent · local ▾</span><span class="chip">Claude Sonnet 4 ▾</span><span class="chip">Ask Before Edits ▾</span></div>
+<div class="hr"></div>
+<div class="dim">Sessions list below the input: "Local" group, "Show 3 more sessions"</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">11</span></td><td>Session switcher in the chat header (chat sessions view, shipping) so the restored panel names the session it holds.</td></tr>
+<tr><td><span class="n">12</span></td><td>Restore banner: written kind ("Claude agent · local folder" / "Claude agent · worktree feat/…" / "chat"), last status. This is the fix for the "no visible session-type picker mid-session" debt: the kind is always visible even when it can no longer be changed.</td></tr>
+<tr><td><span class="n">13</span></td><td>Input toolbar chips. The first chip is the session target picker (sessionTargetPickerActionItem.ts) — editable only in an empty session; in a running session it renders as a read-only label with the same words, never disappears.</td></tr>
+</table></div>
+</div>
+</body>
+</html>

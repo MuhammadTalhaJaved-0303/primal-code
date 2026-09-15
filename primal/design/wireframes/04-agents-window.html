@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Primal Code wireframes — 04 Agents window</title>
+<style>
+:root{--ink:#111;--g2:#444;--g3:#777;--g4:#aaa;--g5:#d4d4d4;--g6:#ececec;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--paper);padding:24px 32px;max-width:1180px}
+h1{font-size:20px;margin:0 0 4px}
+.meta{color:var(--g3);font-size:12px;margin-bottom:14px}.meta b{color:var(--ink)}
+.screen{border:1px solid var(--ink);margin:0 0 28px;break-inside:avoid}
+.screen>h2{font-size:13px;margin:0;padding:6px 10px;border-bottom:1px solid var(--ink);background:var(--g6);display:flex;justify-content:space-between}
+.frame{position:relative;padding:12px}
+.box{border:1px solid var(--g2);padding:8px;background:#fff}
+.dash{border:1px dashed var(--g3)}.fill{background:var(--g6)}.dark{background:var(--ink);color:#fff}
+.btn{display:inline-block;border:1px solid var(--ink);padding:3px 10px;border-radius:3px;margin:2px 4px 2px 0;font-size:12px;background:#fff}
+.btn.primary{background:var(--ink);color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.dim{color:var(--g3)}.small{font-size:11px}
+.row{display:flex;gap:10px}.col{flex:1}
+.n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;vertical-align:middle;margin-right:4px;flex:none}
+.legend{border-top:1px solid var(--ink);padding:8px 10px;font-size:12px}
+.legend table{border-collapse:collapse;width:100%}.legend td{vertical-align:top;padding:3px 6px 3px 0;border-bottom:1px solid var(--g6)}
+.state{font-size:10px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--ink);padding:0 4px;border-radius:2px;white-space:nowrap}
+.hr{border-top:1px solid var(--g5);margin:8px 0}
+.toast{border:1px solid var(--ink);box-shadow:3px 3px 0 var(--g5);padding:8px;background:#fff}
+.titlebar{border-bottom:1px solid var(--g2);padding:4px 8px;font-size:11px;background:var(--g6);display:flex;gap:8px}
+.chip{display:inline-block;border:1px solid var(--g2);border-radius:10px;padding:0 8px;font-size:11px;margin-right:4px;background:#fff}
+.side{flex:0 0 24%;min-height:300px;display:flex;flex-direction:column}
+.sash{border-top:3px double var(--g3);margin:6px -8px;text-align:center;font-size:10px;color:var(--g3)}
+.input{border:1px solid var(--ink);padding:6px 8px;margin-top:6px;background:#fff}
+.stage{position:relative;border:1px solid var(--g2);background:repeating-linear-gradient(135deg,#fff 0 9px,#f3f3f3 9px 10px);padding:10px}
+.stage .card{background:#fff;border:1px solid var(--g2);padding:10px 14px}
+ul{margin:4px 0;padding-left:18px}
+@media print{body{padding:0}.screen{page-break-after:always}}
+</style>
+</head>
+<body>
+<h1>04 — The Agents window: landing and session view</h1>
+<div class="meta">
+<b>Stories 2 and 3</b> — the window where agent work starts and is reviewed. Also answers two placement questions: where the motif stage may live, and where model/provider state is shown.<br>
+<b>Maps to</b> src/vs/sessions/contrib/sessions/browser (sessions view grouped by workspace, customizationsTree.ts with the persisted Sessions/Customizations sash) · contrib/chat/browser/newChatWidget.ts (header "New session in … with …", quick-chat header "New Chat with …") ·
+newSessionPromptOptions.ts ("Send your first prompt") · newChatInput.ts (rotating placeholders, "Add Context...", "Send (Alt-click to start in the background)") · noAgentHostEmptyState.ts ("No agent hosts available / Connect a host to get started") ·
+agentHostDownloadProgress.ts · newChatMotifStage.ts (PR #22: the landing is a motif stage; PR #23 raises the ceiling to 35 % behind a scrim plate and defaults to World; the Agents window has no status bar, so no "Motif Motion" item) · primalSettingsEditor.ts (key state, Claude Code login detection) · primalDeckStatus.ts (status words).
+</div>
+
+<!-- SCREEN 1 -->
+<div class="screen">
+<h2><span>Screen 1 · Landing — sidebar, motif stage, composer, provider strip</span><span class="dim">Agents window, project selected</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box side small">
+<div><span class="n">1</span><b>SESSIONS</b> <span class="btn small" style="float:right">New Session</span></div>
+<div class="mono" style="margin-top:4px"><span class="dim">acme-api</span><br>&nbsp;add rate limit <span class="state">completed</span><br>&nbsp;fix login redirect <span class="state">input needed</span><br><span class="dim">docs-site</span><br>&nbsp;rewrite install page <span class="state">failed</span><br><span class="dim">Chats</span><br>&nbsp;explain loader.ts</div>
+<div class="sash">▲ drag ▼ (persisted height)</div>
+<div><span class="n">2</span><b>CUSTOMIZATIONS</b></div>
+<div class="mono">▸ Agents <span class="dim">2</span><br>▸ Skills <span class="dim">5</span><br>▸ Instructions <span class="dim">1</span><br>▸ Hooks <span class="dim">0</span><br>▸ MCP Servers <span class="dim">1</span><br>▸ Plugins <span class="dim">0</span></div>
+</div>
+<div class="col">
+<div class="stage">
+<div class="small dim" style="position:absolute;right:8px;top:6px"><span class="n">3</span>motif stage · "world" · ≤ 35 % · resting</div>
+<div class="card" style="margin-top:18px">
+<div style="font-size:16px">New session in <span class="chip">acme-api ▾</span> with <span class="chip">Claude ▾</span></div>
+<div class="input" style="min-height:50px"><span class="dim">What's next on your roadmap?</span></div>
+<div class="small" style="margin-top:4px"><span class="chip">Add Context...</span><span class="chip">Claude Sonnet 4 ▾</span><span class="chip">Ask Before Edits ▾</span><span class="chip">New Worktree ▾</span><span class="chip">main ▾</span> <span class="btn primary small" style="float:right">Send</span></div>
+<div class="box dash small" style="margin-top:8px"><span class="n">4</span><b>Send your first prompt</b> <span class="dim">×</span><br><span class="chip">Fix the failing test in auth.spec.ts</span><span class="chip">Add rate limiting to /login</span><span class="chip">Explain how sessions are stored</span></div>
+</div>
+</div>
+<div class="box fill small" style="margin-top:8px"><span class="n">5</span><b>Claude</b> · via your Claude Code login <span class="state">ready</span> &nbsp;·&nbsp; <b>Codex</b> · no OpenAI key <span class="state">not available</span> &nbsp;·&nbsp; <span class="btn small">Manage providers</span></div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">1</span></td><td>Shipping sessions list: grouped by workspace, "Chats" group, status words. "New Session" is the shipping action label ("New Session ({0})" with the agent name when several are configured).</td></tr>
+<tr><td><span class="n">2</span></td><td>Shipping customizations tree (six categories, lazy, 20-row cap) with the draggable sash whose height persists under agentSessions.customizationsPane.height. Counts are real item counts ("{0}, {1} items").</td></tr>
+<tr><td><span class="n">3</span></td><td>The only place a motif may live in this window: the landing stage behind the composer card, at the same 35 % ceiling as Primal Start (PR #23; the composer card is its own scrim plate), never behind a stream or code (the motif setting's own text: contrast of text over something that moves cannot be checked). The card is opaque. Because this window has no status bar, a small "motif: resting · pause" control belongs in this corner — decision D11.</td></tr>
+<tr><td><span class="n">4</span></td><td>Shipping "Send your first prompt" options widget (newSessionPromptOptions.ts) — suggestions are data from the composer service; closing it is remembered.</td></tr>
+<tr><td><span class="n">5</span></td><td>Provider strip, proposed. One line, always visible on the landing, sourced from the same detection the settings page uses (keychain login probe, saved keys, SDK presence). Words, not dots: "ready" / "key saved" / "no key" / "downloading" / "not available". "Manage providers" runs primalCode.manageProviders.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 2 -->
+<div class="screen">
+<h2><span>Screen 2 · Session view — stream, changes rail, composer with model state</span><span class="dim">status "running"</span></h2>
+<div class="frame">
+<div class="row">
+<div class="box side small mono" style="min-height:240px">SESSIONS<br><span class="dim">acme-api</span><br>&nbsp;<b>add rate limit</b> <span class="state">running</span><br>&nbsp;fix login redirect<br><span class="dim">Chats</span><br>&nbsp;explain loader.ts</div>
+<div class="col box" style="min-height:240px">
+<div class="titlebar"><span class="n">6</span>add rate limit <span class="state">running</span> <span class="dim">· worktree feat/rate-limit · Claude Sonnet 4</span> <span class="btn small" style="margin-left:auto">Stop</span></div>
+<div class="row" style="padding:8px">
+<div class="col mono small">
+<div class="dim">plain ground — no motif behind the stream</div>
+<div>▸ read &nbsp;src/middleware/auth.ts</div>
+<div>"Adding a token-bucket limiter…"</div>
+<div>✎ edit &nbsp;src/middleware/rateLimit.ts &nbsp;+48 −0</div>
+<div>▸ run &nbsp;npm test &nbsp;<span class="dim">running…</span></div>
+</div>
+<div class="box small" style="flex:0 0 32%"><span class="n">7</span><b>CHANGES</b> 1 file<br><span class="mono">rateLimit.ts Created +48</span><br><span class="btn small">View All Changes (1)</span><div class="hr"></div><b>CHECKS</b> <span class="dim">no pull request</span></div>
+</div>
+<div style="padding:0 8px 8px">
+<div class="input small"><span class="dim">Follow-up…</span></div>
+<div class="small" style="margin-top:4px"><span class="n">8</span><span class="chip">Claude agent · worktree</span><span class="chip">Claude Sonnet 4 ▾</span><span class="chip">Ask Before Edits ▾</span> <span class="dim">Send (Alt-click to start in the background)</span></div>
+</div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">6</span></td><td>Header facts: name, status word, worktree branch, model. Stop is the shipping cancel. The status word here, in the sidebar, in The Rig and in The Deck is the same four-word vocabulary from ChatSessionStatus.</td></tr>
+<tr><td><span class="n">7</span></td><td>Changes rail is the shipping Changes view docked beside the stream instead of below it, so review can start while the agent is still running. "View All Changes ({0})" opens the multi-file diff.</td></tr>
+<tr><td><span class="n">8</span></td><td>Composer chips in a running session: the kind chip is read-only text ("Claude agent · worktree"); the model chip stays a picker but lists only models this session can run (02 · callout 3). Anything else is a mismatch the picker refuses to offer.</td></tr>
+</table></div>
+</div>
+
+<!-- SCREEN 3 -->
+<div class="screen">
+<h2><span>Screen 3 · Model / provider state — every state in words</span><span class="dim">popover from the provider strip or the model chip</span></h2>
+<div class="frame">
+<div class="row">
+<div class="col box small">
+<div><span class="n">9</span><b>Providers on this Mac</b></div>
+<div class="hr"></div>
+<div class="mono">
+Anthropic &nbsp;<span class="state">ready</span> &nbsp;via Claude Code login (keychain) — no key needed<br>
+OpenAI &nbsp;&nbsp;&nbsp;<span class="state">no key</span> &nbsp;Codex agent and GPT models unavailable → <span class="btn small">Add key</span><br>
+DeepSeek &nbsp;<span class="state">key saved</span> &nbsp;chat models only; can power the coding agent through its Anthropic-compatible endpoint<br>
+Google · Kimi · GLM · MiniMax · Custom &nbsp;<span class="state">no key</span><br>
+<div class="hr"></div>
+Coding agent: <b>Anthropic</b> (setting primalCode.agent.provider)<br>
+Claude SDK 0.3.220 &nbsp;<span class="state">installed</span> · Codex SDK 0.146.0 &nbsp;<span class="state">not downloaded</span>
+</div>
+</div>
+<div class="col">
+<div class="box dash small" style="margin-bottom:8px"><span class="n">10</span><b>Empty state (no host yet)</b><br>No agent hosts available<br><span class="dim">Connect a host to get started</span> <span class="btn small">Learn more</span> <span class="btn small">Manage providers</span></div>
+<div class="box dash small" style="margin-bottom:8px"><span class="n">11</span><b>First use</b><br>Downloading Claude agent… <span class="mono">▮▮▯▯▯ 38 %</span><br><span class="dim">Composer stays enabled; the prompt is queued and sent when the host is up.</span></div>
+<div class="box dash small"><span class="n">12</span><b>Key rejected by the provider</b><br>"Anthropic returned 401 for the saved key." <span class="btn small">Open Settings</span> <span class="btn small">Retry</span><br><span class="dim">Shown inline in the session, never as a silent stop. Status word becomes "failed".</span></div>
+</div>
+</div>
+</div>
+<div class="legend"><table>
+<tr><td><span class="n">9</span></td><td>All rows come from state the settings editor already reads: saved keys per provider id, the keychain login probe, the agent-provider setting, and SDK presence on disk (product.json agentSdks + the download cache). Provider descriptions are the settings page's own sentences.</td></tr>
+<tr><td><span class="n">10</span></td><td>Shipping empty state strings (noAgentHostEmptyState.ts). Proposal adds "Manage providers" beside "Learn more" because the missing-host cause on a fresh install is nearly always a missing key or SDK.</td></tr>
+<tr><td><span class="n">11</span></td><td>Shipping progress string; the queued-prompt behaviour is a proposal (decision D6 in 01 covers bundling the SDK, which would remove this state for Claude).</td></tr>
+<tr><td><span class="n">12</span></td><td>Proposed error surface. Whether the agent host reports a 401 distinctly needs checking in the host protocol; if it cannot, the copy degrades to "The provider refused the request" with the same two buttons.</td></tr>
+</table></div>
+</div>
+</body>
+</html>
