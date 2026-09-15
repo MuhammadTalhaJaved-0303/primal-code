@@ -370,13 +370,15 @@ export class AgentHostGitService implements IAgentHostGitService {
 		} catch (error) {
 			const mergeHead = await this._runGit(workingDirectory, ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']);
 			if (mergeHead) {
+				const mergeMessage = error instanceof Error ? error.message : String(error);
 				try {
 					await this._runGit(workingDirectory, ['merge', '--abort'], { timeout: 60_000, throwOnError: true });
 				} catch (abortError) {
-					const mergeMessage = error instanceof Error ? error.message : String(error);
 					const abortMessage = abortError instanceof Error ? abortError.message : String(abortError);
 					throw new Error(`Merge failed and could not be aborted: ${mergeMessage}; ${abortMessage}`, { cause: error });
 				}
+				// Say what state the checkout was left in: the abort succeeded, so nothing changed.
+				throw new Error(`${mergeMessage}. The merge was aborted, so the checkout is unchanged.`, { cause: error });
 			}
 			throw error;
 		}
@@ -1050,7 +1052,7 @@ export class AgentHostGitService implements IAgentHostGitService {
 						this._logService.warn(`[agentHostGitService] > git ${args.join(' ')} failed; full stderr:\n${stderr}`);
 					}
 					if (options?.throwOnError) {
-						reject(new Error(formatGitError(args, timeoutMs, didTimeOut, error, stderr), { cause: error }));
+						reject(new Error(formatGitError(args, timeoutMs, didTimeOut, error, stderr, stdout), { cause: error }));
 						return;
 					}
 					resolve(undefined);
@@ -1251,7 +1253,12 @@ export function isRetryableWorktreeRemovalError(error: unknown): boolean {
  *
  * Exported for tests.
  */
-export function formatGitError(args: readonly string[], timeoutMs: number, didTimeOut: boolean, error: cp.ExecFileException, stderr: string): string {
+/**
+ * `stdout` is where `git merge` reports conflicts (`CONFLICT (content): Merge conflict in
+ * <file>`); stderr is often empty then, and an error that only summarised stderr said nothing
+ * about which files collided. Pass it so a conflict is reported by name.
+ */
+export function formatGitError(args: readonly string[], timeoutMs: number, didTimeOut: boolean, error: cp.ExecFileException, stderr: string, stdout: string = ''): string {
 	const subcommand = args[0] ?? '(unknown)';
 	let reason: string;
 	if (didTimeOut) {
@@ -1263,8 +1270,29 @@ export function formatGitError(args: readonly string[], timeoutMs: number, didTi
 	} else {
 		reason = error.message;
 	}
-	const detail = summarizeStderrForError(stderr);
+	const detail = [summarizeConflictsForError(stdout), summarizeStderrForError(stderr)].filter(part => part.length > 0).join('; ');
 	return detail ? `${reason}: ${detail}` : reason;
+}
+
+const MAX_CONFLICTS_NAMED = 5;
+
+/**
+ * The `CONFLICT ...` lines git prints on stdout when a merge stops, joined into one line and
+ * capped so a wide conflict still reads as a sentence. Empty when there are none.
+ *
+ * Exported for tests.
+ */
+export function summarizeConflictsForError(stdout: string): string {
+	if (!stdout) {
+		return '';
+	}
+	const conflicts = stdout.split(/[\r\n]+/g).map(line => line.trim()).filter(line => line.startsWith('CONFLICT'));
+	if (conflicts.length === 0) {
+		return '';
+	}
+	const named = conflicts.slice(0, MAX_CONFLICTS_NAMED);
+	const remainder = conflicts.length - named.length;
+	return remainder > 0 ? `${named.join('; ')}; and ${remainder} more` : named.join('; ');
 }
 
 /**

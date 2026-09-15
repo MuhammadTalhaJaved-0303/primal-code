@@ -34,6 +34,7 @@ import { ILanguageModelChatMetadata } from '../../common/languageModels.js';
 import { ILanguageModelToolsService } from '../../common/tools/languageModelToolsService.js';
 import { IChatSessionsService, localChatSessionType } from '../../common/chatSessionsService.js';
 import { type IChatAcceptInputOptions, IChatWidget, IChatWidgetService } from '../chat.js';
+import { ReloadSessionModelsCommandId } from '../widget/input/chatInputModelFitNotice.js';
 import { getAgentSessionProvider, AgentSessionProviders, AgentSessionTarget } from '../agentSessions/agentSessions.js';
 import { getEditingSessionContext } from '../chatEditing/chatEditingActions.js';
 import { ctxHasEditorModification, ctxHasRequestInProgress, ctxIsGlobalEditingSession } from '../chatEditing/chatEditingEditorContextKeys.js';
@@ -520,13 +521,17 @@ export class OpenSessionTargetPickerAction extends Action2 {
 			tooltip: localize('setSessionTarget', "Set Session Target"),
 			category: CHAT_CATEGORY,
 			f1: false,
-			precondition: ContextKeyExpr.and(ChatContextKeys.enabled, ContextKeyExpr.or(ChatContextKeys.chatSessionIsEmpty, ChatContextKeys.inAgentSessionsWelcome), ChatContextKeys.currentlyEditingInput.negate(), ChatContextKeys.currentlyEditing.negate()),
+			// Primal Code: not gated on `ChatContextKeys.enabled`. This product ships no
+			// default chat participant, so `chatIsEnabled` only turns true once an
+			// agent-host dynamic agent has registered — and this picker is how an empty
+			// session gets an agent behind it. Gating it on chat being enabled hid the
+			// one control that enables chat.
+			precondition: ContextKeyExpr.and(ContextKeyExpr.or(ChatContextKeys.chatSessionIsEmpty, ChatContextKeys.inAgentSessionsWelcome), ChatContextKeys.currentlyEditingInput.negate(), ChatContextKeys.currentlyEditing.negate()),
 			menu: [
 				{
 					id: MenuId.ChatInput,
 					order: 0,
 					when: ContextKeyExpr.and(
-						ChatContextKeys.enabled,
 						ChatContextKeys.location.isEqualTo(ChatAgentLocation.Chat),
 						ChatContextKeys.inQuickChat.negate(),
 						ChatContextKeys.chatSessionIsEmpty,
@@ -540,7 +545,6 @@ export class OpenSessionTargetPickerAction extends Action2 {
 					id: MenuId.ChatInput,
 					order: 0,
 					when: ContextKeyExpr.and(
-						ChatContextKeys.enabled,
 						ChatContextKeys.location.isEqualTo(ChatAgentLocation.Chat),
 						ChatContextKeys.inQuickChat.negate(),
 						IsSessionsWindowContext.negate(),
@@ -557,6 +561,31 @@ export class OpenSessionTargetPickerAction extends Action2 {
 		if (widget) {
 			widget.input.openSessionTargetPicker();
 		}
+	}
+}
+
+/**
+ * The one-click fix behind the "no session model loaded yet" notice: re-queries the
+ * session type's model provider for the widget bound to the given session resource
+ * (falling back to the focused widget) and re-validates the selection.
+ */
+export class ReloadSessionModelsAction extends Action2 {
+	static readonly ID = ReloadSessionModelsCommandId;
+
+	constructor() {
+		super({
+			id: ReloadSessionModelsAction.ID,
+			title: localize2('interactive.reloadSessionModels.label', "Retry Loading Session Models"),
+			category: CHAT_CATEGORY,
+			f1: false,
+		});
+	}
+
+	override async run(accessor: ServicesAccessor, ...args: unknown[]): Promise<void> {
+		const widgetService = accessor.get(IChatWidgetService);
+		const sessionResource = args[0];
+		const widget = (URI.isUri(sessionResource) ? widgetService.getWidgetBySessionResource(sessionResource) : undefined) ?? widgetService.lastFocusedWidget;
+		widget?.input.reloadSessionModels();
 	}
 }
 
@@ -1183,6 +1212,7 @@ export function registerChatExecuteActions(): DisposableStore {
 	store.add(registerAction2(OpenPermissionPickerAction));
 	store.add(registerAction2(OpenModePickerAction));
 	store.add(registerAction2(OpenSessionTargetPickerAction));
+	store.add(registerAction2(ReloadSessionModelsAction));
 	store.add(registerAction2(OpenDelegationPickerAction));
 	store.add(registerAction2(OpenWorkspacePickerAction));
 	store.add(registerAction2(ChatSessionPrimaryPickerAction));
