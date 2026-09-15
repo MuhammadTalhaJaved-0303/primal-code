@@ -183,6 +183,10 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/contrib/primalReport",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/contrib/primalUpdate",
 			"project": "vscode-workbench"
 		},

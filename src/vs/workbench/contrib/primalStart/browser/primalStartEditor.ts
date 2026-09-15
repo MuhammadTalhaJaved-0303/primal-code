@@ -13,12 +13,15 @@ import { splitRecentLabel } from '../../../../base/common/labels.js';
 import { IDisposable, MutableDisposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 import { isMacintosh, isNative } from '../../../../base/common/platform.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
+import { URI } from '../../../../base/common/uri.js';
 import { localize } from '../../../../nls.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { ConfigurationTarget, IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IEditorOptions } from '../../../../platform/editor/common/editor.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { ILabelService, Verbosity } from '../../../../platform/label/common/label.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
 import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
@@ -54,6 +57,9 @@ const OPEN_PROJECT_COMMAND_ID = isMacintosh && isNative
 
 /** Contributed by the built-in Git extension (`extensions/git/package.json`). */
 const GIT_CLONE_COMMAND_ID = 'git.clone';
+
+/** The upstream Help > Documentation command; its keybinding, if any, is shown on the docs button. */
+const OPEN_DOCUMENTATION_COMMAND_ID = 'workbench.action.openDocumentationUrl';
 
 /** One primary action slab. */
 interface IStartAction {
@@ -150,6 +156,8 @@ export class PrimalStartEditor extends EditorPane {
 		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
 		@IPrimalMotifService private readonly motifService: IPrimalMotifService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
+		@IProductService private readonly productService: IProductService,
+		@IOpenerService private readonly openerService: IOpenerService,
 	) {
 		super(PrimalStartEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -244,6 +252,19 @@ export class PrimalStartEditor extends EditorPane {
 			keybindingCommandId: GIT_CLONE_COMMAND_ID,
 			run: () => this.commandService.executeCommand(GIT_CLONE_COMMAND_ID)
 		});
+
+		// The same address Help > Documentation opens (`product.documentationUrl`),
+		// so there is one documentation entry point. A build without one gets no
+		// button rather than a button that does nothing.
+		const documentationUrl = this.productService.documentationUrl;
+		if (documentationUrl) {
+			this.renderActionButton(actions, {
+				icon: Codicon.book,
+				label: localize('primalStart.documentation', "Documentation"),
+				keybindingCommandId: OPEN_DOCUMENTATION_COMMAND_ID,
+				run: () => this.openerService.open(URI.parse(documentationUrl), { openExternal: true })
+			});
+		}
 	}
 
 	private renderActionButton(container: HTMLElement, action: IStartAction): HTMLButtonElement {
