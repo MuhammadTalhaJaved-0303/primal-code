@@ -517,7 +517,7 @@
  * and therefore not checkable at all. The content block gets a plate of its
  * own, painted in the window's own ground colour so it has no shape - what it
  * reads as is the motif fading out behind the words. At 0.9 over the stage's
- * 0.14 ceiling what survives behind the text is under 1.5% ink.
+ * 0.35 ceiling what survives behind the text is 3.5% ink (0.35 x 0.1).
  *
  * `.new-chat-widget-container` already establishes a stacking context
  * (`container-type: size` implies layout containment, and it now carries

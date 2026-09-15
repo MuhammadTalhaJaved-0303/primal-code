@@ -15,6 +15,7 @@ import { isMacintosh, isNative } from '../../../../base/common/platform.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { localize } from '../../../../nls.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
+import { ConfigurationTarget, IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IEditorOptions } from '../../../../platform/editor/common/editor.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { ILabelService, Verbosity } from '../../../../platform/label/common/label.js';
@@ -29,7 +30,9 @@ import { IEditorGroup } from '../../../services/editor/common/editorGroupsServic
 import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchLayoutService } from '../../../services/layout/browser/layoutService.js';
 import { ACTION_ID_NEW_CHAT, CHAT_OPEN_ACTION_ID } from '../../chat/browser/actions/chatActions.js';
-import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../primalMotif/browser/primalMotif.js';
+import { IPrimalMotifService, PRIMAL_MOTIF_ID_SETTING_ID, PRIMAL_MOTIF_STAGE_CLASS, getMotifDescriptors, toMotifId } from '../../primalMotif/browser/primalMotif.js';
+import { composeMotifChoices } from '../../primalMotif/browser/primalMotifChoices.js';
+import { renderMotifRow } from './primalStartMotifRow.js';
 import { PRIMAL_THEME_GALLERY_COMMAND_ID } from '../../primalThemeGallery/common/primalThemeGallery.js';
 import { IPrimalVibe, IPrimalVibeService, PRIMAL_VIBES, PRIMAL_VIBE_CYCLE_COMMAND_ID, PRIMAL_VIBE_PICK_COMMAND_ID } from '../../primalVibes/browser/primalVibes.js';
 import { PrimalStartInput } from './primalStartInput.js';
@@ -146,6 +149,7 @@ export class PrimalStartEditor extends EditorPane {
 		@IKeybindingService private readonly keybindingService: IKeybindingService,
 		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
 		@IPrimalMotifService private readonly motifService: IPrimalMotifService,
+		@IConfigurationService private readonly configurationService: IConfigurationService,
 	) {
 		super(PrimalStartEditor.ID, group, telemetryService, themeService, storageService);
 	}
@@ -186,6 +190,7 @@ export class PrimalStartEditor extends EditorPane {
 		this.renderHero(page);
 		this.renderActions(page);
 		this.renderVibeStrip(page);
+		this.renderMotifStrip(page);
 		this.renderRecents(page);
 		this.renderFooter(page);
 
@@ -312,6 +317,33 @@ export class PrimalStartEditor extends EditorPane {
 			card.classList.toggle('current', isCurrent);
 			card.setAttribute('aria-pressed', String(isCurrent));
 		}
+	}
+
+	//#endregion
+
+	//#region Motif row
+
+	/**
+	 * The MOTIF row, one row under VIBE. The row itself is pure DOM
+	 * (primalStartMotifRow.ts); this is the only place it meets a service: it
+	 * reads the setting for the current mark, writes it on a click, and moves
+	 * the mark when the setting changes from anywhere else (the picker, the
+	 * settings editor, another window - the setting is application-scoped).
+	 */
+	private renderMotifStrip(page: HTMLElement): void {
+		const section = DOM.append(page, $('.primal-start-section'));
+		DOM.append(section, $('.primal-start-section-label', undefined, localize('primalStart.motifs', "Motif")));
+
+		const currentMotifId = (): string => toMotifId(this.configurationService.getValue<unknown>(PRIMAL_MOTIF_ID_SETTING_ID));
+		const row = renderMotifRow(section, composeMotifChoices(getMotifDescriptors(), currentMotifId()), motifId => {
+			this.configurationService.updateValue(PRIMAL_MOTIF_ID_SETTING_ID, motifId, ConfigurationTarget.USER).catch(onUnexpectedError);
+		}, this.editorDisposables);
+
+		this.editorDisposables.add(this.configurationService.onDidChangeConfiguration(event => {
+			if (event.affectsConfiguration(PRIMAL_MOTIF_ID_SETTING_ID)) {
+				row.markCurrent(currentMotifId());
+			}
+		}));
 	}
 
 	//#endregion

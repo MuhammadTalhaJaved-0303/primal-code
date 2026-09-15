@@ -38,6 +38,8 @@ import {
 	onDidRegisterMotif
 } from './primalMotif.js';
 import { PrimalMotifScheduler } from './primalMotifScheduler.js';
+// `Motif: Choose Motif...` - registered on import; see primalMotifPicker.ts.
+import './primalMotifPicker.js';
 
 const MOTIF_CATEGORY = localize2('primalCode.motif.category', "Motif");
 

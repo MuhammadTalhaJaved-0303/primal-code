@@ -67,7 +67,19 @@ export const PRIMAL_MOTIF_MOTIONS: readonly PrimalMotifMotion[] = Object.freeze(
 /** The motif that ships as the default: the wallpaper's own static wash, unchanged. */
 export const PRIMAL_MOTIF_STATIC_ID = 'static';
 
-export const PRIMAL_MOTIF_DEFAULT_ID = PRIMAL_MOTIF_STATIC_ID;
+/**
+ * The motif a fresh install shows: the world. Spelled as a literal rather than
+ * imported from `motifs/globe.ts`, which imports this file; `primalMotifDefault.test.ts`
+ * pins it to `PRIMAL_MOTIF_WORLD_ID` and to a registered descriptor.
+ *
+ * Shipping a motif ON by default is what makes the ladder's default motion
+ * (`settle`) load-bearing for WCAG 2.2.2: a burst of `PRIMAL_MOTIF_BURST_MS`
+ * (4.5 s) eases to rest on its own inside the five seconds the criterion counts
+ * from, so nothing that starts automatically moves for longer than that, and
+ * the reader never has to find a control to make it stop. The same test pins
+ * that arithmetic.
+ */
+export const PRIMAL_MOTIF_DEFAULT_ID = 'world';
 export const PRIMAL_MOTIF_DEFAULT_MOTION: PrimalMotifMotion = 'settle';
 export const PRIMAL_MOTIF_DEFAULT_PERPETUAL_ON_BATTERY = false;
 
