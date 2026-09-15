@@ -5,7 +5,7 @@
 
 import assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
-import { formatGitError, getRemoteTrackingRef, GitCheckoutProgressParser, isRetryableWorktreeRemovalError, parseChangedPaths, parseDefaultBranchRef, parseFetchRemoteUrls, parseGitDiffRawNumstat, parseGitHubRepoFromRemote, parseGitStatusV2, parseHasGitHubRemote, parseSingleLsTreeEntry, parseUntrackedPaths, summarizeStderrForError } from '../../node/agentHostGitService.js';
+import { formatGitError, getRemoteTrackingRef, GitCheckoutProgressParser, isRetryableWorktreeRemovalError, parseChangedPaths, parseDefaultBranchRef, parseFetchRemoteUrls, parseGitDiffRawNumstat, parseGitHubRepoFromRemote, parseGitStatusV2, parseHasGitHubRemote, parseSingleLsTreeEntry, parseUntrackedPaths, summarizeConflictsForError, summarizeStderrForError } from '../../node/agentHostGitService.js';
 import { buildGitBlobUri } from '../../node/gitDiffContent.js';
 import { URI } from '../../../../base/common/uri.js';
 import { EMPTY_TREE_OBJECT, getBranchCompletions, resolveDiffBaseBranchName } from '../../common/agentHostGitService.js';
@@ -457,6 +457,42 @@ suite('AgentHostGitService', () => {
 			assert.strictEqual(
 				formatGitError(['status'], 5_000, false, err, ''),
 				'spawn git ENOENT',
+			);
+		});
+
+		test('names the files a merge stopped on, which git reports on stdout with an empty stderr', () => {
+			const err = Object.assign(new Error('Command failed'), { code: 1 });
+			const stdout = [
+				'Auto-merging notes.txt',
+				'CONFLICT (content): Merge conflict in notes.txt',
+				'Automatic merge failed; fix conflicts and then commit the result.',
+			].join('\n');
+			assert.strictEqual(
+				formatGitError(['merge', '--no-edit', '--', 'agents/session'], 60_000, false, err, '', stdout),
+				'git merge exited with code 1: CONFLICT (content): Merge conflict in notes.txt',
+			);
+		});
+
+		test('keeps both the conflict names and the stderr summary when git reports both', () => {
+			const err = Object.assign(new Error('Command failed'), { code: 1 });
+			assert.strictEqual(
+				formatGitError(['merge', '--no-edit', '--', 'x'], 60_000, false, err, 'hint: use merge --abort\n', 'CONFLICT (content): Merge conflict in a.txt\n'),
+				'git merge exited with code 1: CONFLICT (content): Merge conflict in a.txt; hint: use merge --abort',
+			);
+		});
+	});
+
+	suite('summarizeConflictsForError', () => {
+		test('is empty without conflict lines', () => {
+			assert.strictEqual(summarizeConflictsForError(''), '');
+			assert.strictEqual(summarizeConflictsForError('Already up to date.\n'), '');
+		});
+
+		test('joins conflict lines and caps how many are named', () => {
+			const stdout = Array.from({ length: 7 }, (_, i) => `CONFLICT (content): Merge conflict in file${i}.txt`).join('\n');
+			assert.strictEqual(
+				summarizeConflictsForError(stdout),
+				'CONFLICT (content): Merge conflict in file0.txt; CONFLICT (content): Merge conflict in file1.txt; CONFLICT (content): Merge conflict in file2.txt; CONFLICT (content): Merge conflict in file3.txt; CONFLICT (content): Merge conflict in file4.txt; and 2 more',
 			);
 		});
 	});

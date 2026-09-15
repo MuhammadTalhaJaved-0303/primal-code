@@ -152,6 +152,8 @@ import { handleTerminalCommandPaste, isTerminalCommandInput, isTerminalCommandPa
 import { ChatDynamicVariableModel } from '../../attachments/chatDynamicVariables.js';
 import { ChatDragAndDrop } from '../chatDragAndDrop.js';
 import { ChatFollowups } from './chatFollowups.js';
+import { ChatInputModelFitNotice } from './chatInputModelFitNotice.js';
+import { ModelSessionFitKind, resolveModelSessionFit } from './chatInputModelSessionFit.js';
 import { IChatInputNotificationService } from './chatInputNotificationService.js';
 import { ChatGoalBannerWidget } from './chatGoalBannerWidget.js';
 import { ChatInputNotificationWidget } from './chatInputNotificationWidget.js';
@@ -445,6 +447,8 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	private inputContainer!: HTMLElement;
 	private inputAndSideToolbar!: HTMLElement;
 	private readonly _notificationWidget = this._register(new MutableDisposable<ChatInputNotificationWidget>());
+	/** Words for a selected model the bound session cannot answer with. See {@link checkModelInSessionPool}. */
+	private readonly _modelFitNotice: ChatInputModelFitNotice;
 	private readonly _goalBannerWidget = this._register(new MutableDisposable<ChatGoalBannerWidget>());
 	private readonly _onDidDismissGoalBanner = this._register(new Emitter<void>());
 	/** Fired when the user dismisses the autopilot goal banner. */
@@ -926,6 +930,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			}));
 		}
 
+		this._modelFitNotice = this._register(this.instantiationService.createInstance(ChatInputModelFitNotice));
 		this._attachmentModel = this._register(this.instantiationService.createInstance(ChatAttachmentModel));
 		const attachmentModel = this._attachmentModel;
 		this._register(this._attachmentModel.onDidChange(() => {
@@ -1737,10 +1742,26 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	 */
 	private _pullModelsForSessionType(sessionType: string | undefined): void {
 		if (sessionType && sessionType !== 'local') {
+			// Re-validate whether the pull succeeded or not: a failed pull leaves the
+			// pool empty, and that state must be put into words, not left silent.
 			void this.languageModelsService.selectLanguageModels({ vendor: sessionType })
-				.then(() => this.checkModelInSessionPool(sessionType))
-				.catch(() => { });
+				.catch(() => { })
+				.finally(() => {
+					if (!this._store.isDisposed) {
+						this.checkModelInSessionPool(sessionType);
+					}
+				});
 		}
+	}
+
+	/**
+	 * Re-queries the bound session type's model provider, then re-validates the
+	 * selection. The one-click fix behind the "no session model loaded yet" notice.
+	 */
+	public reloadSessionModels(): void {
+		const sessionType = this.getCurrentSessionType();
+		this._pullModelsForSessionType(sessionType);
+		this.checkModelInSessionPool(sessionType);
 	}
 
 	private _syncInputStateToModel(): void {
@@ -1793,6 +1814,11 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			this._syncInputStateToModel();
 		};
 		this._modelSelectionController.applySelection(model, apply, isUserAction);
+		if (isUserAction) {
+			// The user has acted: an explained fallback is over, and a new pick is judged afresh.
+			this._modelFitNotice.clear();
+			this.checkModelInSessionPool();
+		}
 	}
 
 	private _applyProgrammaticLanguageModel(model: ILanguageModelChatMetadataAndIdentifier): void {
@@ -1962,22 +1988,37 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 
 	/**
 	 * A selected model the session cannot serve (e.g. a BYOK chat model kept
-	 * from another context inside an agent session) makes Enter silently
-	 * no-op. When that happens, fall back to the session's default model.
+	 * from another context inside an agent session) used to make Enter a silent
+	 * no-op: either the submit precondition went false with nothing said, or the
+	 * session quietly answered with a different model. Every outcome of
+	 * {@link resolveModelSessionFit} is now acted on and put into words above
+	 * the input, including the empty-pool states this check used to skip.
 	 */
 	private checkModelInSessionPool(sessionType?: string): void {
 		sessionType ??= this.getCurrentSessionType();
-		const current = this._currentLanguageModel.get();
-		if (!current) {
-			return;
+		const sessionPool = this.getModelsForSessionType(sessionType);
+		const fit = resolveModelSessionFit({
+			selectedModel: this._currentLanguageModel.get(),
+			sessionType,
+			sessionPool,
+			defaultModel: sessionPool.find(model => model.metadata.isDefaultForLocation[this.location]) ?? sessionPool[0],
+			sessionRequiresCustomModels: !!sessionType && this.chatSessionsService.requiresCustomModelsForSessionType(sessionType),
+			sessionSupportsAutoModel: !sessionType || this.chatSessionsService.supportsAutoModelForSessionType(sessionType),
+		});
+		switch (fit.kind) {
+			case ModelSessionFitKind.UseMatchingModel:
+				this._applyProgrammaticLanguageModel(fit.model);
+				break;
+			case ModelSessionFitKind.UseSessionDefault:
+				this.setCurrentLanguageModelToDefault(sessionType);
+				break;
 		}
-		const valid = this.getModelsForSessionType(sessionType);
-		if (valid.length === 0) {
-			return; // nothing to switch to yet; later model events re-validate
-		}
-		if (!valid.some(m => m.identifier === current.identifier)) {
-			this.setCurrentLanguageModelToDefault(sessionType);
-		}
+		const isEditorWidget = !!this._widget && this.getWidgetLocationInfo(this._widget).location === ChatWidgetLocation.Editor;
+		this._modelFitNotice.update(fit, {
+			sessionResource: this.getCurrentSessionResource(),
+			sessionType,
+			newSessionPosition: isEditorWidget ? 'editor' : 'sidebar',
+		});
 	}
 
 	private setCurrentLanguageModelToDefault(forSessionType?: string) {
@@ -3011,6 +3052,9 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			// Re-initialize from storage first so the user's previous selection for
 			// this pool is restored
 			this.reinitializeIfOutsidePool(() => this.initSelectedModel());
+			// Every session bind gets a fit check, so an empty or foreign pool is
+			// put into words as soon as the input is bound, not only on a change.
+			this.checkModelInSessionPool(newSessionType);
 		}
 	}
 
