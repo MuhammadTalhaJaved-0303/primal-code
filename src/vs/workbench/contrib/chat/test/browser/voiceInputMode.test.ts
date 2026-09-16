@@ -80,7 +80,20 @@ suite('VoiceInputModeService', () => {
 		);
 	});
 
-	test('shows the segmented pill only when it has multiple active controls', () => {
+	/**
+	 * The pill hosts a voice cell beside a dictation cell, so it can only earn
+	 * its place when Voice Mode is available. It is not, and cannot be, in this
+	 * product (see AGENTS_VOICE_AVAILABLE in agentsVoice.ts): Voice Mode needs a
+	 * Copilot entitlement, a GitHub sign-in and Microsoft's voice backend. So the
+	 * pill never renders and the standalone dictation control always takes over.
+	 *
+	 * This test used to assert the opposite - that granting the entitlement key
+	 * lights the pill - which was true upstream and is now unreachable here by
+	 * construction. It is written this way round deliberately, so that restoring
+	 * Voice Mode one day means revisiting this expectation rather than silently
+	 * changing what users see.
+	 */
+	test('cannot show the segmented pill, because Voice Mode is unavailable in this product', () => {
 		const values: Record<string, ContextKeyValue> = {
 			[ChatContextKeys.enabled.key]: true,
 			[AGENTS_VOICE_ENTITLED.key]: true,
@@ -95,15 +108,26 @@ suite('VoiceInputModeService', () => {
 			getValue: <T extends ContextKeyValue = ContextKeyValue>(key: string) => values[key] as T,
 		});
 
-		assert.strictEqual(matches(SegmentedVoiceInputModePillActive), true);
-		assert.strictEqual(matches(SegmentedVoiceInputModePillInactive), false);
+		// Every key a reader could think to set is set favourably here, including
+		// the entitlement key and hands-free mode.
+		assert.deepStrictEqual({
+			pill: matches(SegmentedVoiceInputModePillActive),
+			standalone: matches(SegmentedVoiceInputModePillInactive),
+		}, {
+			pill: false,
+			standalone: true,
+		});
 
+		// Nor when dictation drops away, nor when a voice connection is claimed:
+		// the voice term is false by construction, and it gates both arms.
 		values[ChatContextKeys.speechToTextConfigured.key] = false;
-		assert.strictEqual(matches(SegmentedVoiceInputModePillActive), false);
-		assert.strictEqual(matches(SegmentedVoiceInputModePillInactive), true);
-
 		values[AGENTS_VOICE_CONNECTED.key] = true;
-		assert.strictEqual(matches(SegmentedVoiceInputModePillActive), true);
-		assert.strictEqual(matches(SegmentedVoiceInputModePillInactive), false);
+		assert.deepStrictEqual({
+			pill: matches(SegmentedVoiceInputModePillActive),
+			standalone: matches(SegmentedVoiceInputModePillInactive),
+		}, {
+			pill: false,
+			standalone: true,
+		});
 	});
 });

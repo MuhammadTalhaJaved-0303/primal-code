@@ -470,10 +470,14 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 			// GitHub sign-in and connectivity are validated when a session starts.
 			return !!this._voiceWsUrl();
 		}
-		// On-device transcription needs no configuration — the model downloads
-		// on first use. It is only unavailable where the platform lacks native
-		// inference support (e.g. web).
-		return this._localTranscription.isSupported;
+		// On-device transcription needs no key, but it does need a runtime it can
+		// actually fetch. `isSupported` only answers "could this platform run the
+		// native addon" — it is a platform/arch allowlist. The addon itself is
+		// downloaded from the descriptor in `product.dictationRuntime`, so a build
+		// without one can never open a session: the user clicks the mic and meets
+		// a failure, every time. Ask both questions, the way the `mai` arm above
+		// asks for its endpoint before offering the cloud backend.
+		return this._localTranscription.isSupported && !!this._productService.dictationRuntime;
 	}
 
 	get showTranscriptWhileDictating(): boolean {
