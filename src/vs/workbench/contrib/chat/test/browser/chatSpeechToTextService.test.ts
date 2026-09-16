@@ -7,7 +7,7 @@ import assert from 'assert';
 import sinon from 'sinon';
 import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
-import { ChatSpeechToTextService, createDictationCleanupSystemPrompt, isDictationEntitled, stripDictationFillers } from '../../browser/speechToText/chatSpeechToTextService.js';
+import { ChatSpeechToTextService, DICTATION_MAI_MODEL_ID, createDictationCleanupSystemPrompt, isDictationEntitled, stripDictationFillers } from '../../browser/speechToText/chatSpeechToTextService.js';
 import { resolveDictationLanguage } from '../../browser/speechToText/dictationLanguage.js';
 import { ChatEntitlement } from '../../../../services/chat/common/chatEntitlementService.js';
 import { ILanguageModelChatRequestOptions, ILanguageModelChatResponse, ILanguageModelChatSelector, ILanguageModelsService } from '../../common/languageModels.js';
@@ -32,6 +32,76 @@ type CleanupTestService = {
 suite('ChatSpeechToTextService', () => {
 
 	ensureNoDisposablesAreLeakedInTestSuite();
+
+	/**
+	 * `isConfigured` is the single answer to "can dictation actually run right
+	 * now". Every mic affordance in both windows hangs off it, through the
+	 * `chatSpeechToTextConfigured` context key, so a getter that says yes when
+	 * the backend can never start is exactly a mic button that does nothing.
+	 */
+	type AvailabilityService = {
+		_configurationService: { getValue: (key: string) => unknown };
+		_chatEntitlementService: { entitlement: ChatEntitlement; isInternal: boolean };
+		_productService: { dictationRuntime?: { urlTemplate: string; version: string }; voiceWsUrl?: string };
+		_localTranscription: { isSupported: boolean };
+		readonly isConfigured: boolean;
+	};
+
+	function availabilityService(options: {
+		model?: string;
+		enabled?: boolean;
+		platformSupported?: boolean;
+		dictationRuntime?: { urlTemplate: string; version: string };
+		voiceWsUrl?: string;
+		backendUrl?: string;
+	}): AvailabilityService {
+		const service = Object.create(ChatSpeechToTextService.prototype) as AvailabilityService;
+		service._configurationService = {
+			getValue: (key: string) => {
+				switch (key) {
+					case 'dictation.enabled': return options.enabled ?? true;
+					case 'dictation.model': return options.model ?? 'nemo';
+					case 'agents.voice.backendUrl': return options.backendUrl ?? '';
+					default: return undefined;
+				}
+			},
+		};
+		service._chatEntitlementService = { entitlement: ChatEntitlement.Unknown, isInternal: false };
+		service._productService = { dictationRuntime: options.dictationRuntime, voiceWsUrl: options.voiceWsUrl };
+		service._localTranscription = { isSupported: options.platformSupported ?? true };
+		return service;
+	}
+
+	const RUNTIME = { urlTemplate: 'https://example.invalid/{target}.tar.gz', version: '1.0.0' };
+
+	test('does not offer on-device dictation when this build cannot fetch the runtime', () => {
+		// The platform allowlist says darwin-arm64 could run it, but without
+		// `product.dictationRuntime` the utility process has no native addon to
+		// download and the session always fails after the user clicks.
+		assert.deepStrictEqual({
+			noRuntimeDescriptor: availabilityService({ platformSupported: true }).isConfigured,
+			runtimeDescriptorPresent: availabilityService({ platformSupported: true, dictationRuntime: RUNTIME }).isConfigured,
+			platformUnsupported: availabilityService({ platformSupported: false, dictationRuntime: RUNTIME }).isConfigured,
+		}, {
+			noRuntimeDescriptor: false,
+			runtimeDescriptorPresent: true,
+			platformUnsupported: false,
+		});
+	});
+
+	test('still hides the cloud backend without a voice endpoint, and the setting still wins', () => {
+		assert.deepStrictEqual({
+			maiWithoutEndpoint: availabilityService({ model: DICTATION_MAI_MODEL_ID }).isConfigured,
+			maiWithEndpoint: availabilityService({ model: DICTATION_MAI_MODEL_ID, voiceWsUrl: 'wss://example.invalid/voice' }).isConfigured,
+			maiWithConfiguredEndpoint: availabilityService({ model: DICTATION_MAI_MODEL_ID, backendUrl: 'wss://example.invalid/voice' }).isConfigured,
+			disabledBySetting: availabilityService({ enabled: false, dictationRuntime: RUNTIME }).isConfigured,
+		}, {
+			maiWithoutEndpoint: false,
+			maiWithEndpoint: true,
+			maiWithConfiguredEndpoint: true,
+			disabledBySetting: false,
+		});
+	});
 
 	test('allows dictation without a paid plan and restricts MAI for external Enterprise users', () => {
 		assert.deepStrictEqual({

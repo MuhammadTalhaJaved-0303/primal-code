@@ -24,7 +24,7 @@ import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
 import { URI } from '../../../../base/common/uri.js';
 import * as nls from '../../../../nls.js';
 import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
-import { Extensions as ConfigurationExtensions, ConfigurationScope, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
+import { Extensions as ConfigurationExtensions, ConfigurationScope, IConfigurationNode, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
 import { ContextKeyExpr, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 import { SegmentedVoiceInputModePillInactive } from '../../chat/browser/voiceInputMode/voiceInputModeContextKeys.js';
 import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
@@ -35,7 +35,7 @@ import { IWorkbenchContribution, WorkbenchPhase, registerWorkbenchContribution2 
 import { ConfigurationKeyValuePairs, IConfigurationMigrationRegistry, Extensions as WorkbenchConfigurationExtensions } from '../../../common/configuration.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
 
-import { AgentsVoiceSettingId, AgentsVoiceStorageKeys, AGENTS_VOICE_CONNECTED, AGENTS_VOICE_CONNECTING, AGENTS_VOICE_ENABLED, AGENTS_VOICE_ENTITLED, AGENTS_VOICE_LISTENING, AGENTS_VOICE_RECONNECTING } from '../common/agentsVoice.js';
+import { AgentsVoiceSettingId, AgentsVoiceStorageKeys, AGENTS_VOICE_AVAILABLE, AGENTS_VOICE_CONNECTED, AGENTS_VOICE_CONNECTING, AGENTS_VOICE_ENABLED, AGENTS_VOICE_ENTITLED, AGENTS_VOICE_LISTENING, AGENTS_VOICE_RECONNECTING } from '../common/agentsVoice.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IChatEntitlementService } from '../../../services/chat/common/chatEntitlementService.js';
 import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
@@ -500,6 +500,9 @@ registerAction2(class extends Action2 {
 			id: 'agentsVoice.simulateConnection',
 			title: nls.localize2('agentsVoice.simulateConnection', "Voice: Simulate Connection (Dev)"),
 			f1: true,
+			// Every sibling Voice Mode action carries this; these two did not, so
+			// they were the feature's only entries left in the palette.
+			precondition: AGENTS_VOICE_ENABLED,
 		});
 	}
 	async run(accessor: ServicesAccessor): Promise<void> {
@@ -516,6 +519,7 @@ registerAction2(class extends Action2 {
 			id: 'agentsVoice.resetOnboarding',
 			title: nls.localize2('resetAgentsVoiceOnboarding', "Voice: Reset Onboarding"),
 			f1: true,
+			precondition: AGENTS_VOICE_ENABLED,
 		});
 	}
 	async run(accessor: ServicesAccessor): Promise<void> {
@@ -582,7 +586,12 @@ registerAction2(class extends Action2 {
 // --- Settings ---
 
 const configurationRegistry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration);
-configurationRegistry.registerConfiguration({
+
+// Held rather than registered inline: the configuration registry is read at
+// module load and the Settings editor does not consult context keys, so a
+// `when` clause cannot hide a setting. Guarding the call is the only way to
+// keep ten settings for an unreachable feature out of the Settings editor.
+const AGENTS_VOICE_CONFIGURATION: IConfigurationNode = {
 	id: 'agentsVoice',
 	title: nls.localize('agentsVoiceConfigurationTitle', "Voice Mode"),
 	type: 'object',
@@ -701,7 +710,11 @@ configurationRegistry.registerConfiguration({
 			scope: ConfigurationScope.APPLICATION,
 		},
 	}
-});
+};
+
+if (AGENTS_VOICE_AVAILABLE) {
+	configurationRegistry.registerConfiguration(AGENTS_VOICE_CONFIGURATION);
+}
 
 // Migrate the removed `agents.voice.turn.autoEndMode` setting onto the two
 // settings that now govern turn-ending, preserving the previous behavior:

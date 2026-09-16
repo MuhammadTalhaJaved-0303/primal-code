@@ -15,7 +15,6 @@ import { Registry } from '../../../../../platform/registry/common/platform.js';
 import { registerIcon } from '../../../../../platform/theme/common/iconRegistry.js';
 import { ViewPaneContainer } from '../../../../browser/parts/views/viewPaneContainer.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../../common/contributions.js';
-import { ChatContextKeys } from '../../../chat/common/actions/chatContextKeys.js';
 import {
 	Extensions as ViewContainerExtensions,
 	IViewContainersRegistry,
@@ -25,6 +24,7 @@ import {
 } from '../../../../common/views.js';
 import { IViewsService } from '../../../../services/views/common/viewsService.js';
 import { VoiceTranscriptsViewPane } from './voiceTranscriptsView.js';
+import { AGENTS_VOICE_ENABLED } from '../../common/agentsVoice.js';
 
 const CONTAINER_ID = 'workbench.view.voiceTranscriptsContainer';
 const VIEW_ID = VoiceTranscriptsViewPane.ID;
@@ -84,7 +84,10 @@ class ShowVoiceTranscriptsAction extends Action2 {
 			title: localize2('agentsVoice.showTranscripts', "Show Voice Transcripts"),
 			f1: true,
 			category: localize2('agentsVoiceCategory', "Agents Voice"),
-			precondition: ChatContextKeys.enabled,
+			// Was ChatContextKeys.enabled, which is true in this fork as soon as an
+			// agent-host agent registers - so the command, and through it the view,
+			// were reachable for a feature that can never record a transcript.
+			precondition: AGENTS_VOICE_ENABLED,
 		});
 	}
 
@@ -197,7 +200,7 @@ MenuRegistry.appendMenuItem(MenuId.ViewTitle, {
 		id: SHOW_VIEW_COMMAND_ID,
 		title: localize('agentsVoice.showTranscripts.menu', "Show Voice Transcripts"),
 	},
-	when: ContextKeyExpr.equals('view', 'workbench.panel.chat.view.copilot'),
+	when: ContextKeyExpr.and(AGENTS_VOICE_ENABLED, ContextKeyExpr.equals('view', 'workbench.panel.chat.view.copilot')),
 	group: '3_show',
 	order: 2,
 });

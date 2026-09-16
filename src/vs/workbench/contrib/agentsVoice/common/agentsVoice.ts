@@ -28,11 +28,28 @@ export const AGENTS_VOICE_LISTENING = new RawContextKey<boolean>('agentsVoiceLis
  * prohibitively expensive to build and evaluate on every menu/keybinding update.
  */
 export const AGENTS_VOICE_ENTITLED = new RawContextKey<boolean>('agentsVoiceEntitled', false);
-export const AGENTS_VOICE_ENABLED = ContextKeyExpr.and(
-	ChatContextKeys.enabled,
-	ContextKeyExpr.equals('config.agents.voice.enabled', true),
-	AGENTS_VOICE_ENTITLED,
-)!;
+/**
+ * Whether Voice Mode can work in this product at all.
+ *
+ * It cannot. Voice Mode is a realtime WebSocket feature that needs three things
+ * this fork does not have and will not add: a Copilot Pro entitlement, a GitHub
+ * sign-in, and Microsoft's voice backend (`product.voiceWsUrl`, which
+ * `primal/rebrand.ts` strips along with every other Microsoft endpoint). At
+ * runtime every gated surface was already dark, because the entitlement key is
+ * never set - but "never set" and "cannot be set" are different promises, and
+ * the surfaces that hang off no gate at all were not dark. Saying it once, here,
+ * makes the answer the same everywhere and leaves the code in the tree for the
+ * day there is a backend to point it at.
+ */
+export const AGENTS_VOICE_AVAILABLE: boolean = false;
+
+export const AGENTS_VOICE_ENABLED = AGENTS_VOICE_AVAILABLE
+	? ContextKeyExpr.and(
+		ChatContextKeys.enabled,
+		ContextKeyExpr.equals('config.agents.voice.enabled', true),
+		AGENTS_VOICE_ENTITLED,
+	)!
+	: ContextKeyExpr.false();
 
 export const enum AgentsVoiceSettingId {
 	ShowButton = 'agents.voice.showButton',
