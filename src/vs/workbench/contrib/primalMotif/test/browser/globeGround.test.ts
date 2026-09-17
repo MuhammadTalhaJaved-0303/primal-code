@@ -28,7 +28,7 @@ const SAMPLE_Y = Math.round(PRIMAL_MOTIF_BUFFER_HEIGHT * 0.06);
 const SAMPLE_SIZE = 24;
 
 function peakAlphaAwayFromTheGlobe(role: PrimalMotifRole): number {
-	const host = createTestMotifHost('canvas', role, INK_PALETTE);
+	const host = createTestMotifHost('canvas2d', role, INK_PALETTE);
 	const renderer = getMotifDescriptor(PRIMAL_MOTIF_WORLD_ID)!.create();
 
 	try {

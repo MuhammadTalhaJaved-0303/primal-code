@@ -61,11 +61,21 @@
 
 	/* The stage's opacity ceiling. A FIXED CONSTANT, and deliberately not a
 	 * setting - see the stage rule below for why the number has to be decided
-	 * here rather than by the reader. Raised from 0.14 on 2026-09-15: at 0.14
-	 * the owner, on a dark vibe, could not see the picture at all, and every
-	 * stage host carries its own scrim plate (primalStart.css, the sessions
-	 * landing), which is what keeps text readable, not this number. */
-	--primal-motif-stage-strength: 0.35;
+	 * here rather than by the reader.
+	 *
+	 * It was 0.14, where the picture could not be seen at all on a dark vibe,
+	 * and briefly 0.35, where it still could not. What made a higher number
+	 * safe was not taste: until the wash fix the globe painted the ambient
+	 * gradient across the whole stage, so raising this raised a full-pane cloud
+	 * with the page's cards sitting on it. A stage now carries the globe and
+	 * nothing else, so the ceiling governs one object in the corner of the
+	 * frame rather than a field behind everything.
+	 *
+	 * What keeps text readable is the scrim plate each stage host paints under
+	 * its own words, not this number - and those plates tightened to 0.95 in
+	 * the same change, so what survives behind a word is 3.1% ink, which is
+	 * where the doctrine put it when the ceiling was 0.14. */
+	--primal-motif-stage-strength: 0.62;
 
 	/* =====================================================================
 	 * 1. The surface

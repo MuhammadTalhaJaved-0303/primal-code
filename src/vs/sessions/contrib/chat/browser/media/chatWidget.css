@@ -516,8 +516,8 @@
  * ground, and contrast against something that moves is per-pixel and per-frame
  * and therefore not checkable at all. The content block gets a plate of its
  * own, painted in the window's own ground colour so it has no shape - what it
- * reads as is the motif fading out behind the words. At 0.9 over the stage's
- * 0.35 ceiling what survives behind the text is 3.5% ink (0.35 x 0.1).
+ * reads as is the motif fading out behind the words. At 0.95 over the stage's
+ * 0.62 ceiling what survives behind the text is 3.1% ink (0.62 x 0.05).
  *
  * `.new-chat-widget-container` already establishes a stacking context
  * (`container-type: size` implies layout containment, and it now carries
@@ -538,6 +538,6 @@
 	z-index: -1;
 	pointer-events: none;
 	background: var(--vscode-agents-background);
-	opacity: 0.9;
+	opacity: 0.95;
 	filter: blur(24px);
 }

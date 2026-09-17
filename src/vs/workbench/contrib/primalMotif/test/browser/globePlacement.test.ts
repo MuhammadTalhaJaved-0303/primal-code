@@ -115,19 +115,26 @@ suite('Primal Motif - globe placement', () => {
 
 		assert.ok(Math.abs(radiusOf(320, 300) - 220) < 1e-9, 'a tiny pane holds at the minimum');
 		assert.ok(Math.abs(radiusOf(5120, 2880) - 560) < 1e-9, 'a huge pane holds at the maximum');
-		// 0.55 of 800 is 440, which is inside the clamp; note that a maximised pane
-		// at 1025 tall would ask for 563.75 and be held at 560, so the size chosen
-		// here has to be one where the ratio is actually what applies.
-		assert.ok(Math.abs(radiusOf(1200, 800) - 0.55 * 800) < 1e-9, 'in between, 0.55 of the shorter side');
+		// The size here has to be one where the ratio is what actually applies:
+		// inside the clamp, and landing on the ten-pixel step. 0.43 of 1000 is
+		// exactly 430, which is both.
+		//
+		// The ratio was 0.55 while the globe's centre sat off the bottom-right
+		// corner. Bringing the centre into the frame put far more of the disc
+		// inside the buffer, which is pixels the rebuild has to light: at 0.46 the
+		// stage rebuild measured 5.2ms against a 4ms layout budget. 0.43 is what
+		// fits, and it is a smaller number for a larger picture.
+		assert.ok(Math.abs(radiusOf(1500, 1000) - 0.43 * 1000) < 1e-9, 'in between, 0.43 of the shorter side');
 	});
 
 	test('the stage radius is taken from the shorter side, so a wide short pane is not banded', () => {
 		// A pane split horizontally is wide and short. Sizing off the long side
 		// would put a disc taller than the pane into it, and all that would show is
-		// a band with no curvature in it at all. 0.55 of 500 is 275, held to the
-		// ten-pixel step: 280 - and nowhere near the 560 the long side would ask for.
+		// a band with no curvature in it at all. 0.43 of 500 is 215, which the clamp
+		// holds up to its 220 minimum - and nowhere near the 560 the long side
+		// would ask for.
 		const wide = screenRadii(computeGlobePlacement('stage', 2000, 500, BUFFER_WIDTH, BUFFER_HEIGHT), 2000, 500);
-		assert.ok(Math.abs(wide.x - 280) < 1e-9, 'the shorter side is the one that decides');
+		assert.ok(Math.abs(wide.x - 220) < 1e-9, 'the shorter side is the one that decides');
 	});
 
 	test('the stage radius is held to ten-pixel steps, so a sash drag does not rebuild the globe per mouse move', () => {
@@ -141,7 +148,8 @@ suite('Primal Motif - globe placement', () => {
 		for (let side = 500; side <= 1000; side += 7) {
 			const radius = radiusOf(2000, side);
 			assert.ok(Math.abs(radius / 10 - Math.round(radius / 10)) < 1e-9, `radius ${radius} at ${side}px is not on the step`);
-			assert.ok(Math.abs(radius - 0.55 * side) <= 5 + 1e-9, `radius ${radius} at ${side}px is more than half a step from the ratio`);
+			assert.ok(radius >= 220 - 1e-9, `radius ${radius} at ${side}px fell under the clamp`);
+			assert.ok(radius <= 0.43 * side + 5 + 1e-9, `radius ${radius} at ${side}px is more than half a step above the ratio`);
 		}
 
 		assert.strictEqual(radiusOf(2000, 800), radiusOf(2000, 801), 'one pixel of drag must not move the radius');
