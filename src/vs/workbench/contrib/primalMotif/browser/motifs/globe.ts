@@ -6,7 +6,7 @@
 import { Color } from '../../../../../base/common/color.js';
 import { localize } from '../../../../../nls.js';
 import { IMotifFrame, IMotifHost, IMotifRenderer, PRIMAL_MOTIF_LAYOUT_BUDGET_MS, PrimalMotifKind, PrimalMotifRole, registerMotif } from '../primalMotif.js';
-import { getWashMap } from './globeGround.js';
+import { getGroundWash } from './globeGround.js';
 import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip } from './globeMask.js';
 import { acquireMotifContext, readMotifInk } from './motifPaint.js';
 
@@ -181,6 +181,32 @@ const LIMB_FADE_PIXELS = 2.2;
 /** Ink alpha of fully lit ocean. */
 const SEA_ALPHA = 0.40;
 
+/**
+ * How sea and land answer the light differently, which is most of what makes a
+ * sphere read as a planet rather than a printed ball.
+ *
+ * Water is close to a mirror at a grazing angle: it is dark where it faces away
+ * and carries a broad sheen where it faces the sun. Land is matte - it scatters
+ * what it receives and saturates early, so it keeps its shape across the whole
+ * lit face and does not blow out under the sun.
+ *
+ * Both are curves over the same lit term, so both live in the tone table and
+ * cost nothing per frame. The exponents are the whole model: sea below 1 would
+ * flatten it, so it stays above; land above the sea's exponent would darken the
+ * continents into the ocean, so it stays below.
+ */
+const SEA_GAMMA = 1.45;
+const LAND_GAMMA = 0.78;
+
+/** The sun's sheen on water: how strong, and how tight around the sub-solar point. */
+const SEA_SHEEN_ALPHA = 0.55;
+const SEA_SHEEN_TIGHTNESS = 7.0;
+
+// Land keeps its shape across the terminator because its exponent is below
+// one, which lifts the midtones. A constant floor would do it too, but it would
+// survive the limb fade and draw a hard ring around the disc, so the curve
+// carries it instead: at no light there is still no land.
+
 /** Ink alpha of fully lit land. The wallpaper's own wash peaks at 1, so this matches the shipped ceiling. */
 const LAND_ALPHA = 1.0;
 
@@ -214,6 +240,16 @@ const HALO_AMBIENT = 0.35;
 /** Standard deviations of the ring that are worth evaluating. */
 const HALO_REACH = 3;
 
+/**
+ * The atmosphere seen edge-on: a thin brightening just inside the limb, on the
+ * lit side only. It is what separates a sphere from a disc - the halo outside
+ * says there is air, and this says the air is in front of the planet too.
+ * A function of the surface normal alone, so it is folded into the backdrop
+ * when the geometry is built and costs nothing per frame.
+ */
+const RIM_ALPHA = 0.30;
+const RIM_POWER = 5.0;
+
 // --- placement -------------------------------------------------------------
 
 /** The globe's radius as a fraction of the window's height, clamped to a screen size the frame can hold. */
@@ -246,11 +282,16 @@ const CENTRE_Y_PIXELS = 12;
  * fraction of height: a stage can be any shape a split leaves it, and a globe
  * sized off the long side of a wide, short pane would be cropped to a band.
  */
-const STAGE_RADIUS_RATIO = 0.55;
+// The stage globe used to be centred at 86%/88% with a radius over half the
+// pane, which put its centre off the bottom-right corner: what reached the
+// frame was a shallow arc with no centre and no horizon, and it read as a
+// smudge rather than as a planet. The centre now sits inside the frame, so the
+// limb curves away on two sides and the continents cross a visible meridian.
+const STAGE_RADIUS_RATIO = 0.43;
 const STAGE_RADIUS_MIN_PIXELS = 220;
 const STAGE_RADIUS_MAX_PIXELS = 560;
-const STAGE_CENTRE_X_RATIO = 0.86;
-const STAGE_CENTRE_Y_RATIO = 0.88;
+const STAGE_CENTRE_X_RATIO = 0.78;
+const STAGE_CENTRE_Y_RATIO = 0.76;
 
 /**
  * The stage radius is held to steps of this many screen pixels.
@@ -397,6 +438,21 @@ const LIMB_TABLE = (() => {
 const limbOf = (nz: number): number => LIMB_TABLE[Math.floor(clamp(nz, 0, 1) * TABLE_STEPS)];
 
 /**
+ * The rim's radial profile. Tabled for the same reason the limb is: it is
+ * evaluated once per pixel of the disc during a rebuild, and a `Math.pow` there
+ * costs more than the whole lighting term around it.
+ */
+const RIM_TABLE = (() => {
+	const table = new Float32Array(TABLE_STEPS + 1);
+	for (let index = 0; index <= TABLE_STEPS; index++) {
+		table[index] = Math.pow(index / TABLE_STEPS, RIM_POWER);
+	}
+	return table;
+})();
+
+const rimOf = (rho: number): number => RIM_TABLE[Math.floor(clamp(rho, 0, 1) * TABLE_STEPS)];
+
+/**
  * `atan` over [0, 1], as an odd minimax polynomial. Worst error 1.7e-6 radians
  * over the whole plane once folded through {@link atan2Of}, which is under a
  * hundredth of one fixed-point longitude unit - and half the cost of the
@@ -489,6 +545,12 @@ export function computeGlobePlacement(role: PrimalMotifRole, cssWidth: number, c
  * there in screen space, so the ring brightens towards the same light the
  * sphere is lit by.
  */
+/** The rim's alpha at radius `rho` inside the disc, facing the light. */
+const rimAlpha = (rho: number, nx: number, up: number): number => {
+	const facing = Math.max(0, (nx * LIGHT_X + up * LIGHT_Y) / Math.max(1e-3, rho));
+	return RIM_ALPHA * rimOf(rho) * facing;
+};
+
 const haloAlpha = (rho: number, nx: number, up: number): number => {
 	const drop = (rho - 1) / HALO_FALLOFF;
 	if (drop < -HALO_REACH || drop > HALO_REACH) {
@@ -600,7 +662,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 			this.inkAlpha = ink.rgba.a;
 			this.image = context.createImageData(host.bufferWidth, host.bufferHeight);
 			this.pixels = new Uint32Array(this.image.data.buffer);
-			this.wash = getWashMap(host.bufferWidth, host.bufferHeight);
+			this.wash = getGroundWash(host.role, host.bufferWidth, host.bufferHeight);
 			this.washTone = this.buildWashTone();
 			this.tone = this.buildTone();
 
@@ -686,9 +748,17 @@ class GlobeMotifRenderer implements IMotifRenderer {
 		const tone = new Uint8Array(SHADE_LEVELS * COVERAGE_LEVELS);
 
 		for (let shade = 0; shade < SHADE_LEVELS; shade++) {
-			const lit = Math.pow(shade / (SHADE_LEVELS - 1), TONE_GAMMA) * this.inkAlpha;
-			const sea = SEA_ALPHA * lit;
-			const land = LAND_ALPHA * lit;
+			// The shared response, then each material's own answer to it.
+			const lit = Math.pow(shade / (SHADE_LEVELS - 1), TONE_GAMMA);
+
+			// Water: dark across the terminator, with a broad glint where it faces
+			// the sun. The glint is clamped so the sheen cannot exceed opaque ink.
+			const sheen = SEA_SHEEN_ALPHA * Math.pow(lit, SEA_SHEEN_TIGHTNESS);
+			const sea = Math.min(1, SEA_ALPHA * Math.pow(lit, SEA_GAMMA) + sheen) * this.inkAlpha;
+
+			// Land: matte, holding its shape into the terminator, and still zero
+			// where there is no light at all.
+			const land = LAND_ALPHA * Math.pow(lit, LAND_GAMMA) * this.inkAlpha;
 
 			for (let coverage = 0; coverage < COVERAGE_LEVELS; coverage++) {
 				const share = coverage / (COVERAGE_LEVELS - 1);
@@ -954,9 +1024,9 @@ class GlobeMotifRenderer implements IMotifRenderer {
 				mipWeight[count] = Math.round(255 * clamp(spread / filtered - 1, 0, 1));
 				// The ring, from the inside. `washTone` is a table, so the composite
 				// is spelled out here rather than looked up.
-				const halo = haloAlpha(rho, nx, up) * this.inkAlpha;
+				const glow = (haloAlpha(rho, nx, up) + rimAlpha(rho, nx, up)) * this.inkAlpha;
 				const under = wash[index] / 255 * this.inkAlpha;
-				backdrop[count] = Math.round(255 * (halo + under * (1 - halo)));
+				backdrop[count] = Math.round(255 * (glow + under * (1 - glow)));
 				count++;
 			}
 		}

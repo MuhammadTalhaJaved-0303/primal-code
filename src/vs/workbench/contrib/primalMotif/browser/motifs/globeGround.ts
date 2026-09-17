@@ -43,6 +43,7 @@ interface IWashMap {
 }
 
 let washMap: IWashMap | undefined;
+let emptyMap: IWashMap | undefined;
 
 /** `t` is the fraction of a pool's radius; the result is that pool's alpha there. */
 const nearPoolAlpha = (t: number): number => {
@@ -64,6 +65,35 @@ const farPoolAlpha = (t: number): number => t >= WASH_FAR_END_STOP ? 0 : WASH_FA
  * is applied later - so it is built once for the life of the window and shared
  * by every surface and every rebuild.
  */
+/**
+ * The ground this motif owes its surface, which depends entirely on where the
+ * surface is mounted.
+ *
+ * GROUND: the wash, because `media/primalMotif.css` drops the wallpaper's own
+ * `background-image` while a motif holds the wallpaper layer, and the ground
+ * would otherwise go flat.
+ *
+ * STAGE: nothing. The same stylesheet deliberately KEEPS the wallpaper's wash
+ * under a staged surface - its comment on the `:not(.primal-motif-staged)`
+ * guard says dropping it there "would not avoid a double gradient" - and the
+ * pane the stage lives in has a background of its own. A stage that painted the
+ * wash anyway would lay a second copy of these two pools inside the pane, which
+ * is a large soft cloud with the page's opaque cards sitting on top of it: it
+ * reads as a shadow around every card, and at the stage's opacity ceiling it is
+ * the most visible thing the motif does. The globe is what a stage is for.
+ */
+export const getGroundWash = (role: 'ground' | 'stage', width: number, height: number): Uint8Array => {
+	if (role === 'ground') {
+		return getWashMap(width, height);
+	}
+
+	if (!emptyMap || emptyMap.width !== width || emptyMap.height !== height) {
+		emptyMap = { width, height, alpha: new Uint8Array(width * height) };
+	}
+
+	return emptyMap.alpha;
+};
+
 export const getWashMap = (width: number, height: number): Uint8Array => {
 	if (washMap && washMap.width === width && washMap.height === height) {
 		return washMap.alpha;
