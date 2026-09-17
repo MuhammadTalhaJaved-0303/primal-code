@@ -14,9 +14,10 @@ import { InstantiationType, registerSingleton } from '../../../../platform/insta
 import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
+import { IHostService } from '../../../services/host/browser/host.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { IWorkbenchContribution, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
-import { IPrimalUpdateService, PRIMAL_CHECK_FOR_UPDATES_COMMAND_ID, PRIMAL_UPDATE_DEFAULT_MODE, PRIMAL_UPDATE_INITIAL_DELAY_MS, PRIMAL_UPDATE_INTERVAL_MS, PRIMAL_UPDATE_MANIFEST_URL, PRIMAL_UPDATE_MODES, PRIMAL_UPDATE_MODE_SETTING_ID, PrimalUpdateTrigger } from './primalUpdate.js';
+import { IPrimalUpdateService, PRIMAL_CHECK_FOR_UPDATES_COMMAND_ID, PRIMAL_UPDATE_DEFAULT_MODE, PRIMAL_UPDATE_INITIAL_DELAY_MS, shouldCheckOnFocus, PRIMAL_UPDATE_INTERVAL_MS, PRIMAL_UPDATE_MANIFEST_URL, PRIMAL_UPDATE_MODES, PRIMAL_UPDATE_MODE_SETTING_ID, PrimalUpdateTrigger } from './primalUpdate.js';
 import { PrimalUpdateService } from './primalUpdateService.js';
 
 const PRIMAL_CATEGORY = localize2('primalCode.category', "Primal Code");
@@ -89,10 +90,14 @@ class PrimalUpdateContribution extends Disposable implements IWorkbenchContribut
 
 	private scheduled = false;
 
+	/** When the last check was sent, or `undefined` until the first one has. */
+	private lastCheckMs: number | undefined;
+
 	constructor(
 		@IPrimalUpdateService private readonly primalUpdateService: IPrimalUpdateService,
 		@IProductService private readonly productService: IProductService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
+		@IHostService private readonly hostService: IHostService,
 		@ILogService private readonly logService: ILogService
 	) {
 		super();
@@ -105,6 +110,16 @@ class PrimalUpdateContribution extends Disposable implements IWorkbenchContribut
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration(PRIMAL_UPDATE_MODE_SETTING_ID)) {
 				this.updateSchedule();
+			}
+		}));
+
+		// Coming back to the window is the other trigger, and the one that makes a
+		// release published while the editor was open reach the reader the moment
+		// they look at it rather than up to eight hours later.
+		this._register(this.hostService.onDidChangeFocus(focused => {
+			if (this.scheduled && shouldCheckOnFocus(focused, this.lastCheckMs, Date.now())) {
+				this.logService.trace('[primalUpdate] window focused and the last check is stale, checking again');
+				this.check();
 			}
 		}));
 
@@ -135,6 +150,7 @@ class PrimalUpdateContribution extends Disposable implements IWorkbenchContribut
 	}
 
 	private check(): void {
+		this.lastCheckMs = Date.now();
 		this.primalUpdateService.checkForUpdates(PrimalUpdateTrigger.Automatic)
 			.then(undefined, error => this.logService.trace('[primalUpdate] background check failed', error));
 	}
