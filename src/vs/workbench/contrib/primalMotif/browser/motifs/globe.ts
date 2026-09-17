@@ -6,7 +6,7 @@
 import { Color } from '../../../../../base/common/color.js';
 import { localize } from '../../../../../nls.js';
 import { IMotifFrame, IMotifHost, IMotifRenderer, PRIMAL_MOTIF_LAYOUT_BUDGET_MS, PrimalMotifKind, PrimalMotifRole, registerMotif } from '../primalMotif.js';
-import { getWashMap } from './globeGround.js';
+import { getGroundWash } from './globeGround.js';
 import { GLOBE_MASK_HEIGHT, GLOBE_MASK_WIDTH, IGlobeMaskMip, buildGlobeMaskMip } from './globeMask.js';
 import { acquireMotifContext, readMotifInk } from './motifPaint.js';
 
@@ -600,7 +600,7 @@ class GlobeMotifRenderer implements IMotifRenderer {
 			this.inkAlpha = ink.rgba.a;
 			this.image = context.createImageData(host.bufferWidth, host.bufferHeight);
 			this.pixels = new Uint32Array(this.image.data.buffer);
-			this.wash = getWashMap(host.bufferWidth, host.bufferHeight);
+			this.wash = getGroundWash(host.role, host.bufferWidth, host.bufferHeight);
 			this.washTone = this.buildWashTone();
 			this.tone = this.buildTone();
 
