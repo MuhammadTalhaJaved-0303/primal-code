@@ -23,12 +23,6 @@ export type IDictationAvailability =
 	| { readonly available: true; readonly providerId: string; readonly providerLabel: string }
 	| { readonly available: false; readonly message: string };
 
-export interface IDictationRequest {
-	/** Signed 16-bit mono samples, little endian. */
-	readonly pcm16: VSBuffer;
-	readonly sampleRate: number;
-}
-
 export type IDictationResult =
 	| { readonly ok: true; readonly text: string }
 	| { readonly ok: false; readonly message: string };
@@ -44,6 +38,12 @@ export interface IPrimalDictationService {
 	/** Which stored key dictation would use, or in plain words why it cannot. */
 	resolveAvailability(): Promise<IDictationAvailability>;
 
-	/** Transcribes one finished recording. Never throws for an expected failure. */
-	transcribe(request: IDictationRequest): Promise<IDictationResult>;
+	/**
+	 * Transcribes one finished recording. Never throws for an expected failure.
+	 *
+	 * The samples are signed 16-bit mono, little endian, and travel as a
+	 * top-level argument on purpose: the IPC layer carries a `VSBuffer` intact
+	 * only there, and turns one nested in an object into JSON.
+	 */
+	transcribe(pcm16: VSBuffer, sampleRate: number): Promise<IDictationResult>;
 }

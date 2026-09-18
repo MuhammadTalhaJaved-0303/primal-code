@@ -163,7 +163,7 @@ suite('ChatSpeechToTextService', () => {
 		_byokChunks: VSBuffer[];
 		_byokBytes: number;
 		_sessionErrorCode: string;
-		_primalDictationService: { transcribe: (request: { pcm16: VSBuffer; sampleRate: number }) => Promise<IDictationResult> };
+		_primalDictationService: { transcribe: (pcm16: VSBuffer, sampleRate: number) => Promise<IDictationResult> };
 		_notificationService: { notify: (notification: { severity: unknown; message: string }) => void };
 		_logService: { error: (message: string) => void };
 		_refreshByokAvailability: () => void;
@@ -179,7 +179,7 @@ suite('ChatSpeechToTextService', () => {
 		service._byokBytes = bytes ?? chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
 		service._sessionErrorCode = '';
 		service._primalDictationService = {
-			transcribe: async request => { sent.push(request); return result; },
+			transcribe: async (pcm16, sampleRate) => { sent.push({ pcm16, sampleRate }); return result; },
 		};
 		service._notificationService = { notify: notification => { shown.push(notification.message); } };
 		service._logService = { error: () => { /* recorded by the notification */ } };
@@ -246,6 +246,34 @@ suite('ChatSpeechToTextService', () => {
 		assert.deepStrictEqual(shown, ['OpenAI rejected the API key, so it could not transcribe.']);
 		assert.strictEqual(service._sessionErrorCode, 'transcribe');
 		assert.strictEqual(recheckCount(), 1, 'a removed or rejected key should stop being offered');
+	});
+
+	test('a newly saved key is flushed to the main process before it is asked about', async () => {
+		// The secret-change event fires in the renderer before the write has
+		// crossed to main; asking first read "no key" in the real app.
+		const order: string[] = [];
+		type RefreshService = {
+			_storageService: { flush: () => Promise<void> };
+			_primalDictationService: { resolveAvailability: () => Promise<IDictationAvailability> };
+			_logService: { warn: (message: string, error?: unknown) => void };
+			_store: { isDisposed: boolean };
+			_byokAvailability: IDictationAvailability | undefined;
+			_updateConfiguredContextKey: () => void;
+			_refreshByokAvailability: () => void;
+		};
+		const service = Object.create(ChatSpeechToTextService.prototype) as RefreshService;
+		service._storageService = { flush: async () => { order.push('flush'); } };
+		service._primalDictationService = { resolveAvailability: async () => { order.push('ask'); return KEY_READY; } };
+		service._logService = { warn: () => { } };
+		service._store = { isDisposed: false };
+		service._byokAvailability = undefined;
+		service._updateConfiguredContextKey = () => { order.push('mic'); };
+
+		service._refreshByokAvailability();
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		assert.deepStrictEqual(order, ['flush', 'ask', 'mic']);
+		assert.deepStrictEqual(service._byokAvailability, KEY_READY);
 	});
 
 	test('allows dictation without a paid plan and restricts MAI for external Enterprise users', () => {

@@ -14,7 +14,8 @@ import { ILogService } from '../../log/common/log.js';
 import { readEncryptedSecret } from '../../secrets/common/secrets.js';
 import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
 import { StorageScope } from '../../storage/common/storage.js';
-import { IDictationAvailability, IDictationRequest, IDictationResult, IPrimalDictationService, MAX_DICTATION_AUDIO_BYTES } from '../common/primalDictation.js';
+import { VSBuffer } from '../../../base/common/buffer.js';
+import { IDictationAvailability, IDictationResult, IPrimalDictationService, MAX_DICTATION_AUDIO_BYTES } from '../common/primalDictation.js';
 import { ITranscriptionHttpRequest, buildTranscriptionRequest, parseTranscriptionResponse } from '../common/transcriptionRequest.js';
 import { ITranscriptionCapability, TRANSCRIPTION_PROVIDERS, noTranscriptionMessage, transcriptionCapabilityFor } from '../common/transcriptionProviders.js';
 import { WAV_HEADER_BYTES } from '../common/wavEncoder.js';
@@ -62,8 +63,8 @@ export class PrimalDictationMainService implements IPrimalDictationService {
 		};
 	}
 
-	async transcribe(request: IDictationRequest): Promise<IDictationResult> {
-		const invalid = this._rejectMalformedRequest(request);
+	async transcribe(pcm16: VSBuffer, sampleRate: number): Promise<IDictationResult> {
+		const invalid = this._rejectMalformedRequest(pcm16, sampleRate);
 		if (invalid) {
 			return invalid;
 		}
@@ -78,7 +79,7 @@ export class PrimalDictationMainService implements IPrimalDictationService {
 		try {
 			httpRequest = buildTranscriptionRequest(
 				capability,
-				{ pcm16: request.pcm16.buffer, sampleRate: request.sampleRate },
+				{ pcm16: pcm16.buffer, sampleRate },
 				apiKey,
 				`primal-${generateUuid()}`,
 			);
@@ -112,8 +113,8 @@ export class PrimalDictationMainService implements IPrimalDictationService {
 	}
 
 	/** Boundary validation: the renderer is trusted, a bug in it is not. */
-	private _rejectMalformedRequest(request: IDictationRequest): IDictationResult | undefined {
-		const samples = request.pcm16?.byteLength ?? 0;
+	private _rejectMalformedRequest(pcm16: VSBuffer, sampleRate: number): IDictationResult | undefined {
+		const samples = pcm16 instanceof VSBuffer ? pcm16.byteLength : 0;
 		if (samples === 0) {
 			return { ok: false, message: localize('primalDictation.silent', "There was no audio to transcribe.") };
 		}
@@ -123,8 +124,8 @@ export class PrimalDictationMainService implements IPrimalDictationService {
 				message: localize('primalDictation.tooLong', "That recording is too long to transcribe. Try again in shorter takes."),
 			};
 		}
-		if (!Number.isInteger(request.sampleRate) || request.sampleRate < MIN_SAMPLE_RATE || request.sampleRate > MAX_SAMPLE_RATE) {
-			this._logService.error(`${LOG_PREFIX} Refusing audio with an impossible sample rate: ${request.sampleRate}.`);
+		if (!Number.isInteger(sampleRate) || sampleRate < MIN_SAMPLE_RATE || sampleRate > MAX_SAMPLE_RATE) {
+			this._logService.error(`${LOG_PREFIX} Refusing audio with an impossible sample rate: ${sampleRate}.`);
 			return { ok: false, message: localize('primalDictation.badAudio', "That recording could not be read, so there is no transcript.") };
 		}
 		return undefined;

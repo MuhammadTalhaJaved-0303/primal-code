@@ -655,15 +655,21 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 		return isDictationEntitled(this._chatEntitlementService.entitlement, this._chatEntitlementService.isInternal, backend === 'mai');
 	}
 
-	/** Re-ask the main process what the stored keys can do, then update the mic. */
+	/**
+	 * Re-ask the main process what the stored keys can do, then update the mic.
+	 * A freshly saved key announces itself here before the write has crossed to
+	 * the main process, so the store is flushed first or the answer is stale.
+	 */
 	private _refreshByokAvailability(): void {
-		this._primalDictationService.resolveAvailability().then(availability => {
-			if (this._store.isDisposed) {
-				return;
-			}
-			this._byokAvailability = availability;
-			this._updateConfiguredContextKey();
-		}, err => this._logService.warn('[chat-stt] could not resolve a dictation provider', err));
+		this._storageService.flush()
+			.then(() => this._primalDictationService.resolveAvailability())
+			.then(availability => {
+				if (this._store.isDisposed) {
+					return;
+				}
+				this._byokAvailability = availability;
+				this._updateConfiguredContextKey();
+			}, err => this._logService.warn('[chat-stt] could not resolve a dictation provider', err));
 	}
 
 	get currentBackend(): string {
@@ -1673,10 +1679,7 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 			return undefined;
 		}
 
-		const result = await this._primalDictationService.transcribe({
-			pcm16: VSBuffer.concat(chunks),
-			sampleRate: SAMPLE_RATE,
-		});
+		const result = await this._primalDictationService.transcribe(VSBuffer.concat(chunks), SAMPLE_RATE);
 		if (result.ok) {
 			return result.text;
 		}
