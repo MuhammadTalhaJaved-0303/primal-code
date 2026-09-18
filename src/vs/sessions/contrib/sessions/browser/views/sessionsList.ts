@@ -12,6 +12,7 @@ import { IListStyles } from '../../../../../base/browser/ui/list/listWidget.js';
 import { IObjectTreeElement, ITreeNode, ITreeRenderer, ITreeContextMenuEvent, ObjectTreeElementCollapseState, ITreeDragAndDrop, ITreeDragOverReaction } from '../../../../../base/browser/ui/tree/tree.js';
 import { RenderIndentGuides, TreeFindMode } from '../../../../../base/browser/ui/tree/abstractTree.js';
 import { Codicon } from '../../../../../base/common/codicons.js';
+import { IAccessibilityService } from '../../../../../platform/accessibility/common/accessibility.js';
 import { onUnexpectedError } from '../../../../../base/common/errors.js';
 import { Emitter, Event } from '../../../../../base/common/event.js';
 import { HighlightedLabel } from '../../../../../base/browser/ui/highlightedlabel/highlightedLabel.js';
@@ -85,6 +86,7 @@ import { ElementsDragAndDropData, ListViewTargetSector } from '../../../../../ba
 import { ISessionsProvidersService } from '../../../../services/sessions/browser/sessionsProvidersService.js';
 import { buildSessionHoverContent } from '../sessionHoverContent.js';
 import { SessionStatusIcon } from '../../../../browser/sessionStatusIcon.js';
+import { SessionAvatar, avatarExpressionFor, avatarFeaturesFor } from '../../../../browser/sessionAvatar.js';
 import { ChatAutomationsEnabledContext } from '../../../../../workbench/contrib/chat/common/automations/automationsEnabled.js';
 import { IAutomationService } from '../../../../../workbench/contrib/chat/common/automations/automationService.js';
 import { ICustomViewService } from '../../../../services/customView/browser/customViewService.js';
@@ -340,7 +342,10 @@ const SESSION_TITLE_SHIMMER_PAUSED_CLASS = 'session-title-shimmer-paused';
 
 interface ISessionItemTemplate {
 	readonly container: HTMLElement;
+	readonly iconContainer: HTMLElement;
 	readonly statusIcon: SessionStatusIcon;
+	avatar?: SessionAvatar;
+	avatarResource?: string;
 	readonly title: HighlightedLabel;
 	readonly titleContainer: HTMLElement;
 	readonly titleToolbar: MenuWorkbenchToolBar | undefined;
@@ -429,6 +434,7 @@ class SessionItemRenderer implements ITreeRenderer<SessionListItem, FuzzyScore, 
 		// TEMPORARY — see the note on the `IAgentSessionsService` import above (#320480).
 		private readonly agentSessionsService: IAgentSessionsService,
 		private readonly _voicePlaybackService: IVoicePlaybackService,
+		private readonly accessibilityService: IAccessibilityService,
 	) {
 	}
 
@@ -439,7 +445,12 @@ class SessionItemRenderer implements ITreeRenderer<SessionListItem, FuzzyScore, 
 		container.classList.add('session-item');
 
 		const iconContainer = DOM.append(container, $('.session-icon'));
-		const statusIcon = disposables.add(this.instantiationService.createInstance(SessionStatusIcon, iconContainer));
+		// The face is the session's identity and carries its liveliness; the
+		// status icon rides along as a small badge for the precise state (spinner,
+		// PR, cross-fade) that a face does not spell out. Both live in the same
+		// slot, which is `position: relative` for the badge to anchor to.
+		const statusBadge = DOM.append(iconContainer, $('.session-status-badge'));
+		const statusIcon = disposables.add(this.instantiationService.createInstance(SessionStatusIcon, statusBadge));
 		const mainCol = DOM.append(container, $('.session-main'));
 		const titleRow = DOM.append(mainCol, $('.session-title-row'));
 		const titleContainer = DOM.append(titleRow, $('.session-title'));
@@ -507,7 +518,7 @@ class SessionItemRenderer implements ITreeRenderer<SessionListItem, FuzzyScore, 
 			}));
 		}
 
-		return { container, statusIcon, title, titleContainer, titleToolbar, pendingVoiceIndicator, detailsRow, approvalRow, approvalLabel, approvalButtonContainer, ciRow, ciLabel, ciButtonContainer, contextKeyService, statusContext, isReadContext, supportsDeleteContext, disposables, elementDisposables };
+		return { container, statusIcon, iconContainer, title, titleContainer, titleToolbar, pendingVoiceIndicator, detailsRow, approvalRow, approvalLabel, approvalButtonContainer, ciRow, ciLabel, ciButtonContainer, contextKeyService, statusContext, isReadContext, supportsDeleteContext, disposables, elementDisposables };
 	}
 
 	renderElement(node: ITreeNode<SessionListItem, FuzzyScore>, _index: number, template: ISessionItemTemplate): void {
@@ -618,6 +629,16 @@ class SessionItemRenderer implements ITreeRenderer<SessionListItem, FuzzyScore, 
 
 			// The status icon widget snaps on row recycling and cross-fades real state changes.
 			template.statusIcon.setStatus(sessionStatus, isRead, isArchived, completedStateIcon, element.resource);
+			// The face: the identity is rebuilt only when the row is bound to a
+			// different session; the expression follows the status on the same
+			// element, so working keeps bobbing across a title change.
+			const resourceKey = element.resource.toString();
+			if (template.avatarResource !== resourceKey) {
+				template.avatar?.dispose();
+				template.avatar = template.elementDisposables.add(new SessionAvatar(template.iconContainer, avatarFeaturesFor(resourceKey)));
+				template.avatarResource = resourceKey;
+			}
+			template.avatar?.update(avatarExpressionFor(sessionStatus, isRead, isArchived), this.accessibilityService.isMotionReduced());
 			// The title shimmer (toggled by the `in-progress` class) is phase-aligned
 			// across rows via an `animationstart` handler on the title element, so no
 			// per-state work is needed here.
@@ -2049,6 +2070,7 @@ export class SessionsList extends Disposable implements ISessionsList {
 		// TEMPORARY (#320480): see the note on the `IAgentSessionsService` import.
 		const agentSessionsService = instantiationService.invokeFunction(accessor => accessor.get(IAgentSessionsService));
 		const voicePlaybackService = instantiationService.invokeFunction(accessor => accessor.get(IVoicePlaybackService));
+		const accessibilityService = instantiationService.invokeFunction(accessor => accessor.get(IAccessibilityService));
 		const sessionRenderer = new SessionItemRenderer(
 			{
 				grouping: this.options.grouping,
@@ -2073,6 +2095,7 @@ export class SessionsList extends Disposable implements ISessionsList {
 			sessionsProvidersService,
 			agentSessionsService,
 			voicePlaybackService,
+			accessibilityService,
 		);
 
 		const showMoreRenderer = new SessionShowMoreRenderer();
@@ -3824,6 +3847,7 @@ export class SessionsFlatList extends Disposable {
 		@IHoverService hoverService: IHoverService,
 		@ISessionsProvidersService sessionsProvidersService: ISessionsProvidersService,
 		@IVoicePlaybackService voicePlaybackService: IVoicePlaybackService,
+		@IAccessibilityService accessibilityService: IAccessibilityService,
 	) {
 		super();
 
@@ -3860,6 +3884,7 @@ export class SessionsFlatList extends Disposable {
 			sessionsProvidersService,
 			agentSessionsService,
 			voicePlaybackService,
+			accessibilityService,
 		);
 
 		this._delegate = new SessionsTreeDelegate(approvalModel, () => false, this.options.approvalRowMaxLines ?? DEFAULT_APPROVAL_ROW_MAX_LINES, this.options.ciFixModel, useCompactQuickChatRows);

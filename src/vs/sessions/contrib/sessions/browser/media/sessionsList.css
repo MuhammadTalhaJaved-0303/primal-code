@@ -976,3 +976,183 @@
 		justify-content: center;
 	}
 }
+
+
+/* ============================================================================
+ * Session avatars — a face per session, in one ink.
+ *
+ * The reference (Grok's list) gives each chat a coloured, bouncing blob. Here
+ * the identity is SHAPE, not colour (the reader is colour blind): a hash of the
+ * session picks the eyes, their spacing, the mouth and a brow, so each session
+ * has a stable face. The expression is the state and animates on a `mood-*`
+ * class. The precise status icon shrinks to a corner badge.
+ *
+ * Every animation is gated on `:not(.still)`; `.still` is set from the widget
+ * under reduced motion, alongside the media query, so both routes stop motion.
+ * ========================================================================== */
+
+.session-avatar {
+	width: 22px;
+	height: 22px;
+	flex-shrink: 0;
+	overflow: visible;
+	color: var(--vscode-foreground);
+	transform-origin: 50% 60%;
+}
+
+/* The container holds the avatar and, on top of it, the small status badge. */
+.session-icon.has-session-avatar {
+	width: 22px;
+	height: 22px;
+}
+
+.session-icon.has-session-avatar > .session-status-badge {
+	position: absolute;
+	right: -2px;
+	bottom: -2px;
+	width: 11px;
+	height: 11px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	box-shadow: 0 0 0 1.5px var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.session-icon.has-session-avatar > .session-status-badge > .codicon {
+	font-size: 10px;
+	height: 10px;
+	line-height: 10px;
+}
+
+.session-icon.has-session-avatar > .session-status-badge > .monaco-pixel-spinner {
+	width: 9px;
+	height: 9px;
+}
+
+/* --- the head and the ink -------------------------------------------------- */
+.session-avatar .avatar-head {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.6;
+	opacity: 0.5;
+}
+
+.session-avatar .avatar-eye {
+	fill: currentColor;
+}
+
+.session-avatar .avatar-mouth,
+.session-avatar .avatar-brow {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+}
+
+/* Brows are hidden unless the face has them or the mood raises them. */
+.session-avatar .avatar-brow {
+	opacity: 0;
+	transition: opacity 160ms ease, transform 160ms ease;
+}
+.session-avatar.brow-raised .avatar-brow {
+	opacity: 0.7;
+}
+
+/* --- identity: eyes, spacing, mouth --------------------------------------- */
+.session-avatar.eyes-line .avatar-eye {
+	transform: scaleY(0.4);
+	transform-box: fill-box;
+	transform-origin: center;
+}
+.session-avatar.eyes-round .avatar-eye {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.2;
+}
+
+.session-avatar.gap-near .avatar-eye-left { transform: translateX(1.1px); }
+.session-avatar.gap-near .avatar-eye-right { transform: translateX(-1.1px); }
+.session-avatar.gap-near.eyes-line .avatar-eye-left { transform: translateX(1.1px) scaleY(0.4); }
+.session-avatar.gap-near.eyes-line .avatar-eye-right { transform: translateX(-1.1px) scaleY(0.4); }
+
+/* The three resting mouths. Mood may override the mouth path via transform. */
+.session-avatar.mouth-flat .avatar-mouth { d: path('M9 15.8 L15 15.8'); }
+.session-avatar.mouth-open .avatar-mouth { d: path('M9.5 15 Q12 17.6 14.5 15'); fill: currentColor; opacity: 0.9; }
+.session-avatar.mouth-curve .avatar-mouth { d: path('M9 15.4 Q12 17 15 15.4'); }
+
+/* --- expression: the state, animated -------------------------------------- */
+
+/* working: a gentle bob and a periodic blink. */
+.session-avatar.mood-working:not(.still) {
+	animation: session-avatar-bob 1.4s ease-in-out infinite;
+}
+.session-avatar.mood-working:not(.still) .avatar-eye {
+	animation: session-avatar-blink 3.2s steps(1, end) infinite;
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+/* waiting: head tilts, brows lift, a slow attention pulse. */
+.session-avatar.mood-waiting {
+	transform: rotate(-8deg);
+}
+.session-avatar.mood-waiting .avatar-brow {
+	opacity: 0.8;
+	transform: translateY(-0.8px);
+}
+.session-avatar.mood-waiting:not(.still) {
+	animation: session-avatar-attention 1.8s ease-in-out infinite;
+}
+
+/* done: a settled upward curve; no motion. */
+.session-avatar.mood-done .avatar-mouth {
+	d: path('M8.8 15 Q12 17.8 15.2 15');
+}
+
+/* failed: a flat, slightly down mouth; no motion. */
+.session-avatar.mood-failed .avatar-mouth {
+	d: path('M9 16 Q12 15 15 16');
+}
+.session-avatar.mood-failed .avatar-eye {
+	transform: scaleY(0.7);
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+/* ready: at rest. */
+
+/* unread lifts the whole face a touch; a shape cue, never a colour. */
+.session-avatar.unread .avatar-head {
+	opacity: 0.85;
+	stroke-width: 1.9;
+}
+
+/* archived fades it back. */
+.session-avatar.archived {
+	opacity: 0.55;
+}
+
+@keyframes session-avatar-bob {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-1.2px); }
+}
+@keyframes session-avatar-blink {
+	0%, 92%, 100% { transform: scaleY(1); }
+	96% { transform: scaleY(0.1); }
+}
+@keyframes session-avatar-attention {
+	0%, 100% { transform: rotate(-8deg); }
+	50% { transform: rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.session-avatar {
+		animation: none !important;
+	}
+	.session-avatar .avatar-eye,
+	.session-avatar .avatar-brow {
+		animation: none !important;
+	}
+}
