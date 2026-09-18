@@ -510,6 +510,44 @@
 	z-index: 1;
 }
 
+/* The pause control for the motion on this stage. Above the picture and the
+ * content, in the corner the globe rises from, so it sits next to what it
+ * governs. Words and a glyph; the pressed state is shape, not colour. */
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host > .primal-motif-motion-control {
+	position: absolute;
+	right: 16px;
+	bottom: 14px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	font-family: inherit;
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-agentsPanel-background, var(--vscode-editorWidget-background));
+	border: 1px solid var(--vscode-widget-border, transparent);
+	border-radius: 999px;
+	cursor: pointer;
+	opacity: 0.85;
+}
+
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host > .primal-motif-motion-control:hover,
+.monaco-workbench:not(.hc-black):not(.hc-light):not(.modern-ui) .sessions-chat-widget.primal-motif-host > .primal-motif-motion-control:focus-visible {
+	opacity: 1;
+	color: var(--vscode-foreground);
+	border-color: var(--vscode-focusBorder);
+	outline: none;
+}
+
+.sessions-chat-widget.primal-motif-host > .primal-motif-motion-control[hidden] {
+	display: none;
+}
+
+.sessions-chat-widget.primal-motif-host > .primal-motif-motion-control .primal-motif-motion-control-glyph {
+	font-size: 12px;
+}
+
 /* --------------------------------------------------------------------------
  * The scrim. MANDATORY, for the reason primalStart.css gives at length: the
  * landing's heading and its "New session in ... with ..." row are text on bare

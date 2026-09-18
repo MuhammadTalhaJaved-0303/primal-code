@@ -6,6 +6,7 @@
 import { $, getWindow, prepend } from '../../../../base/browser/dom.js';
 import { Disposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../../../workbench/contrib/primalMotif/browser/primalMotif.js';
+import { renderMotifMotionControl } from '../../../../workbench/contrib/primalMotif/browser/primalMotifMotionControl.js';
 import { IWorkbenchLayoutService } from '../../../../workbench/services/layout/browser/layoutService.js';
 
 /**
@@ -33,10 +34,17 @@ export const NEW_CHAT_MOTIF_HOST_CLASS = 'primal-motif-host';
  * hidden behind a session, made again when it is shown, and withdrawn for good
  * on dispose. Which motif is drawn, at what strength and whether it moves at
  * all is the scheduler's decision, not this class's.
+ *
+ * On a stage the motif keeps moving by default (`defaultMotionFor` in
+ * primalMotif.ts), and WCAG 2.2.2 then needs a pause control the reader can
+ * see. The IDE window has one in its status bar; this window has no status bar,
+ * so the landing carries its own, appended after the stage so it paints above
+ * the picture it governs.
  */
 export class NewChatMotifStage extends Disposable {
 
 	private readonly stage: HTMLElement;
+	private readonly control: HTMLElement;
 	private readonly container: HTMLElement;
 	private readonly registration = this._register(new MutableDisposable());
 	private hostVisible = true;
@@ -57,6 +65,8 @@ export class NewChatMotifStage extends Disposable {
 		// The offer names the workbench container the pane lives in, never the
 		// pane: that is where the window's single surface is resolved.
 		this.container = layoutService.getContainer(getWindow(host));
+
+		this.control = renderMotifMotionControl(host, motifService, this._store).element;
 
 		this.updateOffer();
 	}
@@ -91,5 +101,6 @@ export class NewChatMotifStage extends Disposable {
 	override dispose(): void {
 		super.dispose();
 		this.stage.remove();
+		this.control.remove();
 	}
 }

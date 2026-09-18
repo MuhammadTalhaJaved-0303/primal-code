@@ -20,10 +20,15 @@ import '../../browser/motifs/motifs.js';
 
 /**
  * WCAG 2.2.2 (Level A) applies to moving content that starts automatically and
- * lasts more than five seconds. The product ships a motif ON by default, so
- * the criterion is met by the shape of the default - a burst that stops on its
- * own inside that window - rather than by a control the user has to find.
- * Every number that shape rests on is pinned here.
+ * lasts more than five seconds. The product ships a motif ON by default, and
+ * behind the editor the criterion is met by the shape of the default - a burst
+ * that stops on its own inside that window - rather than by a control the user
+ * has to find. Every number that shape rests on is pinned here.
+ *
+ * On a stage the default is perpetual (see `defaultMotionFor`), and there the
+ * criterion is met the other way it allows: a visible pause control on the
+ * stage host. `primalMotifStageMotion.test.ts` pins the role split, and the
+ * stage hosts' own tests pin that the control is rendered.
  */
 const WCAG_2_2_2_THRESHOLD_MS = 5000;
 

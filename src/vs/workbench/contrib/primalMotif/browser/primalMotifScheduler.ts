@@ -46,9 +46,9 @@ import {
 	PrimalMotifState,
 	PrimalMotifTrigger,
 	getMotifDescriptor,
+	resolveMotifMotion,
 	settleIntensity,
-	toMotifId,
-	toMotifMotion
+	toMotifId
 } from './primalMotif.js';
 import { IMotifPlan, MotifPowerSource, MotifRunMode, SPEED_LIMIT_NOMINAL, motifBudgetKey, resolveMotifPlan } from './primalMotifLadder.js';
 import { MotifSurface } from './primalMotifSurface.js';
@@ -325,7 +325,14 @@ export class PrimalMotifScheduler extends Disposable implements IPrimalMotifServ
 	}
 
 	get motion(): PrimalMotifMotion {
-		return toMotifMotion(this.configurationService.getValue<unknown>(PRIMAL_MOTIF_MOTION_SETTING_ID));
+		// Only an explicit choice is read from the setting: `getValue` would hand
+		// back the schema default, which is the ground role's answer and not a
+		// choice. The main window's mount decides the rest; a window has exactly
+		// one surface, so "a stage is registered for the window" is the same
+		// fact as "the surface is on a stage".
+		const inspected = this.configurationService.inspect<unknown>(PRIMAL_MOTIF_MOTION_SETTING_ID);
+		const chosen = inspected.userValue ?? inspected.userLocalValue ?? inspected.userRemoteValue;
+		return resolveMotifMotion(chosen, this.resolveMount(this.layoutService.mainContainer)?.role === 'stage');
 	}
 
 	/**
