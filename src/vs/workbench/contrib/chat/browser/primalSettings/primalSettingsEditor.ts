@@ -9,6 +9,7 @@ import { Dimension } from '../../../../../base/browser/dom.js';
 import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { DisposableStore } from '../../../../../base/common/lifecycle.js';
 import { localize } from '../../../../../nls.js';
+import { canTranscribe } from '../../../../../platform/primalDictation/common/transcriptionProviders.js';
 import { IAgentHostService } from '../../../../../platform/agentHost/common/agentService.js';
 import { IPrimalProvider, PRIMAL_CUSTOM_BASE_URL_SETTING_ID, PRIMAL_HARNESS_PROVIDER_SETTING_ID, PRIMAL_LEGACY_ANTHROPIC_SECRET_KEY, PRIMAL_PROVIDERS, PRIMAL_PROVIDER_MODEL_PREVIEWS, providerExtensionSecretKey, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
@@ -227,6 +228,12 @@ export class PrimalSettingsEditor extends EditorPane {
 				? localize('primalSettings.compat.desc', "Chat models, and can power the coding agent through its Anthropic-compatible endpoint.")
 				: localize('primalSettings.chat.desc', "Chat models in the model picker.");
 		DOM.append(row, $('.primal-provider-desc', undefined, desc));
+		// Only a couple of providers have a speech API, so say which ones do:
+		// otherwise the mic is simply missing, with nothing to explain it.
+		if (canTranscribe(provider.id)) {
+			DOM.append(row, $('.primal-provider-desc', undefined,
+				localize('primalSettings.dictation.desc', "Also powers dictation — the microphone in the chat box.")));
+		}
 
 		const controls = DOM.append(row, $('.primal-provider-controls'));
 		const input = DOM.append(controls, $('input')) as HTMLInputElement;

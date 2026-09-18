@@ -64,6 +64,7 @@ import '../workbench/services/localization/browser/localeService.js';
 import '../workbench/services/path/browser/pathService.js';
 import '../workbench/services/themes/browser/browserHostColorSchemeService.js';
 import '../workbench/services/encryption/browser/encryptionService.js';
+import '../workbench/services/primalDictation/browser/primalDictationService.js';
 import '../workbench/services/imageResize/browser/imageResizeService.js';
 import '../workbench/services/secrets/browser/secretStorageService.js';
 import '../workbench/services/workingCopy/browser/workingCopyBackupService.js';

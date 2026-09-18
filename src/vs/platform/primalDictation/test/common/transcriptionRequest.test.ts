@@ -55,8 +55,8 @@ suite('Primal dictation - request shaping', () => {
 		assert.strictEqual(request.headers['Content-Type'], 'application/json');
 
 		const parts = payload.contents[0].parts;
-		const audioPart = parts.find((p: Record<string, unknown>) => 'inline_data' in p);
-		const textPart = parts.find((p: Record<string, unknown>) => 'text' in p);
+		const audioPart = parts.find((p: Record<string, unknown>) => p.inline_data !== undefined);
+		const textPart = parts.find((p: Record<string, unknown>) => p.text !== undefined);
 
 		assert.ok(textPart?.text.length > 0, 'an instruction telling it to transcribe');
 		assert.strictEqual(audioPart.inline_data.mime_type, 'audio/wav');
@@ -67,7 +67,7 @@ suite('Primal dictation - request shaping', () => {
 		for (const id of ['openai', 'google']) {
 			const request = buildTranscriptionRequest(transcriptionCapabilityFor(id)!, AUDIO, KEY, BOUNDARY);
 			assert.strictEqual(request.method, 'POST');
-			assert.ok(!('Cookie' in request.headers), `${id} sent a cookie`);
+			assert.strictEqual(request.headers['Cookie'], undefined, `${id} sent a cookie`);
 		}
 	});
 

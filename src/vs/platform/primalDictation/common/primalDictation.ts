@@ -9,6 +9,13 @@ import { createDecorator } from '../../instantiation/common/instantiation.js';
 export const IPrimalDictationService = createDecorator<IPrimalDictationService>('primalDictationService');
 
 /**
+ * The most audio one take may carry. OpenAI caps uploads at 25 MB; both sides
+ * measure against this so a recording is refused in plain words rather than
+ * silently clipped.
+ */
+export const MAX_DICTATION_AUDIO_BYTES = 24 * 1024 * 1024;
+
+/**
  * Whether the keys on this machine can transcribe, answered before the user
  * presses the microphone so the button is never offered as a dead end.
  */

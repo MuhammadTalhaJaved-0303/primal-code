@@ -14,13 +14,13 @@ import { ILogService } from '../../log/common/log.js';
 import { readEncryptedSecret } from '../../secrets/common/secrets.js';
 import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
 import { StorageScope } from '../../storage/common/storage.js';
-import { IDictationAvailability, IDictationRequest, IDictationResult, IPrimalDictationService } from '../common/primalDictation.js';
+import { IDictationAvailability, IDictationRequest, IDictationResult, IPrimalDictationService, MAX_DICTATION_AUDIO_BYTES } from '../common/primalDictation.js';
 import { ITranscriptionHttpRequest, buildTranscriptionRequest, parseTranscriptionResponse } from '../common/transcriptionRequest.js';
 import { ITranscriptionCapability, TRANSCRIPTION_PROVIDERS, noTranscriptionMessage, transcriptionCapabilityFor } from '../common/transcriptionProviders.js';
 import { WAV_HEADER_BYTES } from '../common/wavEncoder.js';
 
-/** OpenAI caps uploads at 25 MB; stay under it with room for the header. */
-const MAX_AUDIO_BYTES = 24 * 1024 * 1024 - WAV_HEADER_BYTES;
+/** Leave room for the header the samples are about to be wrapped in. */
+const MAX_AUDIO_BYTES = MAX_DICTATION_AUDIO_BYTES - WAV_HEADER_BYTES;
 
 /** Rates a microphone could plausibly have produced. */
 const MIN_SAMPLE_RATE = 8000;
