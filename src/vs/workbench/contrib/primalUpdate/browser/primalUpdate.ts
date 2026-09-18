@@ -33,6 +33,37 @@ export const PRIMAL_UPDATE_INITIAL_DELAY_MS = 20_000;
 /** Re-check cadence while a window stays open. */
 export const PRIMAL_UPDATE_INTERVAL_MS = 8 * 60 * 60 * 1000;
 
+/**
+ * How stale the last check has to be before a window coming back to focus makes
+ * another one.
+ *
+ * The interval above is a backstop for a window nobody touches. It is not an
+ * answer to "a release just went out": an editor left open at ten past nine
+ * would not mention it until the evening. Returning to the window is the moment
+ * a check is both cheap and wanted - the reader is there, and whatever they
+ * were away doing is over - so that is when it looks again.
+ *
+ * Short enough to feel immediate over a coffee, long enough that alt-tabbing
+ * between the editor and a browser does not send a request per switch.
+ */
+export const PRIMAL_UPDATE_FOCUS_STALENESS_MS = 20 * 60 * 1000;
+
+/**
+ * Whether a focus change should send a check.
+ *
+ * `lastCheckMs` is `undefined` until the first check has run. Focus arrives
+ * before the initial delay elapses on almost every launch, and checking then
+ * would make that delay meaningless - it exists so that a window opened and
+ * closed again never sends a request at all.
+ */
+export function shouldCheckOnFocus(focused: boolean, lastCheckMs: number | undefined, nowMs: number): boolean {
+	if (!focused || lastCheckMs === undefined) {
+		return false;
+	}
+
+	return nowMs - lastCheckMs >= PRIMAL_UPDATE_FOCUS_STALENESS_MS;
+}
+
 /** Hard ceiling on the manifest request; a hung network must not hold a token. */
 export const PRIMAL_UPDATE_REQUEST_TIMEOUT_MS = 10_000;
 
