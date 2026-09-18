@@ -513,6 +513,41 @@ export function toMotifMotion(value: unknown): PrimalMotifMotion {
 }
 
 /**
+ * The motion a window uses when the user has not chosen one, by where its
+ * surface is mounted.
+ *
+ * Behind the editor (the ground role) the motif settles: a few seconds after a
+ * trigger and then a resting frame, so nothing keeps moving next to code and
+ * nothing runs per frame while the reader works. That is WCAG 2.2.2 met by
+ * construction - the burst ends inside the five seconds the criterion counts
+ * from - and it is what `PRIMAL_MOTIF_DEFAULT_MOTION` is for.
+ *
+ * A stage is a pane that shows no code, and the picture is the whole point of
+ * it. There the default is perpetual, and 2.2.2 is met the other way the
+ * criterion allows: a pause control the reader can see, which every stage host
+ * carries - the IDE window's status bar item on Primal Start, and the landing's
+ * own control in the Agents window, which has no status bar. The ladder's
+ * parking rules (unfocused, battery, heat, typing) apply as they do everywhere.
+ */
+export function defaultMotionFor(staged: boolean): PrimalMotifMotion {
+	return staged ? 'perpetual' : PRIMAL_MOTIF_DEFAULT_MOTION;
+}
+
+/**
+ * The motion to run: the user's explicit choice if there is one, else the
+ * role's default. A value that is not a motion at all is treated as no choice,
+ * not as `settle` - otherwise a typo in settings.json would quietly turn a
+ * stage's motion off.
+ */
+export function resolveMotifMotion(chosen: unknown, staged: boolean): PrimalMotifMotion {
+	return isMotifMotion(chosen) ? chosen : defaultMotionFor(staged);
+}
+
+function isMotifMotion(value: unknown): value is PrimalMotifMotion {
+	return typeof value === 'string' && (PRIMAL_MOTIF_MOTIONS as readonly string[]).includes(value);
+}
+
+/**
  * Narrows a raw settings value to a registered motif id. An id nobody
  * registered - a hand-edited settings file, or a motif that was removed -
  * resolves to `static` rather than to nothing, so the ground is never broken by

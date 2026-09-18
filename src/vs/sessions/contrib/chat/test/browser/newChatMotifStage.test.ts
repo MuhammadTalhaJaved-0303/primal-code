@@ -5,10 +5,12 @@
 
 import assert from 'assert';
 import { $ } from '../../../../../base/browser/dom.js';
+import { Event } from '../../../../../base/common/event.js';
 import { toDisposable } from '../../../../../base/common/lifecycle.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { TestInstantiationService } from '../../../../../platform/instantiation/test/common/instantiationServiceMock.js';
 import { IPrimalMotifService, PRIMAL_MOTIF_STAGE_CLASS } from '../../../../../workbench/contrib/primalMotif/browser/primalMotif.js';
+import { MOTIF_MOTION_CONTROL_CLASS } from '../../../../../workbench/contrib/primalMotif/browser/primalMotifMotionControl.js';
 import { IWorkbenchLayoutService } from '../../../../../workbench/services/layout/browser/layoutService.js';
 import { NEW_CHAT_MOTIF_HOST_CLASS, NewChatMotifStage } from '../../browser/newChatMotifStage.js';
 
@@ -36,7 +38,13 @@ suite('Sessions - NewChatMotifStage', () => {
 				offers.push(offer);
 				return toDisposable(() => { offer.withdrawn = true; });
 			},
-			relayout() { relayouts++; }
+			relayout() { relayouts++; },
+			// What the pause control reads.
+			motion: 'perpetual',
+			isPaused: false,
+			status: { state: 'moving', motifId: 'world', reason: undefined, fps: 30 },
+			onDidChangeStatus: Event.None,
+			setPaused() { }
 		} as Partial<IPrimalMotifService>);
 
 		const stage = store.add(instantiationService.createInstance(NewChatMotifStage, host));
@@ -79,6 +87,13 @@ suite('Sessions - NewChatMotifStage', () => {
 		stage.setHostVisible(false);
 		stage.layout();
 		assert.strictEqual(relayouts(), 1, 'a hidden landing has no surface to lay out');
+	});
+
+	test('the host carries a visible pause control, because this window has no status bar', () => {
+		const { host } = createHarness();
+		const control = host.querySelector(`.${MOTIF_MOTION_CONTROL_CLASS}`) as HTMLButtonElement | null;
+		assert.ok(control, 'the landing renders the motion control');
+		assert.notStrictEqual(host.firstElementChild, control, 'the control is not the stage: it paints above the picture, not under it');
 	});
 
 	test('disposing withdraws the offer and removes the stage element', () => {
