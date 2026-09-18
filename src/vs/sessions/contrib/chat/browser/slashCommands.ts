@@ -9,7 +9,8 @@ import { autorun } from '../../../../base/common/observable.js';
 import { isEqual } from '../../../../base/common/resources.js';
 import { URI } from '../../../../base/common/uri.js';
 import { CodeEditorWidget } from '../../../../editor/browser/widget/codeEditor/codeEditorWidget.js';
-import { CompletionContext, CompletionItem, CompletionItemKind } from '../../../../editor/common/languages.js';
+import { CompletionContext, CompletionItem } from '../../../../editor/common/languages.js';
+import { presentAgentHostCompletion } from '../../../../workbench/contrib/chat/browser/widget/input/editor/agentHostCompletionPresentation.js';
 import { IModelDeltaDecoration, InjectedTextCursorStops, ITextModel } from '../../../../editor/common/model.js';
 import { IEditorDecorationsCollection } from '../../../../editor/common/editorCommon.js';
 import { Position } from '../../../../editor/common/core/position.js';
@@ -46,7 +47,6 @@ CommandsRegistry.registerCommand(SESSIONS_EXECUTE_SLASH_COMMAND_ID, (_, handler:
 interface ISessionsSlashCommandData {
 	readonly command: string;
 	readonly detail: string;
-	readonly sortText?: string;
 	readonly executeImmediately?: boolean;
 	readonly execute: (args: string) => void;
 }
@@ -162,42 +162,36 @@ export class SlashCommandHandler extends Disposable implements IChatSubmitReques
 		this._slashCommands.push({
 			command: 'vscode-pet',
 			detail: localize('slashCommand.vscodePet', "Toggle an interactive Primal Code pet (Experimental)"),
-			sortText: 'z3_vscodePet',
 			executeImmediately: true,
 			execute: () => this.chatPetService.toggle(),
 		});
 		this._slashCommands.push({
 			command: 'agents',
 			detail: localize('slashCommand.agents', "View and manage custom agents"),
-			sortText: 'z3_agents',
 			executeImmediately: true,
 			execute: openSection(AICustomizationManagementSection.Agents),
 		});
 		this._slashCommands.push({
 			command: 'skills',
 			detail: localize('slashCommand.skills', "View and manage skills"),
-			sortText: 'z3_skills',
 			executeImmediately: true,
 			execute: openSection(AICustomizationManagementSection.Skills),
 		});
 		this._slashCommands.push({
 			command: 'instructions',
 			detail: localize('slashCommand.instructions', "View and manage instructions"),
-			sortText: 'z3_instructions',
 			executeImmediately: true,
 			execute: openSection(AICustomizationManagementSection.Instructions),
 		});
 		this._slashCommands.push({
 			command: 'hooks',
 			detail: localize('slashCommand.hooks', "View and manage hooks"),
-			sortText: 'z3_hooks',
 			executeImmediately: true,
 			execute: openSection(AICustomizationManagementSection.Hooks),
 		});
 		this._slashCommands.push({
 			command: 'models',
 			detail: localize('slashCommand.models', "Open the model picker"),
-			sortText: 'z3_models',
 			executeImmediately: true,
 			execute: () => this.newChatModelPickerService.openModelPicker(),
 		});
@@ -283,15 +277,12 @@ export class SlashCommandHandler extends Disposable implements IChatSubmitReques
 				}
 
 				return {
-					suggestions: this._slashCommands.map((c, i): CompletionItem => {
+					suggestions: this._slashCommands.map((c): CompletionItem => {
 						const withSlash = `/${c.command}`;
 						return {
-							label: withSlash,
+							...presentAgentHostCompletion({ kind: 'command', command: c.command, description: c.detail }, withSlash),
 							insertText: c.executeImmediately ? '' : `${withSlash} `,
-							detail: c.detail,
 							range,
-							sortText: c.sortText ?? 'a'.repeat(i + 1),
-							kind: CompletionItemKind.Text,
 							command: c.executeImmediately ? { id: SESSIONS_EXECUTE_SLASH_COMMAND_ID, title: withSlash, arguments: [this, withSlash] } : undefined,
 						};
 					})
@@ -333,15 +324,12 @@ export class SlashCommandHandler extends Disposable implements IChatSubmitReques
 				}
 
 				return {
-					suggestions: userInvocable.map((c, i): CompletionItem => {
+					suggestions: userInvocable.map((c): CompletionItem => {
 						const label = `/${c.name}`;
 						return {
-							label: { label, description: c.description },
+							...presentAgentHostCompletion({ kind: 'command', command: c.name, description: c.description }, label),
 							insertText: `${label} `,
-							documentation: c.description,
 							range,
-							sortText: 'b'.repeat(i + 1),
-							kind: CompletionItemKind.Text,
 						};
 					})
 				};

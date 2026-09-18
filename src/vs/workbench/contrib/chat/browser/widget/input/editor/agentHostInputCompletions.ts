@@ -11,6 +11,7 @@ import { localize } from '../../../../../../../nls.js';
 import { AgentHostCompletionReferenceKind, chatReferenceVariableEntryId, toAgentHostCompletionVariableEntry, toChatReferenceDynamicVariableValue, type IAgentHostCompletionVariableValue, type IChatReferenceDynamicVariableValue } from '../../../../common/attachments/chatVariableEntries.js';
 import { Position } from '../../../../../../../editor/common/core/position.js';
 import { Range } from '../../../../../../../editor/common/core/range.js';
+import { presentAgentHostCompletion } from './agentHostCompletionPresentation.js';
 import { CompletionItem, CompletionItemKind } from '../../../../../../../editor/common/languages.js';
 import { ITextModel } from '../../../../../../../editor/common/model.js';
 import { ILanguageFeaturesService } from '../../../../../../../editor/common/services/languageFeatures.js';
@@ -186,13 +187,12 @@ export class AgentHostInputCompletions extends AgentHostInputCompletionsBase<ICh
 					const reference = keep
 						? AgentHostReferenceArgument.forCommand(widget, attachment.command, attachment.description, AgentHostInputCompletions._insertedTokenRange(replaceRange, item.insertText), attachment._meta)
 						: undefined;
+					const shown = presentAgentHostCompletion(attachment, label);
 					return {
-						label: { label, description: attachment.description },
+						...shown,
 						insertText: item.insertText,
 						filterText: label,
 						range: replaceRange,
-						kind: CompletionItemKind.Text,
-						detail: attachment.description,
 						command: {
 							id: AgentHostInputCompletions.configActionCommand,
 							title: '',
@@ -200,13 +200,12 @@ export class AgentHostInputCompletions extends AgentHostInputCompletionsBase<ICh
 						},
 					};
 				}
+				const shown = presentAgentHostCompletion(attachment, item.insertText);
 				return {
-					label: { label: item.insertText, description: attachment.description },
+					...shown,
 					insertText: item.insertText,
 					filterText: item.insertText,
 					range: replaceRange,
-					kind: CompletionItemKind.Text,
-					detail: attachment.description,
 					command: {
 						id: AgentHostInputCompletions.addReferenceCommand,
 						title: '',
@@ -216,13 +215,12 @@ export class AgentHostInputCompletions extends AgentHostInputCompletionsBase<ICh
 			}
 			case 'skill': {
 				const label = attachment.displayName ? '/' + attachment.displayName : item.insertText.trimEnd();
+				const shown = presentAgentHostCompletion(attachment, label);
 				return {
-					label: { label, description: attachment.description },
+					...shown,
 					insertText: item.insertText,
 					filterText: item.insertText,
 					range: replaceRange,
-					kind: CompletionItemKind.Text,
-					detail: attachment.description,
 					command: {
 						id: AgentHostInputCompletions.addReferenceCommand,
 						title: '',

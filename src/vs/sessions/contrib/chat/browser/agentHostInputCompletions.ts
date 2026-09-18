@@ -12,6 +12,7 @@ import { Position } from '../../../../editor/common/core/position.js';
 import { Range } from '../../../../editor/common/core/range.js';
 import { OffsetRange } from '../../../../editor/common/core/ranges/offsetRange.js';
 import { IDecorationOptions, IEditorDecorationsCollection } from '../../../../editor/common/editorCommon.js';
+import { presentAgentHostCompletion } from '../../../../workbench/contrib/chat/browser/widget/input/editor/agentHostCompletionPresentation.js';
 import { CompletionItem, CompletionItemKind } from '../../../../editor/common/languages.js';
 import { IModelDeltaDecoration, ITextModel } from '../../../../editor/common/model.js';
 import { ILanguageFeaturesService } from '../../../../editor/common/services/languageFeatures.js';
@@ -308,13 +309,12 @@ export class AgentHostInputCompletionHandler extends AgentHostInputCompletionsBa
 					const entry = keep
 						? toAgentHostCompletionVariableEntry(AgentHostCompletionReferenceKind.Command, referenceText, attachment.command, attachment._meta)
 						: undefined;
+					const shown = presentAgentHostCompletion(attachment, label);
 					return {
-						label: { label, description: attachment.description },
+						...shown,
 						insertText: item.insertText,
 						filterText: label,
 						range: replaceRange,
-						kind: CompletionItemKind.Text,
-						documentation: attachment.description,
 						command: {
 							id: CONFIG_ACTION_COMMAND,
 							title: '',
@@ -330,13 +330,12 @@ export class AgentHostInputCompletionHandler extends AgentHostInputCompletionsBa
 				}
 				const referenceText = item.insertText.trimEnd();
 				const entry = toAgentHostCompletionVariableEntry(AgentHostCompletionReferenceKind.Command, referenceText, attachment.command, attachment._meta);
+				const shown = presentAgentHostCompletion(attachment, item.insertText);
 				return {
-					label: { label: item.insertText, description: attachment.description },
+					...shown,
 					insertText: item.insertText,
 					filterText: item.insertText,
 					range: replaceRange,
-					kind: CompletionItemKind.Text,
-					documentation: attachment.description,
 					command: {
 						id: ADD_REFERENCE_COMMAND,
 						title: '',
@@ -352,13 +351,12 @@ export class AgentHostInputCompletionHandler extends AgentHostInputCompletionsBa
 			case 'skill': {
 				const referenceText = item.insertText.trimEnd();
 				const entry = toAgentHostCompletionVariableEntry(AgentHostCompletionReferenceKind.Skill, referenceText, attachment.uri, attachment._meta);
+				const shown = presentAgentHostCompletion(attachment, item.insertText);
 				return {
-					label: { label: item.insertText, description: attachment.description },
+					...shown,
 					insertText: item.insertText,
 					filterText: item.insertText,
 					range: replaceRange,
-					documentation: attachment.description,
-					kind: CompletionItemKind.Text,
 					command: {
 						id: ADD_REFERENCE_COMMAND,
 						title: '',
