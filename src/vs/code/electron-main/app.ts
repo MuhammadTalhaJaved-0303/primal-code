@@ -91,7 +91,9 @@ import { SnapUpdateService } from '../../platform/update/electron-main/updateSer
 import { Win32UpdateService } from '../../platform/update/electron-main/updateService.win32.js';
 import { isInnoSetupInstall } from '../../platform/update/electron-main/win32UpdateType.js';
 import { IPrimalMediaService } from '../../platform/primalMedia/common/primalMedia.js';
+import { IPrimalDictationService } from '../../platform/primalDictation/common/primalDictation.js';
 import { PrimalMediaMainService } from '../../platform/primalMedia/electron-main/primalMediaMainService.js';
+import { PrimalDictationMainService } from '../../platform/primalDictation/electron-main/primalDictationMainService.js';
 import { IPrimalTelemetryService } from '../../platform/primalTelemetry/common/primalTelemetry.js';
 import { PrimalTelemetryMainService } from '../../platform/primalTelemetry/electron-main/primalTelemetryMainService.js';
 import { IOpenURLOptions, IURLService } from '../../platform/url/common/url.js';
@@ -1188,6 +1190,9 @@ export class CodeApplication extends Disposable {
 		services.set(IPrimalTelemetryService, new SyncDescriptor(PrimalTelemetryMainService, undefined, false /* proxied to other processes */));
 		services.set(IPrimalMediaService, new SyncDescriptor(PrimalMediaMainService, undefined, false /* proxied to other processes */));
 
+		// Dictation (transcribes with the user's own provider key, which is decrypted here and never leaves this process)
+		services.set(IPrimalDictationService, new SyncDescriptor(PrimalDictationMainService, undefined, false /* proxied to other processes */));
+
 		// Windows
 		services.set(IWindowsMainService, new SyncDescriptor(WindowsMainService, [machineId, sqmId, devDeviceId, this.userEnv], false));
 		services.set(IAuxiliaryWindowsMainService, new SyncDescriptor(AuxiliaryWindowsMainService, undefined, false));
@@ -1373,6 +1378,9 @@ export class CodeApplication extends Disposable {
 
 		const primalMediaChannel = ProxyChannel.fromService(accessor.get(IPrimalMediaService), disposables);
 		mainProcessElectronServer.registerChannel('primalMedia', primalMediaChannel);
+
+		const primalDictationChannel = ProxyChannel.fromService(accessor.get(IPrimalDictationService), disposables);
+		mainProcessElectronServer.registerChannel('primalDictation', primalDictationChannel);
 
 		// Metered Connection
 		const meteredConnectionChannel = new MeteredConnectionChannel(accessor.get(IMeteredConnectionService) as MeteredConnectionMainService);

@@ -11,6 +11,8 @@ import { ChatSpeechToTextService, DICTATION_MAI_MODEL_ID, createDictationCleanup
 import { resolveDictationLanguage } from '../../browser/speechToText/dictationLanguage.js';
 import { ChatEntitlement } from '../../../../services/chat/common/chatEntitlementService.js';
 import { ILanguageModelChatRequestOptions, ILanguageModelChatResponse, ILanguageModelChatSelector, ILanguageModelsService } from '../../common/languageModels.js';
+import { VSBuffer } from '../../../../../base/common/buffer.js';
+import { IDictationAvailability, IDictationResult, MAX_DICTATION_AUDIO_BYTES } from '../../../../../platform/primalDictation/common/primalDictation.js';
 
 type CleanupTestService = {
 	_configurationService: {
@@ -44,7 +46,10 @@ suite('ChatSpeechToTextService', () => {
 		_chatEntitlementService: { entitlement: ChatEntitlement; isInternal: boolean };
 		_productService: { dictationRuntime?: { urlTemplate: string; version: string }; voiceWsUrl?: string };
 		_localTranscription: { isSupported: boolean };
+		_byokAvailability: IDictationAvailability | undefined;
 		readonly isConfigured: boolean;
+		_getBackend(): string;
+		_unavailableMessage(): string;
 	};
 
 	function availabilityService(options: {
@@ -54,6 +59,7 @@ suite('ChatSpeechToTextService', () => {
 		dictationRuntime?: { urlTemplate: string; version: string };
 		voiceWsUrl?: string;
 		backendUrl?: string;
+		byok?: IDictationAvailability;
 	}): AvailabilityService {
 		const service = Object.create(ChatSpeechToTextService.prototype) as AvailabilityService;
 		service._configurationService = {
@@ -69,8 +75,12 @@ suite('ChatSpeechToTextService', () => {
 		service._chatEntitlementService = { entitlement: ChatEntitlement.Unknown, isInternal: false };
 		service._productService = { dictationRuntime: options.dictationRuntime, voiceWsUrl: options.voiceWsUrl };
 		service._localTranscription = { isSupported: options.platformSupported ?? true };
+		service._byokAvailability = options.byok;
 		return service;
 	}
+
+	const KEY_READY: IDictationAvailability = { available: true, providerId: 'openai', providerLabel: 'OpenAI (GPT / Codex)' };
+	const NO_KEY: IDictationAvailability = { available: false, message: 'Anthropic (Claude) does not offer speech-to-text.' };
 
 	const RUNTIME = { urlTemplate: 'https://example.invalid/{target}.tar.gz', version: '1.0.0' };
 
@@ -101,6 +111,169 @@ suite('ChatSpeechToTextService', () => {
 			maiWithConfiguredEndpoint: true,
 			disabledBySetting: false,
 		});
+	});
+
+	test('offers the mic once a key that can transcribe is stored', () => {
+		// The whole point of the feature: a build with no on-device runtime used
+		// to be unable to dictate at all, however many provider keys were saved.
+		assert.deepStrictEqual({
+			noRuntimeNoKey: availabilityService({ platformSupported: true }).isConfigured,
+			noRuntimeWithKey: availabilityService({ platformSupported: true, byok: KEY_READY }).isConfigured,
+			noRuntimeKeyCannotTranscribe: availabilityService({ platformSupported: true, byok: NO_KEY }).isConfigured,
+		}, {
+			noRuntimeNoKey: false,
+			noRuntimeWithKey: true,
+			noRuntimeKeyCannotTranscribe: false,
+		});
+	});
+
+	test('prefers on-device transcription over the network when the build can run it', () => {
+		// On-device needs no key and sends nothing anywhere, so a stored key
+		// must not take that away from a build that ships the runtime.
+		assert.deepStrictEqual({
+			runtimeAndKey: availabilityService({ dictationRuntime: RUNTIME, byok: KEY_READY })._getBackend(),
+			keyOnly: availabilityService({ byok: KEY_READY })._getBackend(),
+			neither: availabilityService({})._getBackend(),
+			maiSettingStillWins: availabilityService({ model: DICTATION_MAI_MODEL_ID, byok: KEY_READY })._getBackend(),
+		}, {
+			runtimeAndKey: 'nemo',
+			keyOnly: 'byok',
+			neither: 'nemo',
+			maiSettingStillWins: 'mai',
+		});
+	});
+
+	test('turning dictation off still wins over a stored key', () => {
+		assert.strictEqual(availabilityService({ enabled: false, byok: KEY_READY }).isConfigured, false);
+	});
+
+	test('explains the real reason the mic cannot open', () => {
+		// "not available on this platform" was a lie on a supported platform
+		// that simply had no key.
+		assert.strictEqual(availabilityService({ byok: NO_KEY })._unavailableMessage(), NO_KEY.message);
+		assert.match(availabilityService({})._unavailableMessage(), /platform/);
+	});
+
+	/**
+	 * These providers transcribe a finished recording rather than a stream, so
+	 * the take is accumulated and sent once. What matters is that it is sent
+	 * whole, cleared afterwards, and that every failure reaches the user.
+	 */
+	type TranscribeService = {
+		_byokChunks: VSBuffer[];
+		_byokBytes: number;
+		_sessionErrorCode: string;
+		_primalDictationService: { transcribe: (pcm16: VSBuffer, sampleRate: number) => Promise<IDictationResult> };
+		_notificationService: { notify: (notification: { severity: unknown; message: string }) => void };
+		_logService: { error: (message: string) => void };
+		_refreshByokAvailability: () => void;
+		_transcribeWithProviderKey: () => Promise<string | undefined>;
+	};
+
+	function transcribeService(result: IDictationResult, chunks: VSBuffer[], bytes?: number) {
+		const sent: { pcm16: VSBuffer; sampleRate: number }[] = [];
+		const shown: string[] = [];
+		let rechecked = 0;
+		const service = Object.create(ChatSpeechToTextService.prototype) as TranscribeService;
+		service._byokChunks = chunks;
+		service._byokBytes = bytes ?? chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+		service._sessionErrorCode = '';
+		service._primalDictationService = {
+			transcribe: async (pcm16, sampleRate) => { sent.push({ pcm16, sampleRate }); return result; },
+		};
+		service._notificationService = { notify: notification => { shown.push(notification.message); } };
+		service._logService = { error: () => { /* recorded by the notification */ } };
+		service._refreshByokAvailability = () => { rechecked++; };
+		return { service, sent, shown, recheckCount: () => rechecked };
+	}
+
+	test('sends the whole take once, at the rate it was captured', async () => {
+		const { service, sent } = transcribeService(
+			{ ok: true, text: 'open the file' },
+			[VSBuffer.wrap(new Uint8Array([1, 0])), VSBuffer.wrap(new Uint8Array([2, 0]))],
+		);
+
+		const text = await service._transcribeWithProviderKey();
+
+		assert.strictEqual(text, 'open the file');
+		assert.strictEqual(sent.length, 1);
+		assert.deepStrictEqual(Array.from(sent[0].pcm16.buffer), [1, 0, 2, 0]);
+		assert.strictEqual(sent[0].sampleRate, 16000);
+	});
+
+	test('clears the take, so the next one does not re-send this one', async () => {
+		const { service } = transcribeService({ ok: true, text: 'first' }, [VSBuffer.wrap(new Uint8Array([1, 0]))]);
+
+		await service._transcribeWithProviderKey();
+
+		assert.deepStrictEqual(service._byokChunks, []);
+		assert.strictEqual(service._byokBytes, 0);
+	});
+
+	test('a take past the size limit is refused in words, not quietly clipped', async () => {
+		const { service, sent, shown } = transcribeService(
+			{ ok: true, text: 'never asked for' },
+			[VSBuffer.wrap(new Uint8Array([1, 0]))],
+			MAX_DICTATION_AUDIO_BYTES + 1,
+		);
+
+		const text = await service._transcribeWithProviderKey();
+
+		assert.strictEqual(text, undefined);
+		assert.strictEqual(sent.length, 0, 'nothing should be uploaded');
+		assert.strictEqual(shown.length, 1);
+		assert.match(shown[0], /too long/i);
+		assert.strictEqual(service._sessionErrorCode, 'transcribe');
+	});
+
+	test('a take with no audio asks the provider for nothing', async () => {
+		const { service, sent, shown } = transcribeService({ ok: true, text: 'never asked for' }, []);
+
+		assert.strictEqual(await service._transcribeWithProviderKey(), undefined);
+		assert.strictEqual(sent.length, 0);
+		assert.strictEqual(shown.length, 0, 'saying nothing is not an error worth a notification');
+	});
+
+	test('a refusal from the provider reaches the user, and the key is re-checked', async () => {
+		const { service, shown, recheckCount } = transcribeService(
+			{ ok: false, message: 'OpenAI rejected the API key, so it could not transcribe.' },
+			[VSBuffer.wrap(new Uint8Array([1, 0]))],
+		);
+
+		const text = await service._transcribeWithProviderKey();
+
+		assert.strictEqual(text, undefined);
+		assert.deepStrictEqual(shown, ['OpenAI rejected the API key, so it could not transcribe.']);
+		assert.strictEqual(service._sessionErrorCode, 'transcribe');
+		assert.strictEqual(recheckCount(), 1, 'a removed or rejected key should stop being offered');
+	});
+
+	test('a newly saved key is flushed to the main process before it is asked about', async () => {
+		// The secret-change event fires in the renderer before the write has
+		// crossed to main; asking first read "no key" in the real app.
+		const order: string[] = [];
+		type RefreshService = {
+			_storageService: { flush: () => Promise<void> };
+			_primalDictationService: { resolveAvailability: () => Promise<IDictationAvailability> };
+			_logService: { warn: (message: string, error?: unknown) => void };
+			_store: { isDisposed: boolean };
+			_byokAvailability: IDictationAvailability | undefined;
+			_updateConfiguredContextKey: () => void;
+			_refreshByokAvailability: () => void;
+		};
+		const service = Object.create(ChatSpeechToTextService.prototype) as RefreshService;
+		service._storageService = { flush: async () => { order.push('flush'); } };
+		service._primalDictationService = { resolveAvailability: async () => { order.push('ask'); return KEY_READY; } };
+		service._logService = { warn: () => { } };
+		service._store = { isDisposed: false };
+		service._byokAvailability = undefined;
+		service._updateConfiguredContextKey = () => { order.push('mic'); };
+
+		service._refreshByokAvailability();
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		assert.deepStrictEqual(order, ['flush', 'ask', 'mic']);
+		assert.deepStrictEqual(service._byokAvailability, KEY_READY);
 	});
 
 	test('allows dictation without a paid plan and restricts MAI for external Enterprise users', () => {

@@ -20,6 +20,10 @@ import { DeferredPromise, raceCancellation } from '../../../../../base/common/as
 import { CancellationToken, CancellationTokenSource } from '../../../../../base/common/cancellation.js';
 import { ILogService } from '../../../../../platform/log/common/log.js';
 import { localize } from '../../../../../nls.js';
+import { PRIMAL_HARNESS_PROVIDER_SETTING_ID, providerSecretKey } from '../../../../../platform/agentHost/common/primalProviders.js';
+import { IDictationAvailability, IPrimalDictationService, MAX_DICTATION_AUDIO_BYTES } from '../../../../../platform/primalDictation/common/primalDictation.js';
+import { TRANSCRIPTION_PROVIDERS } from '../../../../../platform/primalDictation/common/transcriptionProviders.js';
+import { ISecretStorageService } from '../../../../../platform/secrets/common/secrets.js';
 import { IStorageService, StorageScope } from '../../../../../platform/storage/common/storage.js';
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IEnvironmentService } from '../../../../../platform/environment/common/environment.js';
@@ -140,7 +144,10 @@ type DictationCleanupModel = 'none' | 'copilot-utility-small' | 'gpt-5.6-luna';
  * - `nemo`: an on-device model via {@link ILocalTranscriptionService} (Foundry Local).
  * - `mai`: the cloud voice service used by Voice Mode, via {@link IVoiceClientService}.
  */
-type DictationBackend = 'nemo' | 'mai';
+type DictationBackend = 'nemo' | 'mai' | 'byok';
+
+/** The stored keys dictation watches, so the mic appears the moment one is added. */
+const DICTATION_SECRET_KEYS = new Set(TRANSCRIPTION_PROVIDERS.map(capability => providerSecretKey(capability.providerId)));
 
 export function isDictationEntitled(entitlement: ChatEntitlement, isInternal: boolean, usesMai: boolean): boolean {
 	return !usesMai || entitlement !== ChatEntitlement.Enterprise || isInternal;
@@ -445,6 +452,14 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 	/** Backend selected for the in-progress session; set at `start`. */
 	private _activeBackend: DictationBackend = 'nemo';
 
+	// --- BYOK (the user's own provider key) session state. ---
+	/** What the stored keys can transcribe, refreshed when a key or the provider setting changes. */
+	private _byokAvailability: IDictationAvailability | undefined;
+	/** PCM16 chunks for the take in progress; sent as one file when recording stops. */
+	private _byokChunks: VSBuffer[] = [];
+	/** Bytes captured this take, counted past the cap so an over-long take fails in words. */
+	private _byokBytes = 0;
+
 	// --- MAI (cloud voice) session state. ---
 	/** Disposables for the active MAI session (transcription listener, etc.). */
 	private readonly _maiSessionDisposables = this._register(new DisposableStore());
@@ -469,6 +484,11 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 			// The cloud backend needs a configured voice websocket endpoint;
 			// GitHub sign-in and connectivity are validated when a session starts.
 			return !!this._voiceWsUrl();
+		}
+		if (backend === 'byok') {
+			// Chosen only when a stored key can actually transcribe, but the keys
+			// can change underneath us, so ask rather than assume.
+			return this._byokAvailability?.available === true;
 		}
 		// On-device transcription needs no key, but it does need a runtime it can
 		// actually fetch. `isSupported` only answers "could this platform run the
@@ -538,6 +558,8 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 		@IPromptsService private readonly _promptsService: IPromptsService,
 		@IChatEntitlementService private readonly _chatEntitlementService: IChatEntitlementService,
 		@IWorkbenchAssignmentService private readonly _assignmentService: IWorkbenchAssignmentService,
+		@IPrimalDictationService private readonly _primalDictationService: IPrimalDictationService,
+		@ISecretStorageService private readonly _secretStorageService: ISecretStorageService,
 	) {
 		super();
 		this._recordingContextKey = ChatContextKeys.speechToTextRecording.bindTo(contextKeyService);
@@ -545,8 +567,20 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 		this._preparingContextKey = ChatContextKeys.speechToTextPreparing.bindTo(contextKeyService);
 		this._updateConfiguredContextKey();
 		this._register(this._configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration(PRIMAL_HARNESS_PROVIDER_SETTING_ID)) {
+				this._refreshByokAvailability();
+				return;
+			}
 			if (e.affectsConfiguration(ENABLED_SETTING) || e.affectsConfiguration(DICTATION_MODEL_SETTING)) {
 				this._updateConfiguredContextKey();
+			}
+		}));
+		// The mic should appear the moment a key that can transcribe is saved,
+		// and disappear the moment it is removed.
+		this._refreshByokAvailability();
+		this._register(this._secretStorageService.onDidChangeSecret(key => {
+			if (DICTATION_SECRET_KEYS.has(key)) {
+				this._refreshByokAvailability();
 			}
 		}));
 		this._register(this._chatEntitlementService.onDidChangeEntitlement(() => {
@@ -591,11 +625,51 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 
 	/** Read the configured dictation backend, derived from the selected model. */
 	private _getBackend(): DictationBackend {
-		return this._configurationService.getValue<string>(DICTATION_MODEL_SETTING) === DICTATION_MAI_MODEL_ID ? 'mai' : 'nemo';
+		if (this._configurationService.getValue<string>(DICTATION_MODEL_SETTING) === DICTATION_MAI_MODEL_ID) {
+			return 'mai';
+		}
+		// On-device transcription wins when this build can actually run it: no
+		// key, no network, nothing leaves the machine. It needs a runtime from
+		// `product.dictationRuntime`, so where there is none the user's own
+		// provider key is what is left.
+		if (this._canRunLocalTranscription()) {
+			return 'nemo';
+		}
+		return this._byokAvailability?.available ? 'byok' : 'nemo';
+	}
+
+	/**
+	 * Whether on-device transcription could open a session at all. `isSupported`
+	 * only answers "could this platform run the native addon"; the addon itself
+	 * is fetched from the descriptor in `product.dictationRuntime`.
+	 */
+	private _canRunLocalTranscription(): boolean {
+		return this._localTranscription.isSupported && !!this._productService.dictationRuntime;
 	}
 
 	private _isEntitledForBackend(backend: DictationBackend): boolean {
+		if (backend === 'byok') {
+			// It is the user's own key. There is nobody to be entitled by.
+			return true;
+		}
 		return isDictationEntitled(this._chatEntitlementService.entitlement, this._chatEntitlementService.isInternal, backend === 'mai');
+	}
+
+	/**
+	 * Re-ask the main process what the stored keys can do, then update the mic.
+	 * A freshly saved key announces itself here before the write has crossed to
+	 * the main process, so the store is flushed first or the answer is stale.
+	 */
+	private _refreshByokAvailability(): void {
+		this._storageService.flush()
+			.then(() => this._primalDictationService.resolveAvailability())
+			.then(availability => {
+				if (this._store.isDisposed) {
+					return;
+				}
+				this._byokAvailability = availability;
+				this._updateConfiguredContextKey();
+			}, err => this._logService.warn('[chat-stt] could not resolve a dictation provider', err));
 	}
 
 	get currentBackend(): string {
@@ -750,10 +824,10 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 			return;
 		}
 
-		if (backend === 'nemo' && !this._localTranscription.isSupported) {
+		if (backend === 'nemo' && !this._canRunLocalTranscription()) {
 			this._notificationService.notify({
 				severity: Severity.Warning,
-				message: localize('chatStt.notSupported', "On-device speech-to-text is not available on this platform."),
+				message: this._unavailableMessage(),
 			});
 			return;
 		}
@@ -874,7 +948,26 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 		if (this._activeBackend === 'mai') {
 			return this._startMaiSession(window, generation);
 		}
+		if (this._activeBackend === 'byok') {
+			// Nothing to open: these providers transcribe a finished recording,
+			// so the session is just the buffer the take accumulates into.
+			this._byokChunks = [];
+			this._byokBytes = 0;
+			return;
+		}
 		return this._startLocalSession(window, generation);
+	}
+
+	/**
+	 * Why the mic cannot open, in the terms that are actually true here: a build
+	 * with no on-device runtime fails for want of a key, not a platform.
+	 */
+	private _unavailableMessage(): string {
+		const availability = this._byokAvailability;
+		if (availability && !availability.available) {
+			return availability.message;
+		}
+		return localize('chatStt.notSupported', "On-device speech-to-text is not available on this platform.");
 	}
 
 	/**
@@ -1557,7 +1650,47 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 			]);
 			return this._transcript;
 		}
+		if (this._activeBackend === 'byok') {
+			return this._transcribeWithProviderKey();
+		}
 		return this._localTranscription.stop();
+	}
+
+	/**
+	 * Send the whole take to the user's own provider and wait for the text.
+	 * Returns `undefined` on failure, having told the user why; the caller keeps
+	 * whatever transcript it already had.
+	 */
+	private async _transcribeWithProviderKey(): Promise<string | undefined> {
+		const chunks = this._byokChunks;
+		const overflowed = this._byokBytes > MAX_DICTATION_AUDIO_BYTES;
+		this._byokChunks = [];
+		this._byokBytes = 0;
+
+		if (!chunks.length) {
+			return undefined;
+		}
+		if (overflowed) {
+			this._sessionErrorCode = this._sessionErrorCode || 'transcribe';
+			this._notificationService.notify({
+				severity: Severity.Warning,
+				message: localize('chatStt.takeTooLong', "That recording is too long to transcribe. Try again in shorter takes."),
+			});
+			return undefined;
+		}
+
+		const result = await this._primalDictationService.transcribe(VSBuffer.concat(chunks), SAMPLE_RATE);
+		if (result.ok) {
+			return result.text;
+		}
+
+		this._sessionErrorCode = this._sessionErrorCode || 'transcribe';
+		this._logService.error(`[chat-stt] provider transcription failed: ${result.message}`);
+		this._notificationService.notify({ severity: Severity.Warning, message: result.message });
+		// The key may have just been removed or rejected; re-ask, so the mic
+		// stops being offered if it can no longer work.
+		this._refreshByokAvailability();
+		return undefined;
 	}
 
 	async cancel(): Promise<void> {
@@ -1586,6 +1719,11 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 				this._voiceClientService.disconnect();
 				this._maiOwnsConnection = false;
 			}
+			return;
+		}
+		if (this._activeBackend === 'byok') {
+			this._byokChunks = [];
+			this._byokBytes = 0;
 			return;
 		}
 		this._localTranscription.cancel();
@@ -1636,6 +1774,15 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
 		const buffer = encodeRawPcm16Buffer(samples);
 		if (this._activeBackend === 'mai') {
 			this._voiceClientService.sendPttAudioChunk(encodeBase64(buffer));
+			return;
+		}
+		if (this._activeBackend === 'byok') {
+			// Keep counting past the cap without keeping the audio, so an
+			// over-long take is refused in words instead of quietly clipped.
+			this._byokBytes += buffer.byteLength;
+			if (this._byokBytes <= MAX_DICTATION_AUDIO_BYTES) {
+				this._byokChunks.push(buffer);
+			}
 			return;
 		}
 		this._localTranscription.pushAudio(buffer).catch(err => this._onAudioPushError(err));
